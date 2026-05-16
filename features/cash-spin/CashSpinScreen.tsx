@@ -26,6 +26,7 @@ export function CashSpinScreen() {
   const [latestLabel, setLatestLabel] = useState<string | null>(null);
   const [viewportH, setViewportH] = useState(0);
   const [headerH, setHeaderH] = useState(0);
+  const [reelCtx, setReelCtx] = useState({ activeReelIndex: 0, roundCount: INITIAL_ROUNDS });
 
   const [shellTheme, setShellTheme] = useState<CashSpinPageTheme>(() => CASH_SPIN_PAGE_THEMES[0]);
   const onPageThemeChange = useCallback((t: CashSpinPageTheme) => {
@@ -64,6 +65,11 @@ export function CashSpinScreen() {
     return formatUsdTotal(sum);
   }, [rounds]);
 
+  const reelProgressLine = useMemo(
+    () => `REEL ${reelCtx.activeReelIndex + 1} · ${reelCtx.roundCount}`,
+    [reelCtx.activeReelIndex, reelCtx.roundCount]
+  );
+
   const onLatestPrize = useCallback((label: string) => {
     setLatestLabel(label);
   }, []);
@@ -77,6 +83,7 @@ export function CashSpinScreen() {
       <CashSpinAppHeader
         totalLine={totalLine}
         latestLine={latestLabel}
+        reelProgressLine={reelProgressLine}
         headerStripeColor={shellTheme.headerStripe}
         onLayout={(e) => setHeaderH(e.nativeEvent.layout.height)}
       />
@@ -99,6 +106,7 @@ export function CashSpinScreen() {
             onLatestPrize={onLatestPrize}
             growToMinLength={growToMinLength}
             onPageThemeChange={onPageThemeChange}
+            onReelContext={setReelCtx}
           />
         ) : null}
       </View>

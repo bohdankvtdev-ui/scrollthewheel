@@ -1,10 +1,19 @@
+import type { Animated } from "react-native";
 import type { ReactNode } from "react";
 import type { WheelPhysicsConfig } from "../../lib/wheel/types";
+
+export type SpinWheelIconFamily = "MaterialIcons" | "MaterialCommunityIcons" | "Ionicons";
 
 export type SpinWheelItem = {
   id: string;
   image?: unknown;
   label?: string;
+  /** Compact wedge caption ($50, PERK, ALL). */
+  shortLabel?: string;
+  icon?: string;
+  iconFamily?: SpinWheelIconFamily;
+  /** Minimal icon chip fill on the slice. */
+  iconTint?: string;
 };
 
 export type SpinWheelProps = {
@@ -44,12 +53,27 @@ export type SpinWheelProps = {
   onSpinPress?: () => void;
   /** When true, the spin control is disabled (e.g. locked until prior steps complete). */
   spinLocked?: boolean;
+  /** Center hub label + press behavior. */
+  hubMode?: "spin" | "claim" | "busy";
+  /** Fires when `hubMode` is `claim` (prize won — advance to next wheel). */
+  onHubClaimPress?: () => void;
+  /** `icons` hides wedge text and draws icon chips on slices. */
+  sliceLabelMode?: "text" | "icons" | "both";
+  /** Softer hub pulse while spinning (less visual jump). */
+  hubAnimSubtle?: boolean;
+  /** When true, hub press only fires `onSpinPress` — parent must call `spinToIndex` via ref. */
+  externalSpinControl?: boolean;
   /** Monotonic id from parent so hub `onLoad` can be matched to the current surface (avoids stale callbacks). */
   hubLoadEpoch?: number;
   /** Fires when the center hub image has finished decoding (or on decode error). Passes `hubLoadEpoch`. */
   onHubImageLoad?: (epoch: number) => void;
+  /**
+   * Prize-disc “lift” pulse while spinning — share with sibling chrome (e.g. bulb ring) so motion matches.
+   */
+  syncDiscScale?: Animated.Value;
 };
 
 export type SpinWheelRef = {
   spin: () => void;
+  spinToIndex: (index: number) => void;
 };

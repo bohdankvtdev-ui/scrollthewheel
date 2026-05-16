@@ -11,12 +11,12 @@ export type CashSpinPageTheme = {
 };
 
 export const CASH_SPIN_PAGE_THEMES: CashSpinPageTheme[] = [
-  { pageBg: "#4A2574", headerStripe: "#FACC15", scrimBase: "rgba(36, 18, 62, 0.5)" },
-  { pageBg: "#134e4a", headerStripe: "#2dd4bf", scrimBase: "rgba(6, 42, 38, 0.52)" },
-  { pageBg: "#4c0519", headerStripe: "#fb7185", scrimBase: "rgba(50, 8, 22, 0.52)" },
-  { pageBg: "#1e1b4b", headerStripe: "#a78bfa", scrimBase: "rgba(22, 18, 58, 0.52)" },
-  { pageBg: "#713f12", headerStripe: "#fde047", scrimBase: "rgba(55, 32, 6, 0.52)" },
-  { pageBg: "#0f172a", headerStripe: "#38bdf8", scrimBase: "rgba(10, 18, 36, 0.55)" },
+  { pageBg: "#6D28D9", headerStripe: "#FFEB3B", scrimBase: "rgba(55, 26, 120, 0.42)" },
+  { pageBg: "#0D9488", headerStripe: "#99F6E4", scrimBase: "rgba(6, 70, 62, 0.4)" },
+  { pageBg: "#BE123C", headerStripe: "#FECDD3", scrimBase: "rgba(90, 10, 32, 0.42)" },
+  { pageBg: "#5B21B6", headerStripe: "#DDD6FE", scrimBase: "rgba(40, 18, 90, 0.42)" },
+  { pageBg: "#CA8A04", headerStripe: "#FEF9C3", scrimBase: "rgba(70, 45, 6, 0.4)" },
+  { pageBg: "#0369A1", headerStripe: "#BAE6FD", scrimBase: "rgba(6, 50, 85, 0.42)" },
 ];
 
 export function pickNextBackgroundIndex(prev: number, length: number): number {

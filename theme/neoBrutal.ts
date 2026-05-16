@@ -1,40 +1,40 @@
 import type { TextStyle, ViewStyle } from "react-native";
 import { FONT_BEBAS_NEUE } from "./fonts";
 
-/** Neo-brutalist shell — balanced with softer surfaces; organic accents. */
+/** Neo-brutalist shell — bright candy field + ink; balanced stroke weight on the wheel. */
 export const Neo = {
-  /** App field — rich purple (bulb ring uses harmonizing rose-crimson). */
-  pageBg: "#4A2574",
+  /** Default shell field (Cash reel themes override per page). */
+  pageBg: "#6D28D9",
   ink: "#0A0A0A",
-  inkMuted: "rgba(10, 10, 10, 0.62)",
+  inkMuted: "rgba(10, 10, 10, 0.58)",
   /** Text on dark / red surfaces */
   textOnDark: "#FAFAFA",
-  textMutedOnDark: "rgba(250, 250, 250, 0.7)",
-  surface: "rgba(255, 255, 255, 0.1)",
-  surfaceDark: "#2D1B4E",
-  /** Wheel prize labels — strong contrast on bright slices. */
-  wheelSliceLabel: "rgba(15, 23, 42, 0.92)",
+  textMutedOnDark: "rgba(250, 250, 250, 0.72)",
+  surface: "rgba(255, 255, 255, 0.14)",
+  surfaceDark: "#4C1D95",
+  /** Wheel prize labels — crisp on neon slices. */
+  wheelSliceLabel: "rgba(15, 23, 42, 0.9)",
   /** Top bar: solid ink — brutal strip on light page */
   headerBg: "#0A0A0A",
   headerBorder: "#0A0A0A",
   headerText: "#FAFAFA",
   headerTextMuted: "rgba(250, 250, 250, 0.45)",
-  /** Classic neo-brutal red (accents, spin hub, pointer). */
-  accent: "#E11D48",
+  /** Punchy accent (pointer rim pulse, hub energy). */
+  accent: "#FF2D55",
   accentInk: "#0A0A0A",
-  neonYellow: "#FACC15",
+  neonYellow: "#FFEB3B",
   neonCyan: "#22D3EE",
   neonMagenta: "#FB7185",
-  /** Prize slices — vivid organic brights. */
+  /** Prize slices — high-chroma brights (ink-weight slice rims). */
   segmentColors: [
-    "#FDE047",
-    "#7DD3FC",
+    "#FFE94D",
+    "#38BDF8",
     "#4ADE80",
-    "#FB7185",
+    "#FF6B9D",
     "#C4B5FD",
-    "#FB923C",
+    "#FDBA74",
   ] as const,
-  borderBold: 5,
+  borderBold: 5.5,
   borderThin: 3,
   radiusCard: 12,
   radiusButton: 14,
@@ -47,22 +47,30 @@ export const NeoBulbRingTheme = {
   ringFill: "#D63D6B",
   ringFillHighlight: "#FBCFE8",
   ringFillShadow: "#9D174D",
-  ringFillStroke: "rgba(10, 10, 10, 0.55)",
-  ringBorderIdle: "rgba(10, 10, 10, 0.35)",
-  ringBorderVictory: "#FDE047",
-  ringBorderWidthIdle: 3,
+  ringFillStroke: "rgba(10, 10, 10, 0.32)",
+  ringBorderIdle: "rgba(10, 10, 10, 0.22)",
+  ringBorderVictory: "#FFEB3B",
+  ringBorderWidthIdle: 1.5,
   bulbDim: "#5A2038",
   bulbMid: "#8B3A4F",
-  bulbHot: "#FDE047",
-  /** Peak idle specular (chase head + strong strikes). */
-  bulbShine: "#FFFBEB",
+  /** Incandescent filament warmth — deep amber between dim and hot. */
+  bulbFilamentAmber: "#EA580C",
+  bulbHot: "#FBBF24",
+  /** Peak idle specular (filament + glass read). */
+  bulbShine: "#FFF8E8",
   bulbRimDim: "rgba(45, 10, 35, 0.5)",
   bulbRimHot: "rgba(254, 249, 195, 0.92)",
   /** Under-bulb cast (purple depth). */
   bulbShadowCast: "rgba(28, 8, 48, 0.82)",
-  /** Wide soft corona around bright strikes + chase head. */
-  bulbLightningHalo: "rgba(253, 224, 71, 0.58)",
-  bulbLightningHaloCore: "rgba(255, 255, 255, 0.36)",
+  /** Bloom toward hub when chase is cold — reads like shaded glass. */
+  bulbHaloOuterCool: "rgba(96, 38, 58, 0.2)",
+  /** Diffused outer bloom — warm tungsten glow through frosted glass. */
+  bulbLightningHalo: "rgba(255, 200, 120, 0.52)",
+  bulbLightningHaloMid: "rgba(255, 230, 175, 0.38)",
+  /** Cool micro-core behind filament (thin glass read). */
+  bulbLightningHaloCore: "rgba(255, 252, 248, 0.42)",
+  /** Glass glint when bulb is brighter (drawn as offset micro-disc). */
+  bulbGlassSpecular: "rgba(255, 255, 255, 0.72)",
   /** Full-opacity rim lines — same RGB family as `bulbLightningHalo` / `bulbLightningHaloCore` (prize slice stroke). */
   bulbHaloRimOuterSolid: "rgb(253, 224, 71)",
   bulbHaloRimInnerSolid: "rgb(255, 252, 245)",
@@ -74,11 +82,12 @@ export const NeoBulbRingTheme = {
   victoryFadeMs: 900,
 } as const;
 
-/** Wheel slice + hub — sharp wedges; default rim is ink; victory shine is opt-in from parent. */
+/** Wheel slice + hub — readable ink rim without “fat” wedges. */
 export const NeoWheel = {
+  /** Same as `Neo.ink` — matches outer prize-ring border. */
   segmentStroke: Neo.ink,
-  segmentStrokeWidth: 3,
-  segmentPadAngle: 0.003,
+  segmentStrokeWidth: 2.5,
+  segmentPadAngle: 0.0024,
   segmentCornerRadius: 0,
   hubBackground: "#FFFBEB",
   hubBorder: "#0A0A0A",
@@ -91,9 +100,9 @@ export const NeoWheel = {
  * **inner** stroked ring (not the raw layout radius). Must match `NeoBulbRing` chrome.
  */
 export const NeoBulbRingLayoutChrome = {
-  ringBorderOuterPx: Neo.borderThin,
-  /** Matches `NeoBulbRing` `ringStyle` border clamp max (~idle 2 + pulse). */
-  ringInnerStrokeMaxPx: 5,
+  ringBorderOuterPx: 2,
+  /** Matches `NeoBulbRing` animated border clamp max (~segmentStroke + burst). */
+  ringInnerStrokeMaxPx: 6,
   bulbToStrokeGapPx: 1,
 } as const;
 

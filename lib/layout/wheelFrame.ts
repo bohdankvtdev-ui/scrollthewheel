@@ -10,6 +10,9 @@ const MAX_WHEEL = 400;
 const MIN_BULBS = 6;
 const MAX_BULBS = 32;
 
+/** Only pad layout when explicitly widening the marquee; extra px mostly pushed bulbs inward visually. */
+const BULB_RING_OUTER_DIAMETER_BOOST = 0;
+
 /**
  * Must stay in sync with `SpinWheel` arc geometry: `.outerRadius(size / 2 - inset)`.
  * Bulb orbit is measured from the **visible prize ring** outer edge, not `size / 2`.
@@ -75,11 +78,12 @@ export function computeBulbRingLayout(input: BulbRingLayoutInput): BulbRingLayou
   );
   /** Gap from visible prize rim to bulb inner edge (px). Smaller = bulbs sit closer to the disc. */
   const rimGap = clamp(input.rimGap ?? Math.round(wheel * 0.010), 2, 10);
-  const outerPad = clamp(input.outerPad ?? Math.round(rimGap * 0.62), 3, 8);
+  /** Narrow band outside bulb hull before chrome — smaller pulls bulbs toward the outer rim without bloating diameter. */
+  const outerPad = clamp(input.outerPad ?? Math.round(rimGap * 0.38), 2, 5);
 
   /**
    * Arc math uses the path outer radius; half the stroke extends outside that path
-   * (`NeoWheel.segmentStrokeWidth` is 3 in app). Bulb clearance starts at the **visible** rim.
+   * (`NeoWheel.segmentStrokeWidth` — thin slice rim). Bulb clearance starts at the **visible** rim.
    */
   const prizeStrokeHalf = NeoWheel.segmentStrokeWidth / 2;
   const prizeRingVisualOuter = wheel / 2 - SPIN_WHEEL_PRIZE_RING_OUTER_INSET + prizeStrokeHalf;
@@ -116,8 +120,8 @@ export function computeBulbRingLayout(input: BulbRingLayoutInput): BulbRingLayou
   let outerDiameter = roundEven((bulbOrbitSeed + bulbOuterEff + padGold + bChrome) * 2);
   let bulbOrbit = bulbOrbitSeed;
 
-  /** 0 = at inner clearance; 1 = at outer chrome clearance (biased inward vs old 0.5 center). */
-  const bulbOrbitInwardBlend = 0.28;
+  /** 1 = stay at outer safe orbit (`rAnnulusOuter`). Lower values bias inward — raising this alone used to force larger `outerDiameter`. */
+  const bulbOrbitInwardBlend = 0.8;
 
   for (let step = 0; step < 20; step += 1) {
     const hf = outerDiameter / 2;
@@ -129,6 +133,8 @@ export function computeBulbRingLayout(input: BulbRingLayoutInput): BulbRingLayou
     if (radialNeed <= hf + 0.02) break;
     outerDiameter = roundEven(outerDiameter + 2);
   }
+
+  outerDiameter = roundEven(outerDiameter + BULB_RING_OUTER_DIAMETER_BOOST);
 
   const cx = outerDiameter / 2;
   const cy = outerDiameter / 2;

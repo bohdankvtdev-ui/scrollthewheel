@@ -18,9 +18,16 @@ export type WheelDecelPresetId =
   | "tight_brake"
   | "cinematic"
   /** Long, soft tail — good default for “premium” / polished spins. */
-  | "glide";
+  | "glide"
+  /** Velocity ~ exponential decay — reads like friction + inertia on a heavy wheel. */
+  | "friction";
 
-/** Tiny inertial settle after main decel — keep excursions small so it reads as mass + friction, not a swaying UI. */
+/** RN `Animated.spring` tuning for the final roll-into-rest (when `tailKind === "spring"`). */
+/** Use `tension` + `friction` only — RN forbids mixing `mass` with this pair. */
+export type WheelSettleTailSpringConfig = {
+  friction: number;
+  tension: number;
+};
 export type WheelSettleWobbleConfig = {
   enabled: boolean;
   /**
@@ -36,6 +43,13 @@ export type WheelSettleWobbleConfig = {
   durationFraction: number;
   /** Per-leg decay on swing size (higher = smaller return swing). */
   decay: number;
+  /**
+   * `spring` — damped `Animated.spring` from just short of the prize into rest (smoothest tail).
+   * `sequence` — legacy multi-leg `timing` wobble.
+   */
+  tailKind?: "spring" | "sequence";
+  /** Spring tuning when `tailKind === "spring"`. */
+  tailSpring?: WheelSettleTailSpringConfig;
 };
 
 /**

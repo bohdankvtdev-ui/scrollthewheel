@@ -20,6 +20,19 @@ function randomPrizeIndex(dataLength: number): number {
   return Math.floor(Math.random() * dataLength);
 }
 
+/** Where the pointer sits along the winning slice: ~0 = inner edge, ~1 = outer edge (in index space). */
+function randomSlicePointerT(): number {
+  const edge = 0.14;
+  const span = 1 - 2 * edge;
+  const c = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+  if (c != null && typeof c.getRandomValues === "function") {
+    const buf = new Uint32Array(1);
+    c.getRandomValues(buf);
+    return edge + (Number(buf[0]) / 4294967296) * span;
+  }
+  return edge + Math.random() * span;
+}
+
 /** Keypoints after main decel: first is overshoot past `F`, last is exact rest angle. */
 function buildWobbleKeypoints(F: number, amp: number, decay: number, legs: number): number[] {
   const n = Math.max(2, Math.round(legs));
@@ -61,12 +74,20 @@ function easingForWobbleLeg(legIndex: number, legCount: number): (t: number) => 
   return Easing.inOut(Easing.cubic);
 }
 
+/** How far short of the prize the friction coast ends — spring closes the gap (degrees). */
+function springUndershootDeg(angleBySegment: number): number {
+  const sliceBased = angleBySegment * 0.038;
+  return Math.min(1.42, Math.max(0.62, sliceBased)) * (0.9 + Math.random() * 0.18);
+}
+
 export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
   const angle = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
   const [enabled, setEnabled] = useState(true);
   const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
-  const angleBySegment = ONE_TURN / dataLength;
+  /** Wheel angle (deg) at last completed rest — for upright prize labels. */
+  const [lastRestAngleDeg, setLastRestAngleDeg] = useState<number | null>(null);
+  const angleBySegment = ONE_TURN / Math.max(1, dataLength);
   const angleOffset = angleBySegment / 2;
 
   useEffect(() => {
@@ -77,12 +98,20 @@ export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
     };
   }, [angle]);
 
-  const spin = (onEnd?: (index: number) => void) => {
-    if (!enabled) return;
+  useEffect(() => {
+    angle.stopAnimation();
+    angle.setValue(0);
+    setWinnerIndex(null);
+    setLastRestAngleDeg(null);
+    setEnabled(true);
+  }, [dataLength, angle]);
 
-    const randomIndex = randomPrizeIndex(dataLength);
+  const spinToIndex = (targetIndex: number, onEnd?: (index: number) => void) => {
+    if (!enabled) return;
+    const randomIndex = Math.max(0, Math.min(dataLength - 1, targetIndex));
+    const slicePointerT = randomSlicePointerT();
     const targetAngle =
-      (ONE_TURN - ((randomIndex + 0.5) * angleBySegment) + angleOffset) % ONE_TURN;
+      (ONE_TURN - ((randomIndex + slicePointerT) * angleBySegment) + angleOffset) % ONE_TURN;
 
     const extraTurns = pickRandomInt(physics.extraFullTurns.min, physics.extraFullTurns.max);
     const landingJitter =
@@ -95,7 +124,8 @@ export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
     );
     const mainEasing = resolveDecelEasing(physics.decel);
     const wobbleCfg = physics.settleWobble;
-    const wobbleOn = wobbleCfg?.enabled === true && (wobbleCfg.wobbleLegs ?? 0) >= 2;
+    const wobbleOn = wobbleCfg?.enabled === true;
+    const tailKind = wobbleCfg?.tailKind ?? "spring";
 
     setEnabled(false);
     setWinnerIndex(null);
@@ -104,12 +134,59 @@ export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
 
     const finish = () => {
       if (!mountedRef.current) return;
+      setLastRestAngleDeg(finalAngle);
       setWinnerIndex(randomIndex);
       setEnabled(true);
       onEnd?.(randomIndex);
     };
 
     if (!wobbleOn || wobbleCfg == null) {
+      Animated.timing(angle, {
+        toValue: finalAngle,
+        duration,
+        easing: mainEasing,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (!finished || !mountedRef.current) return;
+        finish();
+      });
+      return;
+    }
+
+    /** Damped spring into exact rest — continuous velocity feel vs chained timings. */
+    if (tailKind === "spring") {
+      const creep = springUndershootDeg(angleBySegment);
+      const mainEnd = finalAngle - creep;
+      const mainMs = Math.max(620, Math.round(duration * 0.862));
+      const ts = wobbleCfg.tailSpring;
+      const friction = ts?.friction ?? 9;
+      const tension = ts?.tension ?? 17.5;
+
+      Animated.sequence([
+        Animated.timing(angle, {
+          toValue: mainEnd,
+          duration: mainMs,
+          easing: mainEasing,
+          useNativeDriver: true,
+        }),
+        Animated.spring(angle, {
+          toValue: finalAngle,
+          useNativeDriver: true,
+          friction,
+          tension,
+          overshootClamping: true,
+          restDisplacementThreshold: 0.02,
+          restSpeedThreshold: 0.02,
+        }),
+      ]).start(({ finished }) => {
+        if (!finished || !mountedRef.current) return;
+        finish();
+      });
+      return;
+    }
+
+    /* Legacy multi-leg settle (tailKind === "sequence") */
+    if ((wobbleCfg.wobbleLegs ?? 0) < 2) {
       Animated.timing(angle, {
         toValue: finalAngle,
         duration,
@@ -163,11 +240,17 @@ export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
     });
   };
 
+  const spin = (onEnd?: (index: number) => void) => {
+    spinToIndex(randomPrizeIndex(dataLength), onEnd);
+  };
+
   return {
     angle,
     spin,
+    spinToIndex,
     enabled,
     winnerIndex,
+    lastRestAngleDeg,
     angleBySegment,
     angleOffset,
   };

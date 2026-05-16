@@ -1,27 +1,46 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewStyle } from "react-native";
-import { unstable_batchedUpdates } from "react-native";
+import { Platform, unstable_batchedUpdates as rnBatchedUpdates } from "react-native";
+
+/** RN Web does not expose `unstable_batchedUpdates`; React 18 batches setState anyway. */
+function batchedUpdates(fn: () => void): void {
+  if (typeof rnBatchedUpdates === "function") {
+    rnBatchedUpdates(fn);
+    return;
+  }
+  fn();
+}
 import { Gesture } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
   clamp,
+  Easing,
+  Extrapolation,
+  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { REEL_STRIP } from "../reelStripConstants";
 import type { BulbRingPhase } from "../bulbRingPhase";
 import { computeMaxActiveIndex } from "../reelStripModel";
 import type { ScrollWheelRound } from "./useScrollTheWheelRounds";
 
-const { gesture: G, springs: S, visuals: V } = REEL_STRIP;
+const { gesture: G, springs: S, visuals: V, commitTimingMs } = REEL_STRIP;
 
 export type UseReelStripEngineArgs = {
   pageHeight: number;
   rounds: ScrollWheelRound[];
+  /** Align strip with run wheel index on mount / run reset. */
+  initialActiveIndex?: number;
+  /** When this changes, snap strip index (new run) without mid-game resync. */
+  bootRunId?: string;
   onClaimed: (roundIndex: number) => void;
+  /** Commit pending wheel layout before swipe spring (avoids slice-count pop mid-transition). */
+  onPrepareAdvance?: () => void;
   growToMinLength?: (minLength: number) => void;
   /** Fired after the strip commits to the next reel (successful swipe). */
   onReelAdvanced?: () => void;
@@ -30,6 +49,11 @@ export type UseReelStripEngineArgs = {
    * Updated on the UI thread via shared value for worklets.
    */
   stripVisualIntensity?: number;
+  /**
+   * Optional multiplier for wheel frost only. When set, can stay positive while
+   * `stripVisualIntensity` is 0 so reduce-motion users still get a muted wheel blur.
+   */
+  wheelFrostVisualIntensity?: number;
 };
 
 export type ReelStripEngine = {
@@ -41,8 +65,24 @@ export type ReelStripEngine = {
   panGesture: ReturnType<typeof Gesture.Pan>;
   stripStyle: ReturnType<typeof useAnimatedStyle<ViewStyle>>;
   motionScrimStyle: ReturnType<typeof useAnimatedStyle<ViewStyle>>;
+  /** Fades the fixed bottom Spin/Next cue while the strip moves toward the next reel (UI-thread). */
+  bottomCueScrollFadeStyle: ReturnType<typeof useAnimatedStyle<ViewStyle>>;
+  /** Cross-fade layer for next wheel page tint (0 = current, 1 = next). */
+  stripPageBlendStyle: ReturnType<typeof useAnimatedStyle<ViewStyle>>;
+  /**
+   * For the primary reel only: frost layer from strip pan (`translateY`) or web wheel impulse;
+   * opacity scales with `stripVisualIntensity`.
+   */
+  primaryWheelScrollFrostStyle: ReturnType<typeof useAnimatedStyle<ViewStyle>>;
+  /**
+   * Web: route `deltaY` from a `wheel` event so blur reacts to mouse/trackpad scrolling
+   * (native uses pan `translateY` only).
+   */
+  pokeWebWheelScrollBlur: (deltaY: number) => void;
   setSpinningSafe: (spinning: boolean) => void;
   onPrimaryBulbPhaseChange: (phase: BulbRingPhase) => void;
+  /** Programmatic claim — same as swipe-up when round is `won`. */
+  requestAdvance: () => void;
 };
 
 /**
@@ -52,10 +92,14 @@ export type ReelStripEngine = {
 export function useReelStripEngine({
   pageHeight,
   rounds,
+  initialActiveIndex = 0,
+  bootRunId,
   onClaimed,
+  onPrepareAdvance,
   growToMinLength,
   onReelAdvanced,
   stripVisualIntensity = 1,
+  wheelFrostVisualIntensity: wheelFrostVisualIntensityProp,
 }: UseReelStripEngineArgs): ReelStripEngine {
   const pageHStable = Math.max(1, Math.round(pageHeight));
 
@@ -65,13 +109,16 @@ export function useReelStripEngine({
   onClaimedRef.current = onClaimed;
   const onReelAdvancedRef = useRef(onReelAdvanced);
   onReelAdvancedRef.current = onReelAdvanced;
+  const onPrepareAdvanceRef = useRef(onPrepareAdvance);
+  onPrepareAdvanceRef.current = onPrepareAdvance;
 
   const mountedRef = useRef(true);
   const advanceBusyRef = useRef(false);
   const growDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activeIndexRef = useRef(0);
+  const safeStart = Math.max(0, Math.min(initialActiveIndex, Math.max(0, rounds.length - 1)));
+  const [activeIndex, setActiveIndex] = useState(safeStart);
+  const activeIndexRef = useRef(safeStart);
   activeIndexRef.current = activeIndex;
 
   const [isSpinning, setIsSpinning] = useState(false);
@@ -81,13 +128,31 @@ export function useReelStripEngine({
   const translateY = useSharedValue(0);
   const startTranslateY = useSharedValue(0);
   const pageH = useSharedValue(pageHStable);
+
+  useEffect(() => {
+    if (bootRunId == null) return;
+    const next = Math.max(0, Math.min(initialActiveIndex, Math.max(0, rounds.length - 1)));
+    setActiveIndex(next);
+    activeIndexRef.current = next;
+    translateY.value = 0;
+  }, [bootRunId, initialActiveIndex, rounds.length, translateY]);
   const canSwipeNext = useSharedValue(false);
   const busy = useSharedValue(false);
   const stripVisualSV = useSharedValue(stripVisualIntensity);
+  const wheelFrostVisualSV = useSharedValue(
+    wheelFrostVisualIntensityProp ?? stripVisualIntensity
+  );
+
+  /** Web-only shortcut for blur when using wheel instead of drag (see `pokeWebWheelScrollBlur`). */
+  const webWheelBlurImpulse = useSharedValue(0);
 
   useEffect(() => {
     stripVisualSV.value = stripVisualIntensity;
   }, [stripVisualIntensity, stripVisualSV]);
+
+  useEffect(() => {
+    wheelFrostVisualSV.value = wheelFrostVisualIntensityProp ?? stripVisualIntensity;
+  }, [wheelFrostVisualIntensityProp, stripVisualIntensity, wheelFrostVisualSV]);
 
   const maxActive = useMemo(() => computeMaxActiveIndex(rounds), [rounds]);
   const roundCount = rounds.length;
@@ -161,13 +226,29 @@ export function useReelStripEngine({
     };
   }, [translateY]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const { webWheelDecayMs, webWheelDecayFactor } = V.wheelScrollBlur;
+    const id = setInterval(() => {
+      const next = webWheelBlurImpulse.value * webWheelDecayFactor;
+      webWheelBlurImpulse.value = next < 0.012 ? 0 : next;
+    }, webWheelDecayMs);
+    return () => clearInterval(id);
+  }, [webWheelBlurImpulse]);
+
+  const pokeWebWheelScrollBlur = useCallback(
+    (deltaY: number) => {
+      if (Platform.OS !== "web") return;
+      if (!Number.isFinite(deltaY) || deltaY === 0) return;
+      const gain = V.wheelScrollBlur.webWheelImpulseGain;
+      webWheelBlurImpulse.value = Math.min(1, webWheelBlurImpulse.value + Math.abs(deltaY) * gain);
+    },
+    [webWheelBlurImpulse]
+  );
+
   const executeStripAdvance = useCallback(() => {
     if (!mountedRef.current) return;
     if (advanceBusyRef.current) return;
-    advanceBusyRef.current = true;
-    busy.value = true;
-    setStripSpringing(false);
-    setAdvanceBusy(true);
 
     const i = activeIndexRef.current;
     const rs = roundsRef.current;
@@ -175,31 +256,52 @@ export function useReelStripEngine({
     if (i >= len - 1) {
       advanceBusyRef.current = false;
       busy.value = false;
-      setAdvanceBusy(false);
       setStripSpringing(false);
+      setAdvanceBusy(false);
+      return;
+    }
+    if (rs[i]?.status !== "won") {
+      advanceBusyRef.current = false;
+      busy.value = false;
+      setStripSpringing(false);
+      setAdvanceBusy(false);
       return;
     }
 
-    unstable_batchedUpdates(() => {
-      if (rs[i]?.status === "won") {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        try {
-          onClaimedRef.current(i);
-        } catch {
-          /* isolate native bridge failures */
-        }
+    advanceBusyRef.current = true;
+    busy.value = true;
+
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    try {
+      onPrepareAdvanceRef.current?.();
+    } catch {
+      /* isolate failures */
+    }
+
+    batchedUpdates(() => {
+      try {
+        onClaimedRef.current(i);
+      } catch {
+        /* isolate native bridge failures */
       }
-      setActiveIndex((prev) => Math.min(prev + 1, Math.max(0, len - 1)));
+      const nextIndex = Math.min(i + 1, Math.max(0, len - 1));
+      activeIndexRef.current = nextIndex;
+      setActiveIndex(nextIndex);
       onReelAdvancedRef.current?.();
     });
 
-    queueMicrotask(() => {
-      if (!mountedRef.current) return;
-      advanceBusyRef.current = false;
-      busy.value = false;
-      setAdvanceBusy(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!mountedRef.current) return;
+        translateY.value = 0;
+        advanceBusyRef.current = false;
+        busy.value = false;
+        setStripSpringing(false);
+        setAdvanceBusy(false);
+      });
     });
-  }, []);
+  }, [busy, translateY]);
 
   const executeStripAdvanceRef = useRef(executeStripAdvance);
   executeStripAdvanceRef.current = executeStripAdvance;
@@ -265,11 +367,11 @@ export function useReelStripEngine({
             cancelAnimation(translateY);
             busy.value = true;
             runOnJS(armStripSpringStart)();
-            translateY.value = withSpring(
+            translateY.value = withTiming(
               -h,
               {
-                ...S.commit,
-                velocity: Number.isFinite(vy) ? vy : 0,
+                duration: commitTimingMs,
+                easing: Easing.out(Easing.cubic),
               },
               (finished) => {
                 if (!finished) {
@@ -278,7 +380,6 @@ export function useReelStripEngine({
                   runOnJS(stripSpringCancelled)();
                   return;
                 }
-                translateY.value = 0;
                 runOnJS(runStripAdvanceOnJS)();
               }
             );
@@ -293,15 +394,9 @@ export function useReelStripEngine({
     [armStripSpringStart, runStripAdvanceOnJS, stripSpringCancelled]
   );
 
-  const stripStyle = useAnimatedStyle<ViewStyle>(() => {
-    const h = Math.max(1, pageH.value);
-    const p = Math.min(1, Math.abs(translateY.value) / h);
-    const mult = stripVisualSV.value;
-    return {
-      transform: [{ translateY: translateY.value }],
-      opacity: 1 - p * V.stripOpacityDragFactor * mult,
-    };
-  });
+  const stripStyle = useAnimatedStyle<ViewStyle>(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const motionScrimStyle = useAnimatedStyle<ViewStyle>(() => {
     const h = Math.max(1, pageH.value);
@@ -310,6 +405,36 @@ export function useReelStripEngine({
     const mult = stripVisualSV.value;
     return {
       opacity: clamp(q * V.scrimOpacityQuad * mult + p * V.scrimOpacityLinear * mult, 0, V.scrimOpacityMax * mult),
+    };
+  });
+
+  const bottomCueScrollFadeStyle = useAnimatedStyle<ViewStyle>(() => {
+    const h = Math.max(1, pageH.value);
+    const ty = translateY.value;
+    return {
+      opacity: interpolate(ty, [-h, 0], [0, 1], Extrapolation.CLAMP),
+    };
+  });
+
+  const stripPageBlendStyle = useAnimatedStyle<ViewStyle>(() => {
+    const h = Math.max(1, pageH.value);
+    const p = clamp(-translateY.value / h, 0, 1);
+    return { opacity: p };
+  });
+
+  const primaryWheelScrollFrostStyle = useAnimatedStyle<ViewStyle>(() => {
+    const h = Math.max(1, pageH.value);
+    const ty = translateY.value;
+    const panP = Math.min(1, Math.abs(ty) / h);
+    const wheelP = Math.min(1, Math.max(webWheelBlurImpulse.value, 0));
+    const p = Math.max(panP, wheelP);
+    const mult = wheelFrostVisualSV.value;
+    const cap = V.wheelScrollBlur.overlayOpacityMax;
+    if (!(mult > 1e-6)) {
+      return { opacity: 0 };
+    }
+    return {
+      opacity: clamp(p * mult * cap, 0, cap),
     };
   });
 
@@ -336,7 +461,12 @@ export function useReelStripEngine({
     panGesture,
     stripStyle,
     motionScrimStyle,
+    bottomCueScrollFadeStyle,
+    stripPageBlendStyle,
+    primaryWheelScrollFrostStyle,
+    pokeWebWheelScrollBlur,
     setSpinningSafe,
     onPrimaryBulbPhaseChange,
+    requestAdvance: executeStripAdvance,
   };
 }

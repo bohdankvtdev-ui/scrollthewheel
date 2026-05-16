@@ -15,6 +15,15 @@ export function easingFromDecelPreset(id: WheelDecelPresetId): (t: number) => nu
       return Easing.out(Easing.poly(5));
     case "glide":
       return Easing.bezier(0.12, 0.72, 0.16, 1);
+    case "friction": {
+      const lambda = 4.65;
+      const denom = 1 - Math.exp(-lambda);
+      return (t: number) => {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        return (1 - Math.exp(-lambda * t)) / denom;
+      };
+    }
     default:
       return Easing.out(Easing.cubic);
   }
@@ -22,9 +31,10 @@ export function easingFromDecelPreset(id: WheelDecelPresetId): (t: number) => nu
 
 /** Softer pool — fewer harsh brakes, more coast + glide for consistent polish. */
 const DECEL_POOL: readonly WheelDecelPresetId[] = [
+  "friction",
   "glide",
   "long_coast",
-  "glide",
+  "friction",
   "smooth",
   "long_coast",
   "glide",

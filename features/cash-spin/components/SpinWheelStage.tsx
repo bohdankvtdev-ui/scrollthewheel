@@ -1,7 +1,8 @@
 import { SpinWheel } from "../../../wheel";
 import { spinSafetyTimeoutMs } from "../../../lib/wheel";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Text, View, PixelRatio } from "react-native";
+import type { SpinWheelRef } from "../../../wheel/types";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Animated, Text, View, PixelRatio } from "react-native";
 import {
   computeBulbRingLayout,
   computeBulbRingTopOffset,
@@ -44,6 +45,18 @@ export type SpinWheelStageProps = {
   /** Hub PNG decoded (or skipped); pass `hubLoadEpoch` from parent to ignore stale loads. */
   hubLoadEpoch?: number;
   onHubImageReady?: (epoch: number) => void;
+  /**
+   * Circular film grain + light mist over the prize disc area while scrolling the reel strip.
+   */
+  scrollGrainOverlay?: ReactNode;
+  /** Roguelike: parent resolves slice + calls `spinToIndex` on ref. */
+  spinWheelRef?: RefObject<SpinWheelRef | null>;
+  externalSpinControl?: boolean;
+  onExternalSpinPress?: () => void;
+  hubMode?: "spin" | "claim" | "busy";
+  onHubClaimPress?: () => void;
+  sliceLabelMode?: "text" | "icons" | "both";
+  hubAnimSubtle?: boolean;
 };
 
 export function SpinWheelStage({
@@ -60,6 +73,14 @@ export function SpinWheelStage({
   spinLocked = false,
   hubLoadEpoch = 0,
   onHubImageReady,
+  scrollGrainOverlay,
+  spinWheelRef,
+  externalSpinControl = false,
+  onExternalSpinPress,
+  hubMode = "spin",
+  onHubClaimPress,
+  sliceLabelMode = "text",
+  hubAnimSubtle = false,
 }: SpinWheelStageProps) {
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const victoryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,6 +89,9 @@ export function SpinWheelStage({
   const [internalPhase, setInternalPhase] = useState<BulbRingPhase>("idle");
 
   const ringPhase = bulbRingPhaseProp ?? internalPhase;
+
+  /** Mirrors prize-disc lift pulse (`SpinWheel` spinDiscScale) so the bulb ring shakes with the wheel. */
+  const chromeDiscScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     onBulbRingPhaseChange?.(ringPhase);
@@ -187,50 +211,98 @@ export function SpinWheelStage({
   return (
     <View style={{ width: stageWidth, alignItems: "center" }}>
       <View style={{ width: stageWidth, position: "relative", alignItems: "center" }}>
-        <View
+        <Animated.View
           pointerEvents="none"
           style={{
             position: "absolute",
             top: ringTopPx,
             left: ringLeft,
             zIndex: 0,
+            transform: [{ scale: chromeDiscScale }],
           }}
         >
           <NeoBulbRing layout={layout} phase={ringPhase} />
-        </View>
+        </Animated.View>
 
         <View style={{ zIndex: 1, alignItems: "center" }}>
-          <SpinWheel
-            data={data}
-            size={wheel}
-            wheelPhysics={wheelPhysics}
-            segmentBgColor={[...segmentColors]}
-            segmentStrokeColor={NeoWheel.segmentStroke}
-            segmentStrokeWidth={NeoWheel.segmentStrokeWidth}
-            segmentPadAngle={NeoWheel.segmentPadAngle}
-            segmentCornerRadius={NeoWheel.segmentCornerRadius}
-            textColor={textColor}
-            textSize={Math.round(textSize * 1.28)}
-            textFontWeight="400"
-            labelFontFamily={FONT_BEBAS_NEUE}
-            hubLabelFontFamily={FONT_BEBAS_NEUE}
-            hubLabelColor="#FFFBEB"
-            hubRingBorderWidth={NeoWheel.hubBorderWidth}
-            hubRingBorderColor={NeoWheel.hubBorderWidth > 0 ? NeoWheel.hubBorder : undefined}
-            showResultText={false}
-            showSpinButton
-            centerSpinButton
-            hubSoftShadow={false}
-            prizeSliceVictoryShine={ringPhase === "victory"}
-            spinLocked={spinLocked}
-            hubLoadEpoch={hubLoadEpoch}
-            onHubImageLoad={onHubImageReady}
-            knobComponent={<NeoKnob />}
-            onSpinPress={armSafetyTimer}
-            onSpinEnd={(item) => {
-              onLibrarySpinEnd(item);
+          <View
+            style={{
+              width: wheel,
+              height: wheel,
+              position: "relative",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-          />
+            collapsable={false}
+          >
+            <SpinWheel
+              key={
+                ringPhaseResetKey != null
+                  ? `wheel-r${ringPhaseResetKey}`
+                  : `wheel-${data.map((d) => d.id).join("-")}`
+              }
+              ref={spinWheelRef}
+              data={data}
+              size={wheel}
+              wheelPhysics={wheelPhysics}
+              syncDiscScale={chromeDiscScale}
+              segmentBgColor={[...segmentColors]}
+              segmentStrokeColor={NeoWheel.segmentStroke}
+              segmentStrokeWidth={NeoWheel.segmentStrokeWidth}
+              segmentPadAngle={NeoWheel.segmentPadAngle}
+              segmentCornerRadius={NeoWheel.segmentCornerRadius}
+              textColor={textColor}
+              textSize={Math.round(textSize * 1.28)}
+              textFontWeight="400"
+              labelFontFamily={FONT_BEBAS_NEUE}
+              hubLabelFontFamily={FONT_BEBAS_NEUE}
+              hubLabelColor="#FFFBEB"
+              hubRingBorderWidth={NeoWheel.hubBorderWidth}
+              hubRingBorderColor={NeoWheel.hubBorderWidth > 0 ? NeoWheel.hubBorder : undefined}
+              showResultText={false}
+              showSpinButton
+              centerSpinButton
+              hubSoftShadow={false}
+              prizeSliceVictoryShine={ringPhase === "victory"}
+              spinLocked={spinLocked}
+              hubMode={hubMode}
+              onHubClaimPress={onHubClaimPress}
+              sliceLabelMode={sliceLabelMode}
+              hubAnimSubtle={hubAnimSubtle}
+              externalSpinControl={externalSpinControl}
+              hubLoadEpoch={hubLoadEpoch}
+              onHubImageLoad={onHubImageReady}
+              knobComponent={<NeoKnob />}
+              onSpinPress={() => {
+                armSafetyTimer();
+                if (externalSpinControl) {
+                  onExternalSpinPress?.();
+                }
+              }}
+              onSpinEnd={(item) => {
+                onLibrarySpinEnd(item);
+              }}
+            />
+            {scrollGrainOverlay != null ? (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  width: wheel,
+                  height: wheel,
+                  borderRadius: wheel / 2,
+                  overflow: "hidden",
+                  zIndex: 80,
+                  elevation: 80,
+                }}
+                collapsable={false}
+              >
+                {scrollGrainOverlay}
+              </View>
+            ) : null}
+          </View>
         </View>
       </View>
     </View>

@@ -15,6 +15,12 @@ export const COMPACT_WINDOW_AREA = 420_000;
 /** Strip visual multiplier when compact (not reduce-motion): keep a hint of scrim, not full cost. */
 export const COMPACT_STRIP_INTENSITY = 0.55;
 
+/**
+ * Wheel scroll-frost when the OS “reduce motion” strip multiplier is 0 — still shows a soft blur
+ * while dragging (no extra parallax from the rest of the strip).
+ */
+export const WHEEL_FROST_INTENSITY_REDUCE_MOTION = 0.48;
+
 export function isCompactCashSpinWindow(width: number, height: number): boolean {
   return Math.round(width * height) < COMPACT_WINDOW_AREA;
 }

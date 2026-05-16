@@ -5,6 +5,7 @@ export type {
   WheelGamificationConfig,
   WheelPhysicsConfig,
   WheelPresentationConfig,
+  WheelSettleTailSpringConfig,
   WheelSettleWobbleConfig,
   WheelTypeId,
 } from "./types";
