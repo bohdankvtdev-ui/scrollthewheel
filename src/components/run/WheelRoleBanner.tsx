@@ -8,10 +8,9 @@ import { EffectIcon } from "./EffectIcon";
 type WheelRoleBannerProps = {
   role: WheelRole;
   floor: number;
-  bossHp?: number;
 };
 
-export function WheelRoleBanner({ role, floor, bossHp }: WheelRoleBannerProps) {
+export function WheelRoleBanner({ role, floor }: WheelRoleBannerProps) {
   const meta = WHEEL_ROLE_META[role];
 
   return (
@@ -30,11 +29,6 @@ export function WheelRoleBanner({ role, floor, bossHp }: WheelRoleBannerProps) {
         <View style={styles.pillMuted}>
           <Text style={[styles.pillTextMuted, { fontFamily: FONT_BEBAS_NEUE }]}>F{floor}</Text>
         </View>
-        {bossHp != null ? (
-          <View style={[styles.pill, styles.pillBoss]}>
-            <Text style={[styles.pillText, { fontFamily: FONT_BEBAS_NEUE }]}>{bossHp} HP</Text>
-          </View>
-        ) : null}
       </View>
     </View>
   );

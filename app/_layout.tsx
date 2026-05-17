@@ -2,25 +2,30 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { View } from "react-native";
-import { useBebasNeueFonts } from "../theme/fonts";
+import { ScreenTexture } from "../src/components/ScreenTexture";
+import { useAppBootstrap } from "../src/hooks/useAppBootstrap";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {
   /* splash may be unavailable in some environments */
 });
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useBebasNeueFonts();
+  const ready = useAppBootstrap();
 
   useEffect(() => {
-    if (fontsLoaded || fontError != null) {
+    if (ready) {
       void SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontError, fontsLoaded]);
+  }, [ready]);
 
-  if (!fontsLoaded && fontError == null) {
+  if (!ready) {
     return <View style={{ flex: 1, backgroundColor: "#4A2574" }} />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <ScreenTexture>
+      <Stack screenOptions={{ headerShown: false }} />
+    </ScreenTexture>
+  );
 }
 

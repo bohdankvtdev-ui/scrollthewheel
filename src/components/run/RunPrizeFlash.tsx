@@ -84,6 +84,8 @@ export function RunPrizeFlash({
               iconFamily={effect.iconFamily}
               size="md"
               tint={isPerkWin ? "#FEF08A" : effect.accent}
+              iconColor={effect.iconColor}
+              tone={isPerkWin ? "perk" : effect.tone}
               variant={isPerkWin ? "jackpot" : "default"}
             />
           </Animated.View>

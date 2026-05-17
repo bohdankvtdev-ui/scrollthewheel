@@ -12,7 +12,8 @@ export type SliceKind =
   | "booster"
   | "neutral"
   | "bank_wipe"
-  | "bank_cut";
+  | "bank_cut"
+  | "run_effect";
 
 export type SliceWeightTag = "negative" | "positive" | "rare" | "stakes";
 
@@ -29,6 +30,8 @@ export type SlicePayload = {
   sliceDelta?: number;
   /** @deprecated use sliceDelta: 1 */
   expandSlicesTo?: 6 | 8 | 10 | 12;
+  /** Meta slice — see `runEffects.ts` */
+  runEffectId?: string;
 };
 
 export type SliceDefinition = {
@@ -43,6 +46,11 @@ export type SliceDefinition = {
   presentation?: {
     colorIndex?: number;
     rarity?: "common" | "rare" | "curse";
+    /** Wedge fill — paired with iconColor for this slot index */
+    segmentColor?: string;
+    iconColor?: string;
+    captionColor?: string;
+    chipColor?: string;
   };
 };
 

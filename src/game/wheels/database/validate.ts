@@ -1,7 +1,10 @@
 import { getSliceProbabilities } from "../../../systems/ProbabilityResolver";
 import { DEFAULT_RESOLVE_CONTEXT } from "../../../systems/types";
-import { getConfiguredWheelSlices, getWheelConfig } from "./loader";
-import { FLOOR_WHEEL_ORDER, WHEEL_DATABASE } from "./wheelDatabase";
+import { SLICES_PER_WHEEL, WHEEL_THEME_KINDS } from "./constants";
+import { getConfiguredWheelSlices, getPrizeSlotsForWheel, getWheelConfig } from "./loader";
+import { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
+import { FLOOR_WHEEL_ORDER } from "./wheelDatabase";
+import type { WheelPrizeSlot } from "./types";
 import type { WheelConfigId } from "./types";
 
 export type WheelValidationIssue = {
@@ -10,45 +13,61 @@ export type WheelValidationIssue = {
 };
 
 const CHANCE_TOLERANCE = 0.5;
+const VALIDATE_CTX = { runId: "__validate__", cycle: 1, ownedPerks: [] as string[] };
 
-export function validateWheelChances(configId: WheelConfigId): WheelValidationIssue[] {
+export function validateWheelChances(configId: WheelConfigId, cycle = 1): WheelValidationIssue[] {
   const entry = getWheelConfig(configId);
+  const prizes = getPrizeSlotsForWheel(configId, { ...VALIDATE_CTX, cycle });
+  return validatePrizeSlotList(configId, prizes, entry.archetype);
+}
+
+function validatePrizeSlotList(
+  wheelId: string,
+  prizes: WheelPrizeSlot[],
+  archetype: keyof typeof WHEEL_THEME_KINDS
+): WheelValidationIssue[] {
   const issues: WheelValidationIssue[] = [];
-
-  if (entry.prizes.length === 0) {
-    issues.push({ wheelId: configId, message: "No prizes defined" });
-    return issues;
-  }
-
-  if (!entry.prizes.some((row) => row.chance > 0)) {
+  if (prizes.length !== SLICES_PER_WHEEL) {
     issues.push({
-      wheelId: configId,
-      message: "Need at least one prize with chance > 0",
+      wheelId,
+      message: `Expected ${SLICES_PER_WHEEL} prizes, got ${prizes.length}`,
     });
   }
-
-  const sum = entry.prizes.reduce((s, row) => s + row.chance, 0);
+  const sum = prizes.reduce((s, row) => s + row.chance, 0);
   if (Math.abs(sum - 100) > CHANCE_TOLERANCE) {
     issues.push({
-      wheelId: configId,
-      message: `Land chances sum to ${sum.toFixed(1)}% (expected ~100%). All rows count, including 0%.`,
+      wheelId,
+      message: `Land chances sum to ${sum.toFixed(1)}% (expected ~100%)`,
     });
   }
-
+  const allowedKinds = WHEEL_THEME_KINDS[archetype];
+  for (const row of prizes) {
+    const def = PRIZE_CATALOG[row.prize as PrizeCatalogId];
+    if (def == null) {
+      issues.push({ wheelId, message: `Unknown prize "${row.prize}"` });
+    } else if (!allowedKinds.includes(def.kind)) {
+      issues.push({
+        wheelId,
+        message: `"${row.prize}" (${def.kind}) does not match ${archetype} theme`,
+      });
+    }
+  }
   return issues;
 }
 
 export function validateAllWheels(): WheelValidationIssue[] {
-  return FLOOR_WHEEL_ORDER.flatMap((id) => validateWheelChances(id));
+  const issues = FLOOR_WHEEL_ORDER.flatMap((id) => validateWheelChances(id, 1));
+  return [...issues, ...validateWheelChances("wheel_2", 2)];
 }
 
 export function formatWheelOddsReport(configId: WheelConfigId, instanceId = configId): string {
   const entry = getWheelConfig(configId);
-  const slices = getConfiguredWheelSlices(configId, instanceId);
+  const prizes = getPrizeSlotsForWheel(configId, VALIDATE_CTX);
+  const slices = getConfiguredWheelSlices(configId, instanceId, VALIDATE_CTX);
   const rows = getSliceProbabilities(slices, DEFAULT_RESOLVE_CONTEXT);
 
-  const header = `=== ${entry.title} (${configId}) ===`;
-  const chanceNote = `slices on wheel: ${entry.prizes.length} · land % sum: ${entry.prizes.reduce((s, p) => s + p.chance, 0)}%`;
+  const header = `=== ${entry.title} (${configId}) · ${entry.archetype} ===`;
+  const chanceNote = `slices: ${prizes.length}/${SLICES_PER_WHEEL} · land % sum: ${prizes.reduce((s, p) => s + p.chance, 0)}%`;
 
   const lines = [
     header,

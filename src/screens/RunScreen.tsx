@@ -14,6 +14,7 @@ import { RunPrizeFlash } from "../components/run/RunPrizeFlash";
 import { ShopModal } from "../components/run/ShopModal";
 import { RunWheelFeed } from "../components/wheel/RunWheelFeed";
 import { useRunLifecycle } from "../hooks/useRunLifecycle";
+import { ADVANCEMENT_CATALOG } from "../game/advancements";
 import { PERK_CATALOG } from "../data/perks";
 import { RunManager } from "../systems/RunManager";
 import { shopRerollCost } from "../game/shop/offers";
@@ -95,6 +96,41 @@ export function RunScreen() {
     [showToast]
   );
 
+  const handleBuyForge = useCallback(
+    (forgeId: string) => {
+      const current = useRunStore.getState().run;
+      if (current == null) return;
+      const result = ShopSystem.buyForge(current, forgeId);
+      if (!result.ok) {
+        showToast({ type: "info", title: result.reason, icon: "info" });
+        return;
+      }
+      useRunStore.setState({ run: result.run });
+      showToast({ type: "success", title: "Forge upgraded", icon: "build" });
+    },
+    [showToast]
+  );
+
+  const handleBuyAdvancement = useCallback(
+    (advancementId: string) => {
+      const current = useRunStore.getState().run;
+      if (current == null) return;
+      const result = ShopSystem.buyAdvancement(current, advancementId);
+      if (!result.ok) {
+        showToast({ type: "info", title: result.reason, icon: "info" });
+        return;
+      }
+      useRunStore.setState({ run: result.run });
+      const def = ADVANCEMENT_CATALOG[advancementId];
+      showToast({
+        type: "success",
+        title: def != null ? `Installed: ${def.name}` : "Upgrade installed",
+        icon: def?.icon ?? "upgrade",
+      });
+    },
+    [showToast]
+  );
+
   const handleSell = useCallback(
     (perkId: string) => {
       const current = useRunStore.getState().run;
@@ -121,7 +157,7 @@ export function RunScreen() {
     }
     useRunStore.setState({ run: result.run });
     setShopRerolls((r) => r + 1);
-    showToast({ type: "info", title: `Rerolled (−$${cost})`, icon: "refresh" });
+    showToast({ type: "info", title: `Rerolled (−${cost} chips)`, icon: "refresh" });
   }, [shopRerolls, showToast]);
 
   const handleContinueInfinite = useCallback(() => {
@@ -177,6 +213,8 @@ export function RunScreen() {
         run={run}
         onClose={handleShopClose}
         onBuy={handleBuy}
+        onBuyAdvancement={handleBuyAdvancement}
+        onBuyForge={handleBuyForge}
         onSell={handleSell}
         onReroll={handleReroll}
       />

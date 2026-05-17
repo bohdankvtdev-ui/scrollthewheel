@@ -1,5 +1,6 @@
-import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { PrizeGlyph } from "../../../lib/ui/PrizeGlyph";
+import type { SliceVisualTone } from "../../game/content/sliceVisualTheme";
 import { Neo } from "../../../theme/neoBrutal";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import type { IconFamily } from "../../schemas";
@@ -10,38 +11,14 @@ type EffectIconProps = {
   effectHint: string;
   size?: "sm" | "md" | "lg";
   accentBg?: string;
+  iconColor?: string;
+  tone?: SliceVisualTone;
   borderColor?: string;
   onPress?: () => void;
   selected?: boolean;
 };
 
-function Glyph({
-  family,
-  name,
-  size,
-  color,
-}: {
-  family: IconFamily;
-  name: string;
-  size: number;
-  color: string;
-}) {
-  if (family === "MaterialCommunityIcons") {
-    return (
-      <MaterialCommunityIcons
-        name={name as keyof typeof MaterialCommunityIcons.glyphMap}
-        size={size}
-        color={color}
-      />
-    );
-  }
-  if (family === "Ionicons") {
-    return <Ionicons name={name as keyof typeof Ionicons.glyphMap} size={size} color={color} />;
-  }
-  return <MaterialIcons name={name as keyof typeof MaterialIcons.glyphMap} size={size} color={color} />;
-}
-
-const SIZES = { sm: 22, md: 28, lg: 36 } as const;
+const GLYPH_SIZE = { sm: "xs" as const, md: "sm" as const, lg: "md" as const };
 
 export function EffectIcon({
   icon,
@@ -49,23 +26,30 @@ export function EffectIcon({
   effectHint,
   size = "md",
   accentBg = Neo.neonYellow,
+  iconColor,
+  tone = "gain",
   borderColor = Neo.ink,
   onPress,
   selected = false,
 }: EffectIconProps) {
-  const iconPx = SIZES[size];
   const body = (
     <View
       style={[
         styles.box,
         {
-          backgroundColor: accentBg,
           borderColor: selected ? Neo.accent : borderColor,
           borderWidth: selected ? Neo.borderBold : Neo.borderThin,
         },
       ]}
     >
-      <Glyph family={iconFamily} name={icon} size={iconPx} color={Neo.ink} />
+      <PrizeGlyph
+        icon={icon}
+        iconFamily={iconFamily}
+        size={GLYPH_SIZE[size]}
+        tint={accentBg}
+        iconColor={iconColor}
+        tone={tone}
+      />
       <Text style={styles.hint} numberOfLines={2}>
         {effectHint}
       </Text>
@@ -90,12 +74,13 @@ const styles = StyleSheet.create({
   box: {
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
+    borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
     minWidth: 72,
     maxWidth: 88,
-    gap: 4,
+    gap: 6,
+    backgroundColor: "transparent",
   },
   hint: {
     fontFamily: FONT_BEBAS_NEUE,

@@ -1,7 +1,14 @@
 import { DEBUFF_CATALOG } from "../data/debuffs";
 import { PERK_CATALOG } from "../data/perks";
+import {
+  applyPerkLossMult,
+  applyPerkMoneyPayout,
+  applyPerkPercentGain,
+} from "../game/effects/applyPerkEffects";
 import { isJokerSlotFull } from "../game/shop/jokerSlots";
 import { getBlindQuotaForRun, RUN_DEFAULTS } from "../game/loop";
+import { getRunMaxSliceCount, hasAdvancement } from "../game/advancements";
+import { getArchetypeForWheelIndex } from "../game/wheels";
 import type { RunState, SliceCount } from "../schemas";
 import {
   expandSliceCapacity,
@@ -12,7 +19,8 @@ import {
 const MAX_SLICES = RUN_DEFAULTS.maxSliceCapacity;
 
 export function getEffectiveSliceCapacity(run: RunState): SliceCount {
-  return run.sliceCapacity;
+  const fromAdv = getRunMaxSliceCount(run.advancements);
+  return Math.max(run.sliceCapacity, fromAdv) as SliceCount;
 }
 
 export function addSliceSlots(run: RunState, delta: number = 1): RunState {
@@ -68,27 +76,34 @@ export function applyPerkAcquisition(run: RunState, perkId: string): RunState {
   };
 }
 
-export function applyMoneyDelta(run: RunState, rawDelta: number): RunState {
+export function applyMoneyDelta(
+  run: RunState,
+  rawDelta: number,
+  wheelIndex: number = run.wheelIndex
+): RunState {
   if (rawDelta === 0) return run;
 
-  let delta = rawDelta;
+  const archetype = getArchetypeForWheelIndex(wheelIndex);
+  let delta = applyPerkLossMult(rawDelta, run.perks, archetype);
+
+  if (
+    delta < 0 &&
+    hasAdvancement(run, "soft_landing") &&
+    !run.runEffects?.softLandingUsedThisCycle
+  ) {
+    delta = Math.floor(delta * 0.5);
+    run = {
+      ...run,
+      runEffects: { ...run.runEffects, softLandingUsedThisCycle: true },
+    };
+  }
 
   if (delta < 0 && (run.shields ?? 0) > 0) {
     return { ...run, shields: (run.shields ?? 0) - 1 };
   }
 
-  if (delta > 0 && run.perks.includes("gold_rush")) {
-    delta = Math.floor(delta * 1.25);
-  }
-  if (delta > 0 && run.perks.includes("vip_roller")) {
-    delta = Math.floor(delta * 1.2);
-  }
-  if (delta > 0 && run.perks.includes("high_roller")) {
-    delta = Math.floor(delta * 1.15);
-  }
-  if (delta > 0 && run.perks.includes("compounder")) {
-    const fc = Math.max(0, run.floorsCleared ?? 0);
-    delta = Math.floor(delta * (1 + fc * 0.05));
+  if (delta > 0) {
+    delta = applyPerkMoneyPayout(delta, run.perks, run.floorsCleared ?? 0);
   }
 
   let doubleDownPending = run.doubleDownPending;
@@ -108,7 +123,14 @@ export function applyMoneyDelta(run: RunState, rawDelta: number): RunState {
 }
 
 export function applyBankPercent(run: RunState, percent: number): RunState {
-  if (percent >= 0) return applyMoneyDelta(run, Math.floor(run.money * percent));
+  if (percent >= 0) {
+    const gain = applyPerkPercentGain(
+      Math.floor(run.money * percent),
+      run.perks,
+      run.modifiers?.percentGainMult ?? 1
+    );
+    return applyMoneyDelta(run, gain, run.wheelIndex);
+  }
   if ((run.shields ?? 0) > 0) {
     return { ...run, shields: (run.shields ?? 0) - 1 };
   }

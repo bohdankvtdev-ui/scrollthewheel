@@ -1,14 +1,31 @@
 import type { SliceDefinition, SliceCount, WheelDefinition } from "../../../schemas";
-
-function sliceCountFromPrizeCount(count: number): SliceCount {
-  if (count <= 6) return 6;
-  if (count <= 8) return 8;
-  if (count <= 10) return 10;
-  return 12;
-}
+import { SLICES_PER_WHEEL } from "./constants";
 import { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
 import type { PrizeDef, WheelConfigEntry, WheelConfigId, WheelPrizeSlot } from "./types";
+import {
+  buildPrizeSlotsForWheel,
+  finalizeSlicePayload,
+  type BuildWheelPrizeOptions,
+} from "./wheelPrizeBuilder";
 import { FLOOR_WHEEL_ORDER, WHEEL_DATABASE, type FloorWheelOrderId } from "./wheelDatabase";
+
+export type WheelLayoutContext = BuildWheelPrizeOptions;
+
+const VALIDATE_RUN_ID = "__validate__";
+
+function normalizeLayoutContext(
+  ctx?: number | WheelLayoutContext
+): Required<WheelLayoutContext> {
+  if (typeof ctx === "number") {
+    return { runId: VALIDATE_RUN_ID, cycle: ctx, ownedPerks: [], advancements: [] };
+  }
+  return {
+    runId: ctx?.runId ?? VALIDATE_RUN_ID,
+    cycle: ctx?.cycle ?? 1,
+    ownedPerks: ctx?.ownedPerks ?? [],
+    advancements: ctx?.advancements ?? [],
+  };
+}
 
 function assertPrize(prizeId: string): void {
   if (PRIZE_CATALOG[prizeId as PrizeCatalogId] == null) {
@@ -19,19 +36,26 @@ function assertPrize(prizeId: string): void {
 export function buildSliceFromPrizeSlot(
   slot: WheelPrizeSlot,
   wheelId: string,
-  index: number
+  index: number,
+  cycle: number = 1
 ): SliceDefinition {
   assertPrize(slot.prize);
   const template = PRIZE_CATALOG[slot.prize as PrizeCatalogId] as PrizeDef;
+  const { payload, label } = finalizeSlicePayload(
+    { ...template.payload } as Record<string, unknown>,
+    template.kind,
+    template.label,
+    cycle
+  );
   return {
     id: `${wheelId}_${slot.prize}_${index}`,
     kind: template.kind,
-    label: template.label,
+    label,
     icon: template.icon,
     iconFamily: template.iconFamily,
     baseWeight: slot.chance,
     weightTags: template.weightTags ? [...template.weightTags] : undefined,
-    payload: { ...template.payload },
+    payload: payload as PrizeDef["payload"],
     presentation: template.presentation ? { ...template.presentation } : undefined,
   };
 }
@@ -42,16 +66,19 @@ export function buildSliceFromPrizeSlot(
  */
 export function buildSlicesFromPrizes(
   prizes: WheelPrizeSlot[],
-  wheelId: string
+  wheelId: string,
+  cycle: number = 1
 ): SliceDefinition[] {
-  if (prizes.length === 0) {
-    throw new Error(`Wheel "${wheelId}" has no prizes — add rows in wheelDatabase.ts`);
+  if (prizes.length !== SLICES_PER_WHEEL) {
+    throw new Error(
+      `Wheel "${wheelId}" must have exactly ${SLICES_PER_WHEEL} prizes (got ${prizes.length})`
+    );
   }
   const hasWinner = prizes.some((slot) => slot.chance > 0);
   if (!hasWinner) {
     throw new Error(`Wheel "${wheelId}" needs at least one prize with chance > 0`);
   }
-  return prizes.map((slot, index) => buildSliceFromPrizeSlot(slot, wheelId, index));
+  return prizes.map((slot, index) => buildSliceFromPrizeSlot(slot, wheelId, index, cycle));
 }
 
 export function getWheelConfig(configId: WheelConfigId): WheelConfigEntry {
@@ -62,10 +89,23 @@ export function getWheelConfig(configId: WheelConfigId): WheelConfigEntry {
   return entry;
 }
 
+/** Prize rows for a wheel — seeded per run + cycle; scales $/% in `buildSliceFromPrizeSlot`. */
+export function getPrizeSlotsForWheel(
+  configId: WheelConfigId,
+  ctx?: number | WheelLayoutContext
+): WheelPrizeSlot[] {
+  const { runId, cycle, ownedPerks, advancements } = normalizeLayoutContext(ctx);
+  return buildPrizeSlotsForWheel(configId, { runId, cycle, ownedPerks, advancements });
+}
+
 /** Slices for a configured wheel (before floor scaling / capacity padding). */
-export function getConfiguredWheelSlices(configId: WheelConfigId, instanceId: string): SliceDefinition[] {
-  const entry = getWheelConfig(configId);
-  return buildSlicesFromPrizes(entry.prizes, instanceId);
+export function getConfiguredWheelSlices(
+  configId: WheelConfigId,
+  instanceId: string,
+  ctx?: number | WheelLayoutContext
+): SliceDefinition[] {
+  const { cycle } = normalizeLayoutContext(ctx);
+  return buildSlicesFromPrizes(getPrizeSlotsForWheel(configId, ctx), instanceId, cycle);
 }
 
 export function wheelDefinitionFromConfig(configId: WheelConfigId, floor: number): WheelDefinition {
@@ -77,7 +117,7 @@ export function wheelDefinitionFromConfig(configId: WheelConfigId, floor: number
     wheelConfigId: configId,
     role: entry.role,
     title: f > 1 ? `${entry.title} · F${f}` : entry.title,
-    sliceCount: sliceCountFromPrizeCount(entry.prizes.length),
+    sliceCount: SLICES_PER_WHEEL as SliceCount,
     slicePoolId: "config",
     physicsProfileId: entry.physicsProfileId ?? "default",
     modifiers: entry.modifiers,

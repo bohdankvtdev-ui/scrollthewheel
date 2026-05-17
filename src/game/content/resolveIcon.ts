@@ -66,11 +66,25 @@ export function resolveSliceIcon(slice: SliceDefinition): ResolvedIcon {
   }
 
   const byKind = getRegistryIcon("sliceKind", slice.kind);
+  if (slice.kind === "bank_cut" || slice.kind === "bank_wipe") {
+    if (byKind != null) return { ...byKind, source: "registry" };
+  }
+
+  if (slice.icon) {
+    const regTint = byKind?.tint;
+    return {
+      icon: slice.icon,
+      iconFamily: slice.iconFamily,
+      tint: regTint,
+      source: "slice",
+    };
+  }
+
   if (byKind != null) return { ...byKind, source: "registry" };
 
   return {
-    icon: slice.icon,
-    iconFamily: slice.iconFamily,
+    icon: "help-outline",
+    iconFamily: "MaterialIcons",
     source: "slice",
   };
 }

@@ -2,26 +2,36 @@
  * Game loop database — wheels rotation, economy, infinite scaling, shop tree.
  */
 import type { IconFamily, InfiniteScalingParams, SliceCount, WheelDefinition, WheelRole } from "../schemas";
-import { getBlindQuota } from "./gdd";
+import { getBlindQuota, getCycleBonusChips } from "./gdd";
 import { FLOOR_WHEEL_COUNT, prototypeToWheelDefinitions } from "./wheels";
 
-export { GDD_PACING, GDD_LOOP_SUMMARY, PRIZE_TAXONOMY, getBlindQuota, getWheelDifficultyBias } from "./gdd";
+export {
+  GDD_PACING,
+  GDD_LOOP_SUMMARY,
+  PRIZE_TAXONOMY,
+  getBlindQuota,
+  getCycleBonusChips,
+  getCycleParams,
+  getWheelDifficultyBias,
+} from "./gdd";
 
 export const RUN_DEFAULTS = {
   startingMoney: 0,
+  /** Spendable in joker shop during the run */
+  startingChips: 0,
   startingFloor: 1,
   startingSliceCapacity: 6 as SliceCount,
-  maxSliceCapacity: 8 as SliceCount,
+  maxSliceCapacity: 12 as SliceCount,
   minSliceCapacity: 6 as SliceCount,
   historyMaxEvents: 50,
-  /** Run ends only when bank goes negative (Balatro allows $0). */
-  bankruptcyThreshold: -1,
+  /** Run ends when bank is $0 or below. */
+  bankruptcyThreshold: 0,
 } as const;
 
 export const INFINITE_SCALING = {
-  negativeWeightStep: 0.12,
-  stakesMultStep: 0.1,
-  moneyInflationStep: 0.08,
+  negativeWeightStep: 0.14,
+  stakesMultStep: 0.11,
+  moneyInflationStep: 0.06,
   /** Extra negative bias per wheel index within a floor (0–8) */
   wheelIndexNegativeStep: 0.035,
   sliceCapacityBonusFromFloor: 4,
@@ -31,7 +41,7 @@ export const INFINITE_SCALING = {
 /** Ante labels — Balatro-style escalation. */
 export function getBlindLabel(floor: number): string {
   const f = Math.max(1, floor);
-  return `Ante ${f}`;
+  return `Cycle ${f}`;
 }
 
 export function getScalingParams(floor: number): InfiniteScalingParams {
@@ -55,7 +65,7 @@ export function applySliceCapacityFromScaling(current: SliceCount, params: Infin
   ) as SliceCount;
 }
 
-/** 10-wheel floor prototype (see `game/wheels/floorPrototype.ts`). */
+/** 9-wheel cycle (see `game/wheels/database/wheelDatabase.ts`). */
 export const WHEEL_ROTATION: WheelDefinition[] = prototypeToWheelDefinitions(1);
 
 export const WHEEL_COUNT = FLOOR_WHEEL_COUNT;
@@ -96,20 +106,21 @@ export type ShopPerkNode = {
   column: number;
 };
 
+/** Costs are in chips (not run money). */
 export const SHOP_PERK_TREE: ShopPerkNode[] = [
-  { perkId: "lucky_streak", cost: 4, requires: [], tier: 0, column: 0 },
-  { perkId: "iron_reserve", cost: 5, requires: [], tier: 0, column: 1 },
-  { perkId: "ante_insurance", cost: 3, requires: [], tier: 0, column: 2 },
-  { perkId: "extra_slice", cost: 6, requires: [], tier: 0, column: 3 },
-  { perkId: "high_roller", cost: 8, requires: ["lucky_streak"], tier: 1, column: 0 },
-  { perkId: "gold_rush", cost: 10, requires: ["lucky_streak"], tier: 1, column: 1 },
-  { perkId: "safe_harbor", cost: 9, requires: ["iron_reserve"], tier: 1, column: 2 },
-  { perkId: "slice_expander", cost: 12, requires: ["extra_slice"], tier: 1, column: 3 },
+  { perkId: "lucky_money", cost: 5, requires: [], tier: 0, column: 0 },
+  { perkId: "lucky_perk", cost: 5, requires: [], tier: 0, column: 1 },
+  { perkId: "lucky_streak", cost: 6, requires: [], tier: 0, column: 2 },
+  { perkId: "iron_reserve", cost: 6, requires: [], tier: 0, column: 3 },
+  { perkId: "ante_insurance", cost: 4, requires: [], tier: 0, column: 4 },
+  { perkId: "high_roller", cost: 10, requires: ["lucky_money"], tier: 1, column: 0 },
+  { perkId: "gold_rush", cost: 12, requires: ["lucky_money"], tier: 1, column: 1 },
+  { perkId: "safe_harbor", cost: 11, requires: ["iron_reserve"], tier: 1, column: 2 },
   { perkId: "hot_table", cost: 14, requires: ["gold_rush"], tier: 2, column: 0 },
-  { perkId: "coupon_king", cost: 15, requires: ["high_roller"], tier: 2, column: 1 },
-  { perkId: "vip_roller", cost: 16, requires: ["high_roller"], tier: 2, column: 2 },
-  { perkId: "double_down", cost: 18, requires: ["gold_rush", "iron_reserve"], tier: 2, column: 3 },
-  { perkId: "compounder", cost: 22, requires: ["hot_table", "coupon_king"], tier: 3, column: 1 },
+  { perkId: "coupon_king", cost: 14, requires: ["high_roller"], tier: 2, column: 1 },
+  { perkId: "vip_roller", cost: 18, requires: ["high_roller"], tier: 2, column: 2 },
+  { perkId: "double_down", cost: 20, requires: ["gold_rush", "iron_reserve"], tier: 2, column: 3 },
+  { perkId: "compounder", cost: 24, requires: ["hot_table", "coupon_king"], tier: 3, column: 1 },
 ];
 
 export function getBlindQuotaForRun(floor: number, perkIds: string[]): number {

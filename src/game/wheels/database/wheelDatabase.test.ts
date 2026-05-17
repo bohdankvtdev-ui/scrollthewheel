@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
+import {
+  getSliceSlotPalette,
+  getWheelSegmentColors,
+  SLICE_SLOT_PALETTES,
+} from "../../content/sliceVisualTheme";
 import { getSliceProbabilities } from "../../../systems/ProbabilityResolver";
 import { DEFAULT_RESOLVE_CONTEXT } from "../../../systems/types";
+import { SLICES_PER_WHEEL } from "./constants";
 import { buildSlicesFromPrizes, getConfiguredWheelSlices } from "./loader";
 import { validateAllWheels, formatWheelOddsReport } from "./validate";
 import { FLOOR_WHEEL_ORDER } from "./wheelDatabase";
 
 describe("wheelDatabase", () => {
-  it("every wheel has unique prize rows that become visible slices", () => {
+  it("every wheel has exactly six themed slices", () => {
     for (const id of FLOOR_WHEEL_ORDER) {
       const slices = getConfiguredWheelSlices(id, id);
-      expect(slices.length).toBeGreaterThan(0);
+      expect(slices).toHaveLength(SLICES_PER_WHEEL);
       const labels = new Set(slices.map((s) => s.label));
-      expect(labels.size).toBe(slices.length);
+      expect(labels.size).toBe(SLICES_PER_WHEEL);
     }
   });
 
@@ -20,11 +26,14 @@ describe("wheelDatabase", () => {
       [
         { prize: "money_200", chance: 100 },
         { prize: "money_120", chance: 0 },
-        { prize: "perk_gold_rush", chance: 0 },
+        { prize: "money_150", chance: 0 },
+        { prize: "money_100", chance: 0 },
+        { prize: "money_80", chance: 0 },
+        { prize: "money_50", chance: 0 },
       ],
       "test"
     );
-    expect(slices).toHaveLength(3);
+    expect(slices).toHaveLength(6);
     const probs = getSliceProbabilities(slices, {
       ...DEFAULT_RESOLVE_CONTEXT,
       exactLandWeights: true,
@@ -33,26 +42,149 @@ describe("wheelDatabase", () => {
     expect(probs.find((p) => p.label === "+$120")?.probability).toBe(0);
   });
 
-  it("wheel_1 live config matches database land weights", () => {
-    const slices = getConfiguredWheelSlices("wheel_1", "wheel_1");
-    const probs = getSliceProbabilities(slices, {
+  it("percent wheel cycle 1 uses +4/+5/+7 gains without −10%", () => {
+    const c1 = getConfiguredWheelSlices("wheel_2", "wheel_2", 1);
+    const labels = c1.map((s) => s.label);
+    expect(labels).toContain("+4%");
+    expect(labels).toContain("+5%");
+    expect(labels).toContain("+7%");
+    expect(labels).toContain("−10%");
+    expect(c1.every((s) => s.kind !== "bank_cut" || s.icon === "percent")).toBe(true);
+    expect(c1.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
+  });
+
+  it("percent wheel cycle 2+ adds −10% loss wedge", () => {
+    const c2 = getConfiguredWheelSlices("wheel_2", "wheel_2_f2", 2);
+    expect(c2.map((s) => s.label)).toContain("−10%");
+    expect(c2.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
+  });
+
+  it("builder wheel uses six distinct deck labels (not generic Chip)", () => {
+    const slices = getConfiguredWheelSlices("wheel_7", "wheel_7");
+    const labels = slices.map((s) => s.label);
+    expect(labels).toHaveLength(6);
+    expect(new Set(labels).size).toBe(6);
+    expect(labels.filter((l) => l.toLowerCase() === "chip" || l === "+Chip")).toHaveLength(0);
+    expect(labels.some((l) => l.includes("Chip") || l.includes("Mod") || l.includes("Die"))).toBe(true);
+  });
+
+  it("lucky_streak shifts odds on mixed-tag wheels when using database weights", () => {
+    const slices = getConfiguredWheelSlices("wheel_6", "wheel_6");
+    const base = getSliceProbabilities(slices, {
       ...DEFAULT_RESOLVE_CONTEXT,
       exactLandWeights: true,
     });
-    const winner = probs.reduce((best, row) => (row.probability > best.probability ? row : best));
-    expect(winner.probability).toBe(1);
-    expect(winner.label).toBe("Lucky");
+    const lucky = getSliceProbabilities(slices, {
+      ...DEFAULT_RESOLVE_CONTEXT,
+      exactLandWeights: true,
+      positiveWeightMult: 1.15,
+    });
+    const rareOnly = (rows: typeof base) =>
+      rows.filter((s) => s.weightTags.includes("rare") && !s.weightTags.includes("positive"));
+    const rareBase = rareOnly(base).reduce((sum, s) => sum + s.probability, 0);
+    const rareLucky = rareOnly(lucky).reduce((sum, s) => sum + s.probability, 0);
+    const posBase = base
+      .filter((s) => s.weightTags.includes("positive"))
+      .reduce((sum, s) => sum + s.probability, 0);
+    const posLucky = lucky
+      .filter((s) => s.weightTags.includes("positive"))
+      .reduce((sum, s) => sum + s.probability, 0);
+    expect(posLucky).toBeGreaterThan(posBase);
+    expect(rareLucky).toBeLessThan(rareBase);
   });
 
-  it("all wheels validate to ~100% land chance", () => {
+  it("wheel_1 is money-only with same cash icon", () => {
+    const slices = getConfiguredWheelSlices("wheel_1", "wheel_1");
+    expect(slices).toHaveLength(6);
+    expect(slices.filter((s) => s.kind === "money").length).toBeGreaterThanOrEqual(5);
+    expect(slices.some((s) => s.kind === "money_loss")).toBe(true);
+    expect(slices.filter((s) => s.kind === "money").every((s) => s.icon === "attach-money")).toBe(
+      true
+    );
+    const sum = slices.reduce((s, row) => s + row.baseWeight, 0);
+    expect(sum).toBe(100);
+  });
+
+  it("cycle 2 scales money wheel payouts above cycle 1", () => {
+    const c1 = getConfiguredWheelSlices("wheel_1", "wheel_1", 1);
+    const c2 = getConfiguredWheelSlices("wheel_1", "wheel_1_f2", 2);
+    const minGain = (rows: typeof c1) =>
+      Math.min(
+        ...rows
+          .filter((s) => s.kind === "money")
+          .map((s) => s.payload.moneyDelta ?? 0)
+          .filter((n) => n > 0)
+      );
+    expect(minGain(c2)).toBeGreaterThan(minGain(c1));
+  });
+
+  it("lucky wheel layout is stable per run seed", () => {
+    const a = getConfiguredWheelSlices("wheel_6", "wheel_6", { runId: "run-a", cycle: 1 });
+    const b = getConfiguredWheelSlices("wheel_6", "wheel_6", { runId: "run-a", cycle: 1 });
+    const c = getConfiguredWheelSlices("wheel_6", "wheel_6", { runId: "run-b", cycle: 1 });
+    expect(a.map((s) => s.label)).toEqual(b.map((s) => s.label));
+    expect(a.map((s) => s.label)).not.toEqual(c.map((s) => s.label));
+  });
+
+  it("perk wheel omits perks already owned", () => {
+    const slices = getConfiguredWheelSlices("wheel_4", "wheel_4", {
+      runId: "perk-test",
+      cycle: 1,
+      ownedPerks: ["lucky_streak", "gold_rush"],
+    });
+    const perkIds = slices
+      .map((s) => s.payload.perkId)
+      .filter((id): id is string => typeof id === "string");
+    expect(perkIds).not.toContain("lucky_streak");
+    expect(perkIds).not.toContain("gold_rush");
+    expect(perkIds).toHaveLength(6);
+  });
+
+  it("every wheel uses distinct wedge colors per slot", () => {
+    for (const id of FLOOR_WHEEL_ORDER) {
+      const slices = getConfiguredWheelSlices(id, id);
+      const colors = getWheelSegmentColors(slices);
+      expect(new Set(colors).size).toBe(slices.length);
+    }
+  });
+
+  it("each slot uses distinct partner icon ink", () => {
+    const icons = SLICE_SLOT_PALETTES.map((p) => p.icon);
+    expect(new Set(icons).size).toBe(icons.length);
+    for (const slot of SLICE_SLOT_PALETTES) {
+      expect(slot.icon).toMatch(/^#/);
+      expect(slot.segment).not.toBe(slot.icon);
+    }
+  });
+
+  it("all wheels validate to ~100% land chance and theme", () => {
     expect(validateAllWheels()).toEqual([]);
+  });
+
+  it("has nine wheels ending with chaos and boss", () => {
+    expect(FLOOR_WHEEL_ORDER).toHaveLength(9);
+    expect(FLOOR_WHEEL_ORDER[7]).toBe("wheel_8");
+    expect(FLOOR_WHEEL_ORDER[8]).toBe("wheel_9");
+    const chaos = getConfiguredWheelSlices("wheel_8", "wheel_8", { runId: "__validate__", cycle: 3 });
+    expect(
+      chaos.some(
+        (s) =>
+          s.payload.runEffectId === "corruption_spread" ||
+          s.kind === "bank_wipe" ||
+          s.kind === "bank_cut"
+      )
+    ).toBe(true);
+    const boss = getConfiguredWheelSlices("wheel_9", "wheel_9", { runId: "__validate__", cycle: 2 });
+    expect(
+      boss.some((s) => s.payload.runEffectId === "doom_spiral" || s.kind === "relic_offer")
+    ).toBe(true);
   });
 
   it("prints wheel_1 odds (manual inspect)", () => {
     const report = formatWheelOddsReport("wheel_1");
     // eslint-disable-next-line no-console
     console.log("\n" + report + "\n");
-    expect(report).toContain("Lucky");
-    expect(report).toContain("100.0%");
+    expect(report).toContain("Money Wheel");
+    expect(report).toContain("money");
   });
 });

@@ -7,6 +7,7 @@ import { resolveWheelPhysics } from "../../../lib/wheel/resolveWheelPhysics";
 import { normalizeWheelInnerSize } from "../../../lib/layout/wheelFrame";
 import { Neo, NeoWheel, neoTitleStyle } from "../../../theme/neoBrutal";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
+import { getWheelSegmentColors } from "../../game/content/sliceVisualTheme";
 import type { ResolvedWheel, RunState } from "../../schemas";
 import { resolveSlice } from "../../systems/ProbabilityResolver";
 import { RunManager } from "../../systems/RunManager";
@@ -41,9 +42,7 @@ export function WheelRenderer({ run, wheel, wheelIndex, itemHeight, onSettled }:
   const canSpin = RunManager.canSpin(run, wheelIndex) && isActive && !isSpinning;
   const locked = !canSpin;
 
-  const segmentColors = useMemo(() => {
-    return wheel.slices.map((s, i) => Neo.segmentColors[(s.presentation?.colorIndex ?? i) % Neo.segmentColors.length]!);
-  }, [wheel.slices]);
+  const segmentColors = useMemo(() => getWheelSegmentColors(wheel.slices), [wheel.slices]);
 
   const { innerSize, textSize } = useMemo(() => {
     const inner = normalizeWheelInnerSize(Math.min(itemHeight * 0.52, 320));

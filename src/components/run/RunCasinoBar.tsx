@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -14,6 +14,7 @@ import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
+import { RUN_PRESSURE } from "../../game/runState/runPressure";
 import { formatMoney } from "../../utils/formatMoney";
 
 type RunCasinoBarProps = {
@@ -26,6 +27,8 @@ type RunCasinoBarProps = {
 export function RunCasinoBar({ run, shopHighlighted = false, onShop, onReset }: RunCasinoBarProps) {
   const router = useRouter();
   const runChips = run.chipsEarnedThisRun ?? 0;
+  const pressure = run.pressure ?? 0;
+  const winStreak = run.winStreak ?? 0;
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function RunCasinoBar({ run, shopHighlighted = false, onShop, onReset }: 
   return (
     <View style={styles.wrap}>
       <View style={styles.chipBlock} accessibilityLabel={`${runChips} chips this run`}>
-        <MaterialIcons name="toll" size={16} color={Neo.neonCyan} />
+        <MaterialCommunityIcons name="poker-chip" size={18} color={Neo.neonCyan} />
         <Text style={[styles.chipVal, { fontFamily: FONT_BEBAS_NEUE }]}>{runChips}</Text>
       </View>
       <View style={styles.moneyBlock}>
@@ -66,6 +69,22 @@ export function RunCasinoBar({ run, shopHighlighted = false, onShop, onReset }: 
           {run.pendingWheelRebuild ? "→" : ""}
         </Text>
       </View>
+
+      <View style={styles.pressurePill} accessibilityLabel={`Heat ${pressure} of ${RUN_PRESSURE.max}`}>
+        {Array.from({ length: RUN_PRESSURE.max }, (_, i) => (
+          <View
+            key={i}
+            style={[styles.pressureDot, i < pressure && styles.pressureDotHot]}
+          />
+        ))}
+      </View>
+
+      {winStreak >= 2 ? (
+        <View style={styles.streakPill}>
+          <MaterialIcons name="whatshot" size={14} color={Neo.ink} />
+          <Text style={[styles.streakText, { fontFamily: FONT_BEBAS_NEUE }]}>{winStreak}</Text>
+        </View>
+      ) : null}
 
       {(run.shields ?? 0) > 0 ? (
         <View style={styles.shieldPill}>
@@ -160,6 +179,41 @@ const styles = StyleSheet.create({
   },
   sliceText: {
     fontSize: 15,
+    color: Neo.ink,
+  },
+  pressurePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    height: 32,
+    paddingHorizontal: 6,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    borderWidth: Neo.borderThin,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  pressureDot: {
+    width: 7,
+    height: 14,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  pressureDotHot: {
+    backgroundColor: "#FB7185",
+  },
+  streakPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    height: 32,
+    paddingHorizontal: 6,
+    backgroundColor: Neo.neonYellow,
+    borderWidth: Neo.borderThin,
+    borderColor: Neo.ink,
+    borderRadius: 8,
+  },
+  streakText: {
+    fontSize: 14,
     color: Neo.ink,
   },
   shieldPill: {

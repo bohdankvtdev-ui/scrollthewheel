@@ -13,7 +13,7 @@ export type WheelRole =
   | "preparation"
   | "boss";
 
-export type SliceCount = 6 | 8 | 10 | 12;
+export type SliceCount = 6 | 7 | 8 | 9 | 10 | 12;
 
 export type WheelDefinition = {
   id: string;

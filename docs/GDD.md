@@ -8,19 +8,17 @@ This document explains what the player does, how a run works, and where to chang
 
 ## In 60 seconds
 
-1. You start a **run** with **$500** and a wheel that has **6 wedges** (grows to 7, then 8 max).
-2. Each **floor** has **9 wheels** in a fixed order. You **spin once** per wheel.
-3. The wedge you land on gives **cash**, a **perk**, a **chip**, a **curse**, etc.
-4. After each spin you **swipe up** (or tap Next) to go to the next wheel.
-5. After wheel 9, the game checks: is your **bank ≥ floor target**?
-   - **Yes** → you cleared the floor → harder **floor 2**, same 9-wheel pattern.
-   - **No** → you lose the run.
-6. If your bank hits **$0** at any time → you lose immediately.
-7. **Shop** is optional — open it yourself from the top bar; it does not pop up after every wheel.
-8. **Perks** = small icons in your loadout (passive bonuses for the whole run).
-9. **Chips** = another row of icons (also passives). They are **not** spell cards.
+1. You start a **run** with **$300** and a **6-wedge** wheel (fixed count).
+2. Each **cycle** has **9 wheels** in a fixed order. You **spin once** per wheel.
+3. Wedges give **cash**, **perks**, **chips**, **curses**, or **run effects** (Debt Bomb, Doom Spiral, …).
+4. After each spin, **swipe up** (or tap Next) for the next wheel.
+5. After **wheel 9 (Boss)**, you **clear the cycle** and continue to a harder **cycle 2+** (same 9-wheel route).
+6. **Cycle bonus:** if bank ≥ bonus target at cycle end, you earn extra **meta chips** (optional, not required to advance).
+7. You **lose** when your **bank hits $0** (no separate HP).
+8. **Shop** is optional — open from the top bar after spins (highlight only).
+9. **Meta chips** = long-term score; **money** = in-run shop currency.
 
-**Pacing goal:** about **10 minutes** per average run (~9 wheels × ~45 seconds × ~1.5 floors).
+**Pacing goal:** **5–30 minutes** depending on cycles survived (~9 wheels × ~45s per cycle).
 
 ---
 
@@ -28,9 +26,9 @@ This document explains what the player does, how a run works, and where to chang
 
 | Term | Meaning |
 |------|---------|
-| **Bank / money** | Your cash. This is the only number that decides win/lose on a floor. |
-| **Floor** | One full pass through all 9 wheels, then a target check. |
-| **Floor target** (quota) | Minimum bank required after wheel 9. Shown in the UI progress bar. |
+| **Bank / money** | In-run cash for shop and slices. |
+| **Cycle** | One full pass through all 9 wheels; boss is wheel 9. |
+| **Cycle bonus** (quota) | Optional bank target for extra meta chips at cycle end. |
 | **Wheel** | One spin stage (wedges on the disc). Exactly one spin per wheel per floor. |
 | **Wedge / slice** | One segment on the wheel; each has a prize type and effect. |
 | **Perk** | Permanent upgrade for this run (icon in loadout). Bought in shop or won on wheel. |
@@ -74,34 +72,31 @@ Floor starts — bank $500, target e.g. $520, wheel 1 of 9
 
 | What happens | When |
 |--------------|------|
-| **Lose — bankrupt** | Bank reaches **$0** (any time). |
-| **Lose — missed target** | Finished wheel 9 and bank **below floor target**. |
-| **Win floor** | Finished wheel 9 and bank **at or above floor target**. |
-| **Keep playing** | After winning a floor, start floor 2+ with harder odds and a higher target. |
+| **Lose — broke** | Bank is **$0** or below — run ends. |
+| **Clear cycle** | Survive wheel 9 boss → **cycle level++**, harder wheels. |
+| **Cycle bonus** | Bank ≥ bonus target at cycle end → extra meta chips. |
 
-There is no “final credits” screen goal yet — the mode is **infinite floors** until you lose.
+Mode is **infinite cycles** until you lose. No hard blind gate to advance.
 
 ---
 
-## The 9 wheels (every floor, same order)
+## The 9 wheels (every cycle, same order)
 
-Each floor uses the same **roles** in the same order. Names in the UI may show `· F2` on later floors but the **design role** is unchanged.
+| # | Wheel | Purpose |
+|---|--------|---------|
+| 1 | **Money** | Warm-up economy — flat cash only |
+| 2 | **Percent** | % cuts, wipe, double bank |
+| 3 | **Risk** | Big swings, curses, cash losses |
+| 4 | **Perk** | Build engine — perk offers |
+| 5 | **Drain** | Punishment — losses, Debt Bomb, Lock |
+| 6 | **Lucky** | Jackpots and streak perks |
+| 7 | **Builder** | Chip row add/remove/upgrade |
+| 8 | **Chaos** | Pre-boss stress — wipe, corruption, gamble |
+| 9 | **Boss** | Gate — mega rewards, Doom Spiral, relic |
 
-| # | What you see | Design purpose |
-|---|----------------|----------------|
-| 1 | **Starter** | Gentle start: small cash, intro perks |
-| 2 | **Cash Rush** | More money wedges |
-| 3 | **High Roller** | Big wins and bigger losses, curses |
-| 4 | **Cool Down** | Recovery: shields, +1 wedge, safer slices |
-| 5 | **Stakes Wheel** | Can lose **% of your whole bank** (danger is on the wedges, not a separate banner) |
-| 6 | **Jackpot** | Rare huge cash and relics |
-| 7 | **Power Surge** | Many **perk** wedges |
-| 8 | **Mod Wheel** | Add, remove, or upgrade **chips** |
-| 9 | **Boss Wheel** | Worst risks (wipe, −75% bank) and best rewards |
+**Cycle scaling:** Cycle 2+ adds negative bias, shop price increases, cycle 3+ swaps some wheels to risk, cycle 4+ double-boss pressure on wheel 9.
 
-**Difficulty within a floor:** Later wheels (5–9) are meant to feel heavier. Higher **floor number** makes negatives stronger and cash prizes scale up.
-
-**Where to edit order or pools:** `src/game/loop.ts` (`WHEEL_ROTATION`) + `src/game/prizes.ts` (`SLICE_POOLS`).
+**Edit wheels:** `src/game/wheels/database/wheelDatabase.ts` + `prizeCatalog.ts`. Run `npm run validate:wheels`.
 
 ---
 
@@ -156,8 +151,10 @@ Icons in the **perk row**; tap for description. Won on wheels or bought in **sho
 
 - Opened **manually** (store icon) — **not** after every wheel.
 - **Branching tree:** cheap perks first; later nodes need earlier buys.
-- Pay from your **bank**; same perks as on wheels (including +1 Slice twice until 8 wedges).
-- **Edit tree & prices:** `SHOP_PERK_TREE` in `src/game/loop.ts`.
+- Pay with **chips** earned during the run (poker-chip icon in the top bar) — **not** bank money.
+- Starting chips: **12**; spins and cycle clears earn more.
+- **Bank money** is only for wheel slice outcomes and cycle bonus targets.
+- **Edit tree & chip prices:** `SHOP_PERK_TREE` in `src/game/loop.ts`.
 
 ---
 

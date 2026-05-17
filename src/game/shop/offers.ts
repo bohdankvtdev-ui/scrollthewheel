@@ -1,6 +1,7 @@
 import { SHOP_PERK_TREE, type ShopPerkNode } from "../loop";
 import type { RunState } from "../../schemas";
 import { BALATRO_ECONOMY } from "../balatroEconomy";
+import { shopChipCost } from "./chipEconomy";
 import { countJokers, isJokerSlotFull } from "./jokerSlots";
 
 function seedFromRun(run: RunState, salt: number): number {
@@ -23,17 +24,12 @@ function mulberry32(seed: number) {
 
 function nodeAvailable(run: RunState, node: ShopPerkNode): boolean {
   if (node.perkId === "extra_slice" || node.perkId === "slice_expander") {
-    return run.sliceCapacity < 8;
+    return false;
   }
   if (run.perks.includes(node.perkId)) return false;
-  if (isJokerSlotFull(run) && !run.perks.includes(node.perkId)) {
-    const isSliceUpgrade = node.perkId === "extra_slice" || node.perkId === "slice_expander";
-    if (!isSliceUpgrade) return false;
-  }
+  if (isJokerSlotFull(run)) return false;
   for (const req of node.requires) {
-    if (req === "extra_slice") {
-      if (run.sliceCapacity < 7) return false;
-    } else if (!run.perks.includes(req)) {
+    if (!run.perks.includes(req)) {
       return false;
     }
   }
@@ -65,7 +61,8 @@ export function pickShopOfferIds(
 }
 
 export function shopRerollCost(run: RunState, rerollsThisVisit: number): number {
-  return BALATRO_ECONOMY.shopRerollBaseCost + rerollsThisVisit * 2;
+  const base = BALATRO_ECONOMY.shopRerollBaseCost + rerollsThisVisit * 2;
+  return shopChipCost(run, base);
 }
 
 export function sellRefundAmount(baseCost: number): number {

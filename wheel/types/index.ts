@@ -12,8 +12,12 @@ export type SpinWheelItem = {
   shortLabel?: string;
   icon?: string;
   iconFamily?: SpinWheelIconFamily;
-  /** Minimal icon chip fill on the slice. */
+  /** @deprecated Prefer iconChipBg */
   iconTint?: string;
+  iconChipBg?: string;
+  iconColor?: string;
+  captionColor?: string;
+  iconTone?: import("../../src/game/content/sliceVisualTheme").SliceVisualTone;
 };
 
 export type SpinWheelProps = {
@@ -71,6 +75,9 @@ export type SpinWheelProps = {
    * Prize-disc “lift” pulse while spinning — share with sibling chrome (e.g. bulb ring) so motion matches.
    */
   syncDiscScale?: Animated.Value;
+  /** Tap a wedge to preview its prize (disabled while spinning). */
+  onSlicePress?: (index: number) => void;
+  slicePressEnabled?: boolean;
 };
 
 export type SpinWheelRef = {

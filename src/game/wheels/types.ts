@@ -1,6 +1,6 @@
 import type { WheelDefinition, WheelRole } from "../../schemas";
 
-/** Design-facing wheel kinds (10-wheel floor prototype). */
+/** Design-facing wheel kinds (9-wheel cycle). */
 export type WheelArchetype =
   | "money"
   | "percent"
@@ -9,8 +9,7 @@ export type WheelArchetype =
   | "drain"
   | "lucky"
   | "builder"
-  | "jackpot"
-  | "curse"
+  | "chaos"
   | "boss";
 
 export type PrototypeWheelTemplate = {

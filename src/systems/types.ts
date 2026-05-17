@@ -5,6 +5,8 @@ export type ResolveContext = {
   bossWeightMult: number;
   wheelNegativeBias: number;
   tagMults: Record<string, number>;
+  /** Per-slice-kind land weight mult (lucky money / lucky perk). */
+  kindWeightMults?: Partial<Record<string, number>>;
   /** When true, land % = slice baseWeight only (wheelDatabase `chance` values). */
   exactLandWeights?: boolean;
 };

@@ -1,7 +1,12 @@
 import type { ResolvedWheel } from "./wheel.schema";
 import type { SliceCount } from "./wheel.schema";
 
-export type RunPhase = "active" | "won" | "lost_money" | "lost_blind" | "lost_boss";
+export type RunPhase =
+  | "active"
+  | "won"
+  | "lost_money"
+  | "lost_blind"
+  | "lost_boss";
 
 export type SpinEvent = {
   wheelIndex: number;
@@ -16,6 +21,23 @@ export type RunModifiersPersisted = {
   moneyLossMult?: number;
   rareWeightMult?: number;
   chipGainMult?: number;
+  /** +% bank from percent wheel gains (chip forge). */
+  percentGainMult?: number;
+};
+
+export type ChipForgeLevels = Partial<
+  Record<"forge_cash" | "forge_guard" | "forge_chips" | "forge_barrier", number>
+>;
+
+/** Temporary rules from complexity slices (Lock, Corruption, Doom Spiral, …). */
+export type RunEffectsPersisted = {
+  forcedArchetypeByIndex?: Record<number, string>;
+  negativeBiasBonus?: number;
+  corruptionRemainingWheels?: number;
+  doomSpiralRemainingWheels?: number;
+  debtShieldUsedThisCycle?: boolean;
+  softLandingUsedThisCycle?: boolean;
+  ironGritUsed?: boolean;
 };
 
 export type RunState = {
@@ -27,9 +49,19 @@ export type RunState = {
   /** Meta chips earned this run (global score; not spendable in-run). */
   chipsEarnedThisRun?: number;
   modifiers?: RunModifiersPersisted;
+  runEffects?: RunEffectsPersisted;
   pendingJokerOffers?: string[];
   deck: string[];
   perks: string[];
+  /** Shop-bought run upgrades (slice inject, cycle bonuses, …). */
+  advancements?: string[];
+  /** Repeatable chip-forge levels (in-run shop). */
+  chipForge?: ChipForgeLevels;
+  forgeShieldsGranted?: number;
+  /** Heat 0–5 — lose at 5. Bad spins add; wins remove. */
+  pressure?: number;
+  winStreak?: number;
+  lossStreak?: number;
   /** Blocks money-loss slices (Iron Reserve). */
   shields?: number;
   debuffs: string[];

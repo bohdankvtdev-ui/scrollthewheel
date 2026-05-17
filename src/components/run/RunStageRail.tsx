@@ -28,7 +28,7 @@ export function RunStageRail({ run }: RunStageRailProps) {
             {floorTier}
           </Text>
           <Text style={[styles.floorMeta, { fontFamily: FONT_BEBAS_NEUE }]}>
-            Blind · Wheel {run.wheelIndex + 1}/{WHEEL_COUNT}
+            Wheel {run.wheelIndex + 1}/{WHEEL_COUNT} · Cycle {run.floor}
           </Text>
         </View>
         <View style={[styles.wheelBadge, { borderColor: stage.accent }]}>
@@ -55,7 +55,7 @@ export function RunStageRail({ run }: RunStageRailProps) {
           />
         </View>
         <Text style={[styles.quotaTarget, { fontFamily: FONT_BEBAS_NEUE }]}>
-          Blind {formatMoney(run.blindQuota)}
+          Bonus {formatMoney(run.blindQuota)}
         </Text>
       </View>
 

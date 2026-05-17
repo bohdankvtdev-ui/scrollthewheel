@@ -2,6 +2,11 @@ import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { PERK_CATALOG } from "../../data/perks";
 import { PERK_TIER_LABELS } from "../../game/gdd";
+import {
+  getPerkDisplay,
+  PERK_CATEGORY_COLORS,
+  PERK_CATEGORY_LABELS,
+} from "../../game/perks/perkDisplay";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { IconFamily } from "../../schemas";
@@ -12,40 +17,76 @@ type PerkDetailSheetProps = {
   onClose: () => void;
 };
 
-function Glyph({ family, name }: { family: IconFamily; name: string }) {
+function Glyph({
+  family,
+  name,
+  color,
+}: {
+  family: IconFamily;
+  name: string;
+  color: string;
+}) {
   if (family === "MaterialCommunityIcons") {
     return (
       <MaterialCommunityIcons
         name={name as keyof typeof MaterialCommunityIcons.glyphMap}
         size={40}
-        color={Neo.ink}
+        color={color}
       />
     );
   }
-  return <MaterialIcons name={name as keyof typeof MaterialIcons.glyphMap} size={40} color={Neo.ink} />;
+  return (
+    <MaterialIcons
+      name={name as keyof typeof MaterialIcons.glyphMap}
+      size={40}
+      color={color}
+    />
+  );
 }
 
 export function PerkDetailSheet({ perkId, visible, onClose }: PerkDetailSheetProps) {
   const perk = perkId != null ? PERK_CATALOG[perkId] : null;
+  const display = perkId != null ? getPerkDisplay(perkId) : null;
   if (perk == null) return null;
+
+  const colors = PERK_CATEGORY_COLORS[perk.category];
+  const categoryLabel = PERK_CATEGORY_LABELS[perk.category];
+  const bullets = display?.bullets ?? [perk.description];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.iconBox}>
-            <Glyph family={perk.iconFamily} name={perk.icon} />
+          <View style={[styles.iconBox, { backgroundColor: colors.bg }]}>
+            <Glyph family={perk.iconFamily} name={perk.icon} color={colors.accent} />
           </View>
+
           <Text style={[styles.name, { fontFamily: FONT_BEBAS_NEUE }]}>{perk.name}</Text>
+          {perk.tagline.length > 0 ? (
+            <Text style={styles.tagline}>{perk.tagline}</Text>
+          ) : null}
+
           <View style={styles.metaRow}>
             <Text style={[styles.tier, { fontFamily: FONT_BEBAS_NEUE }]}>
               {PERK_TIER_LABELS[perk.tier]}
             </Text>
-            <Text style={styles.category}>{perk.category}</Text>
+            <Text style={[styles.category, { backgroundColor: colors.bg, color: colors.accent }]}>
+              {categoryLabel}
+            </Text>
           </View>
-          <Text style={styles.desc}>{perk.description}</Text>
+
+          <View style={styles.bulletBox}>
+            <Text style={[styles.bulletHeading, { fontFamily: FONT_BEBAS_NEUE }]}>How it works</Text>
+            {bullets.map((line) => (
+              <View key={line} style={styles.bulletRow}>
+                <Text style={styles.bulletDot}>•</Text>
+                <Text style={styles.bulletText}>{line}</Text>
+              </View>
+            ))}
+          </View>
+
           <Pressable style={styles.closeBtn} onPress={onClose}>
-            <Text style={[styles.closeLbl, { fontFamily: FONT_BEBAS_NEUE }]}>Close</Text>
+            <Text style={[styles.closeLbl, { fontFamily: FONT_BEBAS_NEUE }]}>Got it</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -63,68 +104,105 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    maxWidth: 320,
-    backgroundColor: Neo.neonYellow,
+    maxWidth: 340,
+    backgroundColor: "#FFFBEB",
     borderWidth: Neo.borderBold,
     borderColor: Neo.ink,
     borderRadius: Neo.radiusCard,
     padding: 20,
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
+    width: 72,
+    height: 72,
+    borderRadius: 16,
     borderWidth: Neo.borderBold,
     borderColor: Neo.ink,
-    backgroundColor: "#FFFBEB",
     alignItems: "center",
     justifyContent: "center",
   },
   name: {
-    fontSize: 24,
+    fontSize: 26,
     color: Neo.ink,
     letterSpacing: 0.4,
+    textAlign: "center",
+  },
+  tagline: {
+    fontSize: 15,
+    color: "rgba(0,0,0,0.55)",
+    textAlign: "center",
+    marginTop: -2,
   },
   metaRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     alignItems: "center",
+    marginTop: 4,
   },
   tier: {
-    fontSize: 14,
+    fontSize: 13,
     color: Neo.ink,
-    backgroundColor: Neo.neonCyan,
+    backgroundColor: Neo.neonYellow,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 6,
     borderWidth: Neo.borderThin,
     borderColor: Neo.ink,
   },
   category: {
     fontSize: 12,
-    color: Neo.ink,
-    opacity: 0.7,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    fontWeight: "700",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: Neo.borderThin,
+    borderColor: Neo.ink,
+    overflow: "hidden",
   },
-  desc: {
-    fontSize: 15,
+  bulletBox: {
+    width: "100%",
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderRadius: 10,
+    borderWidth: Neo.borderThin,
+    borderColor: "rgba(0,0,0,0.12)",
+    gap: 6,
+  },
+  bulletHeading: {
+    fontSize: 13,
     color: Neo.ink,
-    textAlign: "center",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  bulletRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  bulletDot: {
+    fontSize: 14,
     lineHeight: 20,
-    marginTop: 4,
+    color: Neo.ink,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Neo.ink,
   },
   closeBtn: {
-    marginTop: 8,
+    marginTop: 10,
     backgroundColor: Neo.ink,
     borderRadius: 10,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 11,
+    width: "100%",
+    alignItems: "center",
   },
   closeLbl: {
-    fontSize: 16,
+    fontSize: 17,
     color: Neo.neonYellow,
     letterSpacing: 0.35,
   },

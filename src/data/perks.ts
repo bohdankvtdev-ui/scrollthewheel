@@ -1,5 +1,6 @@
 import type { IconFamily } from "../schemas";
 import type { PerkTier } from "../game/gdd";
+import { PERK_DISPLAY } from "../game/perks/perkDisplay";
 import { withRegistryIcons } from "../game/content/withRegistryIcons";
 
 export type PerkCategory = "economy" | "defense" | "wheel" | "meta";
@@ -9,132 +10,144 @@ export type PerkDefinition = {
   name: string;
   icon: string;
   iconFamily: IconFamily;
+  /** Short line for shop cards & tooltips */
   description: string;
+  tagline: string;
   tier: PerkTier;
   category: PerkCategory;
 };
 
+function def(
+  id: string,
+  name: string,
+  icon: string,
+  iconFamily: IconFamily,
+  tier: PerkTier,
+  category: PerkCategory
+): PerkDefinition {
+  const copy = PERK_DISPLAY[id];
+  return {
+    id,
+    name,
+    icon,
+    iconFamily,
+    tier,
+    category,
+    tagline: copy?.tagline ?? "",
+    description: copy?.shopLine ?? "",
+  };
+}
+
 const PERK_CATALOG_RAW: Record<string, PerkDefinition> = {
-  lucky_streak: {
-    id: "lucky_streak",
-    name: "Lucky Streak",
-    icon: "stars",
-    iconFamily: "MaterialIcons",
-    description: "+15% odds on cash & perk slices",
-    tier: 0,
-    category: "economy",
-  },
-  iron_reserve: {
-    id: "iron_reserve",
-    name: "Iron Reserve",
-    icon: "shield",
-    iconFamily: "MaterialCommunityIcons",
-    description: "+1 shield — blocks one cash loss",
-    tier: 0,
-    category: "defense",
-  },
-  ante_insurance: {
-    id: "ante_insurance",
-    name: "Quota Shield",
-    icon: "policy",
-    iconFamily: "MaterialIcons",
-    description: "Floor cash target −12%",
-    tier: 0,
-    category: "meta",
-  },
-  extra_slice: {
-    id: "extra_slice",
-    name: "+1 Slice",
-    icon: "unfold-more",
-    iconFamily: "MaterialIcons",
-    description: "+1 wedge next wheel (6→7→8 max)",
-    tier: 0,
-    category: "wheel",
-  },
-  slice_expander: {
-    id: "slice_expander",
-    name: "+1 Slice",
-    icon: "unfold-more",
-    iconFamily: "MaterialIcons",
-    description: "Alias: +1 wedge",
-    tier: 0,
-    category: "wheel",
-  },
-  high_roller: {
-    id: "high_roller",
-    name: "High Roller",
-    icon: "casino",
-    iconFamily: "MaterialIcons",
-    description: "+15% cash from money slices",
-    tier: 1,
-    category: "economy",
-  },
-  gold_rush: {
-    id: "gold_rush",
-    name: "Gold Rush",
-    icon: "trending-up",
-    iconFamily: "MaterialIcons",
-    description: "+25% cash from money slices",
-    tier: 1,
-    category: "economy",
-  },
-  safe_harbor: {
-    id: "safe_harbor",
-    name: "Safe Harbor",
-    icon: "security",
-    iconFamily: "MaterialIcons",
-    description: "+1 shield — stacks with Iron Reserve",
-    tier: 1,
-    category: "defense",
-  },
-  coupon_king: {
-    id: "coupon_king",
-    name: "Coupon King",
-    icon: "sell",
-    iconFamily: "MaterialIcons",
-    description: "Shop prices −15%",
-    tier: 2,
-    category: "meta",
-  },
-  hot_table: {
-    id: "hot_table",
-    name: "Hot Table",
-    icon: "whatshot",
-    iconFamily: "MaterialIcons",
-    description: "+10% rare & jackpot slice odds",
-    tier: 2,
-    category: "economy",
-  },
-  vip_roller: {
-    id: "vip_roller",
-    name: "VIP Roller",
-    icon: "workspace-premium",
-    iconFamily: "MaterialIcons",
-    description: "+20% cash from money slices",
-    tier: 2,
-    category: "economy",
-  },
-  double_down: {
-    id: "double_down",
-    name: "Double Down",
-    icon: "exposure-plus-1",
-    iconFamily: "MaterialIcons",
-    description: "Next cash slice pays ×2 (consumes)",
-    tier: 2,
-    category: "economy",
-  },
-  compounder: {
-    id: "compounder",
-    name: "Compounder",
-    icon: "savings",
-    iconFamily: "MaterialIcons",
-    description: "+5% cash per floor already cleared",
-    tier: 3,
-    category: "economy",
-  },
+  lucky_money: def(
+    "lucky_money",
+    "Lucky Money",
+    "cash",
+    "MaterialCommunityIcons",
+    0,
+    "wheel"
+  ),
+  lucky_perk: def(
+    "lucky_perk",
+    "Lucky Perk",
+    "star-four-points",
+    "MaterialCommunityIcons",
+    0,
+    "wheel"
+  ),
+  lucky_streak: def(
+    "lucky_streak",
+    "Lucky Charm",
+    "clover",
+    "MaterialCommunityIcons",
+    0,
+    "wheel"
+  ),
+  iron_reserve: def(
+    "iron_reserve",
+    "Iron Shield",
+    "shield-check",
+    "MaterialCommunityIcons",
+    0,
+    "defense"
+  ),
+  ante_insurance: def(
+    "ante_insurance",
+    "Cycle Cushion",
+    "umbrella",
+    "MaterialCommunityIcons",
+    0,
+    "meta"
+  ),
+  high_roller: def(
+    "high_roller",
+    "Loaded Money",
+    "dice-multiple",
+    "MaterialCommunityIcons",
+    1,
+    "wheel"
+  ),
+  gold_rush: def(
+    "gold_rush",
+    "Gold Rush",
+    "cash-multiple",
+    "MaterialCommunityIcons",
+    1,
+    "economy"
+  ),
+  safe_harbor: def(
+    "safe_harbor",
+    "Safe Harbor",
+    "anchor",
+    "MaterialCommunityIcons",
+    1,
+    "defense"
+  ),
+  coupon_king: def(
+    "coupon_king",
+    "Coupon King",
+    "ticket-percent",
+    "MaterialCommunityIcons",
+    2,
+    "meta"
+  ),
+  hot_table: def(
+    "hot_table",
+    "Hot Table",
+    "fire",
+    "MaterialCommunityIcons",
+    2,
+    "economy"
+  ),
+  vip_roller: def(
+    "vip_roller",
+    "Percent Plus",
+    "crown",
+    "MaterialCommunityIcons",
+    2,
+    "wheel"
+  ),
+  double_down: def(
+    "double_down",
+    "Double Down",
+    "cards-playing",
+    "MaterialCommunityIcons",
+    2,
+    "economy"
+  ),
+  compounder: def(
+    "compounder",
+    "Compounder",
+    "chart-timeline-variant",
+    "MaterialCommunityIcons",
+    3,
+    "economy"
+  ),
 };
 
-/** Icons overridden by `src/game/content/iconRegistry.ts` → `perk` table. */
+/** @deprecated Wheels are fixed at 6 slices — not sold or shown. */
+export const SLICE_PERK_IDS = ["extra_slice", "slice_expander"] as const;
+
 export const PERK_CATALOG = withRegistryIcons(PERK_CATALOG_RAW, "perk");
 
 export const PERK_IDS = Object.keys(PERK_CATALOG);

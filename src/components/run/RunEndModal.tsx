@@ -10,16 +10,22 @@ type RunEndModalProps = {
   onContinueInfinite?: () => void;
 };
 
+const LOSS_COPY: Partial<Record<RunPhase, string>> = {
+  lost_money: "Your bank hit $0 — run over",
+  lost_blind: "Bank below cycle bonus target",
+  lost_boss: "Boss ended the run",
+};
+
 export function RunEndModal({ phase, floor, onRestart, onContinueInfinite }: RunEndModalProps) {
   if (phase === "active") return null;
 
   const title =
     phase === "won"
-      ? "Blind cleared!"
+      ? "Cycle cleared"
       : phase === "lost_money"
-        ? "In debt"
+        ? "Broke"
         : phase === "lost_blind"
-          ? "Missed blind"
+          ? "Missed bonus"
           : "Run over";
 
   return (
@@ -27,18 +33,16 @@ export function RunEndModal({ phase, floor, onRestart, onContinueInfinite }: Run
       <View style={styles.panel}>
         <Text style={neoTitleOnDark(28)}>{title}</Text>
         <Text style={neoSubtitleOnDark(16)}>
-          {phase === "lost_blind"
-            ? `Bank below blind target after all wheels`
-            : phase === "lost_money"
-              ? `Money dropped below $0`
-              : `Ante ${floor} complete`}
+          {phase === "won"
+            ? `Cycle ${floor} complete — next cycle is harder`
+            : LOSS_COPY[phase] ?? "Run ended"}
         </Text>
         <TouchableOpacity style={styles.btn} onPress={onRestart} activeOpacity={0.9}>
           <Text style={styles.btnText}>New Run</Text>
         </TouchableOpacity>
         {phase === "won" && onContinueInfinite != null ? (
           <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={onContinueInfinite} activeOpacity={0.9}>
-            <Text style={styles.btnText}>Next ante</Text>
+            <Text style={styles.btnText}>Next cycle</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -49,14 +53,14 @@ export function RunEndModal({ phase, floor, onRestart, onContinueInfinite }: Run
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10,10,10,0.72)",
+    backgroundColor: "rgba(0,0,0,0.72)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 100,
   },
   panel: {
-    backgroundColor: Neo.surfaceDark,
-    borderWidth: Neo.borderBold,
+    backgroundColor: Neo.ink,
+    borderWidth: Neo.borderWidth,
     borderColor: Neo.ink,
     borderRadius: Neo.radiusCard,
     padding: 24,

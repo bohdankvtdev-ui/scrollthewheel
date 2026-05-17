@@ -1,11 +1,15 @@
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { FONT_BEBAS_NEUE } from "../../theme/fonts";
-import { Neo } from "../../theme/neoBrutal";
 import type { SpinWheelIconFamily, SpinWheelItem } from "../types";
 
-const ICON_PX = 22;
-const DISC = 34;
+function iconSizeForWheel(wheelSize: number): number {
+  return Math.round(Math.min(46, Math.max(34, wheelSize * 0.108)));
+}
+
+function captionSizeForWheel(wheelSize: number): number {
+  return Math.round(Math.min(16, Math.max(12, wheelSize * 0.044)));
+}
 
 export type SliceIconPlacement = {
   x: number;
@@ -16,36 +20,42 @@ function Glyph({
   family,
   name,
   color,
+  size,
 }: {
   family: SpinWheelIconFamily;
   name: string;
   color: string;
+  size: number;
 }) {
   if (family === "MaterialCommunityIcons") {
     return (
       <MaterialCommunityIcons
         name={name as keyof typeof MaterialCommunityIcons.glyphMap}
-        size={ICON_PX}
+        size={size}
         color={color}
       />
     );
   }
   if (family === "Ionicons") {
-    return <Ionicons name={name as keyof typeof Ionicons.glyphMap} size={ICON_PX} color={color} />;
+    return <Ionicons name={name as keyof typeof Ionicons.glyphMap} size={size} color={color} />;
   }
-  return <MaterialIcons name={name as keyof typeof MaterialIcons.glyphMap} size={ICON_PX} color={color} />;
+  return <MaterialIcons name={name as keyof typeof MaterialIcons.glyphMap} size={size} color={color} />;
 }
 
-function isLossCaption(caption: string): boolean {
-  return (
-    caption.startsWith("-") ||
-    caption === "ALL" ||
-    (caption.includes("%") && !caption.startsWith("+") && caption !== "×2")
-  );
-}
+/** Wedge icons + captions — complementary colors, no glow. */
+export function SliceIconLayer({
+  size,
+  data,
+  placements,
+}: {
+  size: number;
+  data: SpinWheelItem[];
+  placements: SliceIconPlacement[];
+}) {
+  const iconPx = iconSizeForWheel(size);
+  const captionPx = captionSizeForWheel(size);
+  const markerW = Math.round(iconPx * 2.2);
 
-/** Lightweight wedge labels — small disc + readable caption (GPU-friendly). */
-export function SliceIconLayer({ size, data, placements }: { size: number; data: SpinWheelItem[]; placements: SliceIconPlacement[] }) {
   return (
     <View style={[styles.layer, { width: size, height: size }]} pointerEvents="none">
       {data.map((item, i) => {
@@ -54,24 +64,27 @@ export function SliceIconLayer({ size, data, placements }: { size: number; data:
         if (pt == null) return null;
         const family = item.iconFamily ?? "MaterialIcons";
         const caption = item.shortLabel ?? item.label ?? "";
-        const loss = isLossCaption(caption);
+        const iconColor = item.iconColor ?? "#1F2937";
+        const captionColor = item.captionColor ?? iconColor;
 
         return (
           <View
             key={item.id}
-            style={[styles.marker, { left: pt.x - 30, top: pt.y - 22 }]}
+            style={[
+              styles.marker,
+              {
+                width: markerW,
+                left: pt.x - markerW / 2,
+                top: pt.y - iconPx * 0.88,
+              },
+            ]}
           >
-            <View
-              style={[
-                styles.disc,
-                loss ? styles.discLoss : styles.discWin,
-                item.iconTint != null && !loss ? { backgroundColor: item.iconTint } : null,
-              ]}
-            >
-              <Glyph family={family} name={item.icon} color={loss ? "#FEE2E2" : Neo.ink} />
-            </View>
+            <Glyph family={family} name={item.icon} color={iconColor} size={iconPx} />
             {caption ? (
-              <Text style={[styles.caption, loss && styles.captionLoss]} numberOfLines={1}>
+              <Text
+                style={[styles.caption, { fontSize: captionPx, maxWidth: markerW + 6, color: captionColor }]}
+                numberOfLines={1}
+              >
                 {caption}
               </Text>
             ) : null}
@@ -90,38 +103,13 @@ const styles = StyleSheet.create({
   },
   marker: {
     position: "absolute",
-    width: 60,
     alignItems: "center",
-    gap: 2,
-  },
-  disc: {
-    width: DISC,
-    height: DISC,
-    borderRadius: DISC / 2,
-    borderWidth: 2,
-    borderColor: Neo.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  discWin: {
-    backgroundColor: "rgba(255,255,255,0.9)",
-  },
-  discLoss: {
-    backgroundColor: "rgba(15,15,15,0.88)",
+    gap: 4,
   },
   caption: {
     fontFamily: FONT_BEBAS_NEUE,
-    fontSize: 10,
-    letterSpacing: 0.35,
-    color: Neo.ink,
+    letterSpacing: 0.55,
     textAlign: "center",
-    maxWidth: 58,
-    textShadowColor: "rgba(255,255,255,0.95)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 4,
-  },
-  captionLoss: {
-    color: "#FEE2E2",
-    textShadowColor: "rgba(0,0,0,0.85)",
+    fontWeight: "700",
   },
 });

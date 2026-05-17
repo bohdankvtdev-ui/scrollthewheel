@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SlicePrizeSheet } from "./SlicePrizeSheet";
 import {
   AccessibilityInfo,
   Platform,
@@ -9,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
-import { MaterialIcons } from "@expo/vector-icons";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { SpinWheelStage } from "../../../features/cash-spin/components/SpinWheelStage";
 import {
@@ -26,13 +26,13 @@ import {
 } from "../../../lib/layout/wheelFrame";
 import { CASH_SPIN_WHEEL_PROFILE } from "../../../lib/wheel/profiles";
 import { resolveWheelPhysics } from "../../../lib/wheel/resolveWheelPhysics";
-import { Neo, neoCardStyle, neoSubtitleOnDark, neoTitleOnDark } from "../../../theme/neoBrutal";
-import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
+import { Neo } from "../../../theme/neoBrutal";
 import type { SpinWheelRef } from "../../../wheel/types";
 import { useRunReelRounds } from "../../hooks/useRunReelRounds";
 import { buildResolveContext } from "../../hooks/useWheelModifiers";
 import { resolveSlice } from "../../systems/ProbabilityResolver";
-import { WHEEL_DATABASE_REVISION } from "../../game/wheels/database/wheelDatabase";
+import { getBulbRingPalette, getWheelSegmentColors } from "../../game/content/sliceVisualTheme";
+import { getArchetypeForConfigId, WHEEL_DATABASE_REVISION } from "../../game/wheels/database";
 import { normalizeRunState } from "../../game/runState";
 import { RunManager } from "../../systems/RunManager";
 import { rebuildWheelsFromDatabase } from "../../systems/WheelSystem";
@@ -54,33 +54,6 @@ function physicsForProfile(profileId: string) {
     });
   }
   return base;
-}
-
-function LockedWheelTeaser({
-  pageHeight,
-  role,
-  floor,
-  stage,
-}: {
-  pageHeight: number;
-  role: import("../../schemas").WheelRole;
-  floor: number;
-  stage: (typeof WHEEL_STAGES)[import("../../schemas").WheelRole];
-}) {
-  const meta = stage;
-  return (
-    <View style={[styles.teaserPage, { height: pageHeight }]}>
-      <View style={[neoCardStyle(360), styles.teaserCard]}>
-        <MaterialIcons name="keyboard-double-arrow-up" size={36} color={Neo.neonYellow} />
-        <MaterialIcons name={meta.icon as never} size={40} color={meta.accent} />
-        <Text style={[neoTitleOnDark(20), styles.teaserTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-          {meta.label}
-        </Text>
-        <Text style={neoSubtitleOnDark(13)}>{meta.vibe}</Text>
-        <Text style={neoSubtitleOnDark(12)}>F{floor} · claim previous first</Text>
-      </View>
-    </View>
-  );
 }
 
 function RunWheelSlot({
@@ -117,20 +90,53 @@ function RunWheelSlot({
   scrollGrainOverlay?: React.ReactNode;
 }) {
   const wheel = run.wheels[roundIndex];
-  if (wheel == null) return <View style={{ height: pageHeight }} />;
+  const isSpinning = useRunStore((s) => s.ui.isSpinning);
+  const [previewSliceIndex, setPreviewSliceIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isSpinning) setPreviewSliceIndex(null);
+  }, [isSpinning]);
 
   const wheelPhysics = useMemo(
-    () => physicsForProfile(wheel.definition.physicsProfileId),
-    [wheel.definition.physicsProfileId]
+    () => physicsForProfile(wheel?.definition.physicsProfileId ?? "default"),
+    [wheel?.definition.physicsProfileId]
   );
 
   const colors = useMemo(
-    () => wheel.slices.map((_, i) => Neo.segmentColors[i % Neo.segmentColors.length]!),
-    [wheel.slices.length]
+    () => (wheel != null ? getWheelSegmentColors(wheel.slices) : []),
+    [wheel?.slices]
   );
+
+  const bulbRingPalette = useMemo(() => {
+    const archetype =
+      wheel?.definition.wheelConfigId != null
+        ? getArchetypeForConfigId(wheel.definition.wheelConfigId)
+        : undefined;
+    return getBulbRingPalette(archetype);
+  }, [wheel?.definition.wheelConfigId]);
+
+  const previewSlice =
+    wheel != null && previewSliceIndex != null
+      ? wheel.slices[previewSliceIndex] ?? null
+      : null;
+
+  const resolveContext = useMemo(
+    () => (wheel != null ? buildResolveContext(run, wheel, roundIndex) : undefined),
+    [run, wheel, roundIndex]
+  );
+
+  if (wheel == null) return <View style={{ height: pageHeight }} />;
 
   return (
     <View style={[styles.slotRow, styles.slotRowCentered, { height: pageHeight }]}>
+      <SlicePrizeSheet
+        slice={previewSlice}
+        sliceIndex={previewSliceIndex}
+        visible={previewSlice != null}
+        onClose={() => setPreviewSliceIndex(null)}
+        wheelSlices={wheel.slices}
+        resolveContext={resolveContext}
+      />
       <View style={styles.wheelSlotShell}>
         <View style={styles.wheelPad}>
           <SpinWheelStage
@@ -139,6 +145,7 @@ function RunWheelSlot({
             textSize={textSize}
             wheelPhysics={wheelPhysics}
             segmentColors={colors}
+            bulbRingPalette={bulbRingPalette}
             textColor={textColor}
             ringPhaseResetKey={ringPhaseResetKey}
             spinLocked={spinLocked}
@@ -152,6 +159,8 @@ function RunWheelSlot({
             onBulbRingPhaseChange={onBulbRingPhaseChange}
             onSpinComplete={(item) => onSpinComplete(roundIndex, item)}
             scrollGrainOverlay={scrollGrainOverlay}
+            slicePressEnabled={!spinLocked && !isSpinning}
+            onSlicePress={(index) => setPreviewSliceIndex(index)}
           />
         </View>
       </View>
@@ -293,6 +302,18 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
     return () => clearTimeout(t);
   }, [isSpinning, reel, setSpinning]);
 
+  const [revealNextSlot, setRevealNextSlot] = useState(false);
+  const scrolling = reel.stripScrollProgress > 0.02;
+
+  useEffect(() => {
+    if (!scrolling) {
+      setRevealNextSlot(false);
+      return;
+    }
+    const t = setTimeout(() => setRevealNextSlot(true), 150);
+    return () => clearTimeout(t);
+  }, [scrolling, reel.stripScrollProgress]);
+
   const renderStripBuffer = useCallback(
     (buffer: "a" | "b") => {
       const roundIndex = buffer === "a" ? reel.activeIndex : reel.nextIndex;
@@ -301,27 +322,9 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
       }
       const ri = roundIndex as number;
       const round = rounds[ri];
-      const nextWheel = run.wheels[ri];
 
-      if (round?.status === "locked") {
-        const nextRole = nextWheel?.definition.role ?? "base";
-        const nextStage = WHEEL_STAGES[nextRole];
-        return (
-          <LockedWheelTeaser pageHeight={pageHeight} role={nextRole} floor={run.floor} stage={nextStage} />
-        );
-      }
-
-      if (round?.status === "claimed") {
-        const label = round.prize?.label ?? "Claimed";
-        return (
-          <View style={[styles.slotRow, styles.slotRowCentered, { height: pageHeight }]}>
-            <View style={[neoCardStyle(340), styles.claimedCard]}>
-              <MaterialIcons name="verified" size={28} color={Neo.neonCyan} />
-              <Text style={[neoTitleOnDark(20), { fontFamily: FONT_BEBAS_NEUE }]}>{label}</Text>
-              <Text style={neoSubtitleOnDark(13)}>Wheel {ri + 1} cleared</Text>
-            </View>
-          </View>
-        );
+      if (buffer === "b" && scrolling && !revealNextSlot) {
+        return <View style={[styles.slotRow, { height: pageHeight }]} />;
       }
 
       const isActive = ri === reel.activeIndex;
@@ -368,11 +371,12 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
       reel.activeIndex,
       reel.nextIndex,
       reel.onPrimaryBulbPhaseChange,
+      reel.stripScrollProgress,
+      revealNextSlot,
       rounds,
       run,
-      slotTint,
+      scrolling,
       textSize,
-      wheelFrostVisualIntensity,
       wheelInnerSize,
     ]
   );
@@ -468,23 +472,5 @@ const styles = StyleSheet.create({
   wheelPad: {
     alignItems: "center",
     paddingHorizontal: 16,
-  },
-  teaserPage: {
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-  teaserCard: {
-    backgroundColor: Neo.surfaceDark,
-    alignItems: "center",
-    gap: 8,
-    borderColor: Neo.neonYellow,
-  },
-  teaserTitle: { textAlign: "center" },
-  claimedCard: {
-    backgroundColor: Neo.surfaceDark,
-    alignItems: "center",
-    gap: 8,
-    alignSelf: "center",
   },
 });

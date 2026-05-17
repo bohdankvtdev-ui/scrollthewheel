@@ -17,6 +17,10 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Defs, G, RadialGradient, Stop } from "react-native-svg";
 import type { BulbRingLayout } from "../../../lib/layout/wheelFrame";
+import {
+  getBulbRingPalette,
+  type BulbRingPalette,
+} from "../../../src/game/content/sliceVisualTheme";
 import { NeoBulbRingTheme, NeoWheel } from "../../../theme/neoBrutal";
 import type { BulbRingPhase } from "../bulbRingPhase";
 
@@ -140,6 +144,7 @@ type BulbBaseProps = {
   chase: SharedValue<number>;
   chaseBoost: SharedValue<number>;
   burst: SharedValue<number>;
+  palette: BulbRingPalette;
 };
 
 const NeoBulbCast = memo(function NeoBulbCast(p: BulbBaseProps) {
@@ -262,7 +267,7 @@ const NeoBulbGlint = memo(function NeoBulbGlint(p: BulbBaseProps) {
 });
 
 const NeoBulbBody = memo(function NeoBulbBody(p: BulbBaseProps) {
-  const { index, bulbCount, cx, cy, baseR, clockMs, chase, chaseBoost, burst } = p;
+  const { index, bulbCount, cx, cy, baseR, clockMs, chase, chaseBoost, burst, palette } = p;
   const animatedProps = useAnimatedProps(() => {
     const t = clockMs.value * 0.001;
     const { b, glowMix, scale } = bulbPhysics(
@@ -278,8 +283,8 @@ const NeoBulbBody = memo(function NeoBulbBody(p: BulbBaseProps) {
       glowMix,
       [0, 0.22, 0.48, 0.74, 1],
       [
-        NeoBulbRingTheme.bulbDim,
-        NeoBulbRingTheme.bulbMid,
+        palette.bulbDim,
+        palette.bulbMid,
         NeoBulbRingTheme.bulbFilamentAmber,
         NeoBulbRingTheme.bulbHot,
         NeoBulbRingTheme.bulbShine,
@@ -312,7 +317,7 @@ const NeoBulbBody = memo(function NeoBulbBody(p: BulbBaseProps) {
       stroke: borderWin,
       strokeWidth: strokeW,
     };
-  }, [baseR, bulbCount, cx, cy, index]);
+  }, [baseR, bulbCount, cx, cy, index, palette.bulbDim, palette.bulbMid]);
 
   return <AnimatedCircle animatedProps={animatedProps} />;
 });
@@ -320,13 +325,15 @@ const NeoBulbBody = memo(function NeoBulbBody(p: BulbBaseProps) {
 export type NeoBulbRingProps = {
   layout: BulbRingLayout;
   phase: BulbRingPhase;
+  /** Wheel-themed ring + bulb base colors (defaults to money/green). */
+  palette?: BulbRingPalette;
 };
 
 /**
- * Rose ring on purple app bg; idle = clockwise hypnotic chase + per-bulb lightning;
- * layered cast + halos for depth; victory = yellow flash on rim + bulbs.
+ * Bulb ring around the prize disc — chase + victory flash; ring tint follows active wheel.
  */
-export function NeoBulbRing({ layout, phase }: NeoBulbRingProps) {
+export function NeoBulbRing({ layout, phase, palette: paletteProp }: NeoBulbRingProps) {
+  const palette = paletteProp ?? getBulbRingPalette("money");
   const gradId = useId().replace(/:/g, "");
   const bulbCount = layout.bulbs.length;
   const clockMs = useSharedValue(0);
@@ -401,7 +408,7 @@ export function NeoBulbRing({ layout, phase }: NeoBulbRingProps) {
     };
   }, []);
 
-  const common = { bulbCount, clockMs, chase, chaseBoost, burst } as const;
+  const common = { bulbCount, clockMs, chase, chaseBoost, burst, palette } as const;
 
   return (
     <View
@@ -411,16 +418,16 @@ export function NeoBulbRing({ layout, phase }: NeoBulbRingProps) {
         position: "relative",
         borderRadius: d / 2,
         overflow: "hidden",
-        backgroundColor: NeoBulbRingTheme.ringFillShadow,
+        backgroundColor: palette.ringFillShadow,
       }}
       pointerEvents="none"
     >
       <Svg width={d} height={d} viewBox={`0 0 ${d} ${d}`} pointerEvents="none">
         <Defs>
           <RadialGradient id={gradId} cx="50%" cy="50%" fx="50%" fy="50%" r="55%">
-            <Stop offset="0%" stopColor={NeoBulbRingTheme.ringFillHighlight} stopOpacity={1} />
-            <Stop offset="52%" stopColor={NeoBulbRingTheme.ringFill} stopOpacity={1} />
-            <Stop offset="100%" stopColor={NeoBulbRingTheme.ringFillShadow} stopOpacity={1} />
+            <Stop offset="0%" stopColor={palette.ringFillHighlight} stopOpacity={1} />
+            <Stop offset="52%" stopColor={palette.ringFill} stopOpacity={1} />
+            <Stop offset="100%" stopColor={palette.ringFillShadow} stopOpacity={1} />
           </RadialGradient>
         </Defs>
         <Circle cx={hubX} cy={hubY} r={d / 2} fill={`url(#${gradId})`} />

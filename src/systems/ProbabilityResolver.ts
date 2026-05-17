@@ -25,10 +25,30 @@ export function buildWeightedSlices(
   ctx: ResolveContext
 ): WeightedSlice[] {
   if (ctx.exactLandWeights) {
-    return slices.map((s) => ({
-      ...s,
-      effectiveWeight: Math.max(0, s.baseWeight),
-    }));
+    return slices.map((s) => {
+      let w = Math.max(0, s.baseWeight);
+      for (const tag of s.weightTags ?? []) {
+        if (tag === "negative") w *= ctx.negativeWeightMult;
+        if (tag === "positive") w *= ctx.positiveWeightMult;
+        if (tag === "rare") w *= ctx.rareWeightMult;
+        if (tag === "stakes") {
+          const mult = ctx.tagMults.stakes;
+          if (mult != null) w *= mult;
+        }
+        const relicMult = ctx.tagMults[tag];
+        if (relicMult != null) w *= relicMult;
+      }
+      if (ctx.kindWeightMults?.money != null && s.kind === "money") {
+        w *= ctx.kindWeightMults.money;
+      }
+      if (ctx.kindWeightMults?.perk != null && s.kind === "perk") {
+        w *= ctx.kindWeightMults.perk;
+      }
+      if (ctx.wheelNegativeBias > 0 && (s.weightTags?.includes("negative") ?? false)) {
+        w *= 1 + ctx.wheelNegativeBias;
+      }
+      return { ...s, effectiveWeight: w };
+    });
   }
 
   return slices.map((s) => {
@@ -43,6 +63,12 @@ export function buildWeightedSlices(
       }
       const relicMult = ctx.tagMults[tag];
       if (relicMult != null) w *= relicMult;
+    }
+    if (ctx.kindWeightMults?.money != null && s.kind === "money") {
+      w *= ctx.kindWeightMults.money;
+    }
+    if (ctx.kindWeightMults?.perk != null && s.kind === "perk") {
+      w *= ctx.kindWeightMults.perk;
     }
     if (ctx.wheelNegativeBias > 0 && (s.weightTags?.includes("negative") ?? false)) {
       w *= 1 + ctx.wheelNegativeBias;

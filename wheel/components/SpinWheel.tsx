@@ -18,6 +18,7 @@ import { Neo, NeoBulbRingTheme } from "../../theme/neoBrutal";
 import { useSpinWheel } from "../hooks/useSpinWheel";
 import type { SpinWheelItem, SpinWheelProps, SpinWheelRef } from "../types";
 import { SliceIconLayer } from "./SliceIconLayer";
+import { SliceTouchLayer } from "./SliceTouchLayer";
 
 const windowWidth = Dimensions.get("window").width;
 const ONE_TURN = 360;
@@ -107,6 +108,8 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
     hubLoadEpoch = 0,
     onHubImageLoad,
     syncDiscScale: syncDiscScaleProp,
+    onSlicePress,
+    slicePressEnabled = true,
   },
   ref
 ) {
@@ -281,7 +284,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   const labelPull = showSliceIcons && showSliceText ? 1.22 : 1.08;
 
   const iconPlacements = useMemo(() => {
-    const pull = showSliceText ? 0.94 : 1.06;
+    const pull = showSliceText ? 0.94 : 1.16;
     const rad = (-angleOffset * Math.PI) / 180;
     const half = size / 2;
     return arcs.map((arc) => {
@@ -473,6 +476,13 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
           {showSliceIcons ? (
             <SliceIconLayer size={size} data={data} placements={iconPlacements} />
           ) : null}
+          <SliceTouchLayer
+            size={size}
+            placements={iconPlacements}
+            sliceCount={data.length}
+            enabled={slicePressEnabled && onSlicePress != null}
+            onSlicePress={onSlicePress}
+          />
         </Animated.View>
 
         <Animated.View

@@ -35,8 +35,8 @@ export type WheelConfigEntry = {
     perkBoost?: number;
     stakesBoost?: number;
   };
-  /** Unique prizes + land chances for this wheel only. */
-  prizes: WheelPrizeSlot[];
+  /** Static fallback only — runtime layouts come from `wheelPrizeBuilder`. */
+  prizes?: WheelPrizeSlot[];
 };
 
 export type WheelConfigId = string;

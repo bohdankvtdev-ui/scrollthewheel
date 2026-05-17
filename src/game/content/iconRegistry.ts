@@ -1,83 +1,76 @@
 /**
  * ICON REGISTRY — edit icons here to change them everywhere in the app.
- *
- * Keys:
- * - `perk`, `card`, `debuff`, `relic` — match entity `id` in data/*.ts catalogs
- * - `slice` — optional per-slice override (slice `id` from prizes.ts pools)
- * - `sliceKind` — fallback when no slice override and no linked entity icon
- * - `wheelRole` — floor/wheel background stage icons (loop.ts WHEEL_STAGES)
- *
- * `icon` must exist in the chosen `iconFamily` glyph map (Expo vector icons).
- * Later: swap to `{ asset: require("...") }` when you add custom PNG/SVG assets.
  */
 import type { IconFamily, SliceKind, WheelRole } from "../../schemas";
 
 export type IconSpec = {
   icon: string;
   iconFamily: IconFamily;
-  /** Optional tint for PrizeGlyph / loadout chips */
   tint?: string;
 };
 
 export const ICON_REGISTRY = {
   perk: {
-    lucky_streak: { icon: "stars", iconFamily: "MaterialIcons" },
-    iron_reserve: { icon: "shield", iconFamily: "MaterialCommunityIcons" },
-    ante_insurance: { icon: "policy", iconFamily: "MaterialIcons" },
-    extra_slice: { icon: "unfold-more", iconFamily: "MaterialIcons" },
-    slice_expander: { icon: "unfold-more", iconFamily: "MaterialIcons" },
-    high_roller: { icon: "casino", iconFamily: "MaterialIcons" },
-    gold_rush: { icon: "trending-up", iconFamily: "MaterialIcons" },
-    safe_harbor: { icon: "security", iconFamily: "MaterialIcons" },
-    coupon_king: { icon: "sell", iconFamily: "MaterialIcons" },
-    hot_table: { icon: "whatshot", iconFamily: "MaterialIcons" },
-    vip_roller: { icon: "workspace-premium", iconFamily: "MaterialIcons" },
-    double_down: { icon: "exposure-plus-1", iconFamily: "MaterialIcons" },
-    compounder: { icon: "savings", iconFamily: "MaterialIcons" },
+    lucky_streak: { icon: "clover", iconFamily: "MaterialCommunityIcons" },
+    iron_reserve: { icon: "shield-check", iconFamily: "MaterialCommunityIcons" },
+    ante_insurance: { icon: "umbrella", iconFamily: "MaterialCommunityIcons" },
+    high_roller: { icon: "dice-multiple", iconFamily: "MaterialCommunityIcons" },
+    gold_rush: { icon: "cash-multiple", iconFamily: "MaterialCommunityIcons" },
+    safe_harbor: { icon: "anchor", iconFamily: "MaterialCommunityIcons" },
+    coupon_king: { icon: "ticket-percent", iconFamily: "MaterialCommunityIcons" },
+    hot_table: { icon: "fire", iconFamily: "MaterialCommunityIcons" },
+    vip_roller: { icon: "crown", iconFamily: "MaterialCommunityIcons" },
+    double_down: { icon: "cards-playing", iconFamily: "MaterialCommunityIcons" },
+    compounder: { icon: "chart-timeline-variant", iconFamily: "MaterialCommunityIcons" },
   },
   card: {
-    copper_chip: { icon: "paid", iconFamily: "MaterialIcons" },
-    weighted_die: { icon: "casino", iconFamily: "MaterialIcons" },
-    purity_charm: { icon: "security", iconFamily: "MaterialIcons" },
-    wide_wheel_card: { icon: "unfold-more", iconFamily: "MaterialIcons" },
+    copper_chip: { icon: "poker-chip", iconFamily: "MaterialCommunityIcons" },
+    weighted_die: { icon: "dice-5", iconFamily: "MaterialCommunityIcons" },
+    purity_charm: { icon: "heart", iconFamily: "MaterialCommunityIcons" },
+    wide_wheel_card: { icon: "chart-donut", iconFamily: "MaterialCommunityIcons" },
   },
   debuff: {
-    debt_mark: { icon: "skull", iconFamily: "MaterialCommunityIcons" },
-    rusted_gear: { icon: "alert-octagon", iconFamily: "MaterialCommunityIcons" },
-    curse_of_greed: { icon: "whatshot", iconFamily: "MaterialIcons" },
+    debt_mark: { icon: "skull-crossbones", iconFamily: "MaterialCommunityIcons" },
+    rusted_gear: { icon: "cog-off", iconFamily: "MaterialCommunityIcons" },
+    curse_of_greed: { icon: "fire-alert", iconFamily: "MaterialCommunityIcons" },
   },
   relic: {
-    lucky_coin: { icon: "monetization-on", iconFamily: "MaterialIcons" },
-    void_lens: { icon: "diamond", iconFamily: "MaterialIcons" },
+    lucky_coin: { icon: "circle-multiple", iconFamily: "MaterialCommunityIcons" },
+    void_lens: { icon: "eye-off", iconFamily: "MaterialCommunityIcons" },
     boss_slayer: { icon: "sword-cross", iconFamily: "MaterialCommunityIcons" },
+    coin_magnet: { icon: "magnet", iconFamily: "MaterialCommunityIcons" },
+    firewall: { icon: "shield-lock", iconFamily: "MaterialCommunityIcons" },
+    debt_shield: { icon: "shield-lock", iconFamily: "MaterialCommunityIcons" },
+    hot_hand: { icon: "hand-coin", iconFamily: "MaterialCommunityIcons" },
+    iron_grit: { icon: "arm-flex", iconFamily: "MaterialCommunityIcons" },
   },
   wheelRole: {
     base: { icon: "casino", iconFamily: "MaterialIcons" },
     yield: { icon: "attach-money", iconFamily: "MaterialIcons" },
     risk: { icon: "bolt", iconFamily: "MaterialIcons" },
-    stabilizer: { icon: "healing", iconFamily: "MaterialIcons" },
+    stabilizer: { icon: "favorite", iconFamily: "MaterialIcons" },
     mini_boss: { icon: "local-fire-department", iconFamily: "MaterialIcons" },
     jackpot: { icon: "emoji-events", iconFamily: "MaterialIcons" },
     power: { icon: "auto-awesome", iconFamily: "MaterialIcons" },
-    deck: { icon: "style", iconFamily: "MaterialIcons" },
+    deck: { icon: "poker-chip", iconFamily: "MaterialCommunityIcons" },
     preparation: { icon: "stars", iconFamily: "MaterialIcons" },
-    boss: { icon: "donut-large", iconFamily: "MaterialIcons" },
+    boss: { icon: "skull", iconFamily: "MaterialCommunityIcons" },
   },
-  /** Override a specific wheel slice by id (see prizes.ts). */
   slice: {} as Record<string, IconSpec>,
   sliceKind: {
-    money: { icon: "attach-money", iconFamily: "MaterialIcons" },
-    money_loss: { icon: "remove-circle", iconFamily: "MaterialIcons" },
-    perk: { icon: "auto-awesome", iconFamily: "MaterialIcons" },
-    debuff: { icon: "warning", iconFamily: "MaterialIcons" },
-    deck_add: { icon: "style", iconFamily: "MaterialIcons" },
-    deck_remove: { icon: "delete", iconFamily: "MaterialIcons" },
-    deck_upgrade: { icon: "upgrade", iconFamily: "MaterialCommunityIcons" },
-    relic_offer: { icon: "diamond", iconFamily: "MaterialIcons" },
-    booster: { icon: "trending-up", iconFamily: "MaterialIcons" },
-    neutral: { icon: "remove", iconFamily: "MaterialIcons" },
-    bank_wipe: { icon: "dangerous", iconFamily: "MaterialIcons" },
-    bank_cut: { icon: "percent", iconFamily: "MaterialIcons" },
+    money: { icon: "attach-money", iconFamily: "MaterialIcons", tint: "#FECDD3" },
+    money_loss: { icon: "money-off", iconFamily: "MaterialIcons", tint: "#FEE2E2" },
+    perk: { icon: "auto-awesome", iconFamily: "MaterialIcons", tint: "#EDE9FE" },
+    debuff: { icon: "skull-crossbones", iconFamily: "MaterialCommunityIcons", tint: "#FEE2E2" },
+    deck_add: { icon: "poker-chip", iconFamily: "MaterialCommunityIcons", tint: "#CFFAFE" },
+    deck_remove: { icon: "delete-outline", iconFamily: "MaterialIcons", tint: "#FED7AA" },
+    deck_upgrade: { icon: "arrow-up-bold", iconFamily: "MaterialCommunityIcons", tint: "#D9F99D" },
+    relic_offer: { icon: "diamond-stone", iconFamily: "MaterialCommunityIcons", tint: "#FEF08A" },
+    booster: { icon: "trending-up", iconFamily: "MaterialIcons", tint: "#FEF9C3" },
+    neutral: { icon: "pause-circle-outline", iconFamily: "MaterialCommunityIcons", tint: "#F3F4F6" },
+    bank_wipe: { icon: "wallet-outline", iconFamily: "MaterialCommunityIcons", tint: "#FEE2E2" },
+    bank_cut: { icon: "percent", iconFamily: "MaterialIcons", tint: "#FFEDD5" },
+    run_effect: { icon: "flash-alert", iconFamily: "MaterialCommunityIcons", tint: "#FFEDD5" },
   } satisfies Record<SliceKind, IconSpec>,
 } as const;
 

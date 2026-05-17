@@ -1,3 +1,4 @@
+export { SLICES_PER_WHEEL, WHEEL_THEME_KINDS } from "./constants";
 export type { PrizeDef, WheelConfigEntry, WheelPrizeSlot, WheelConfigId } from "./types";
 export { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
 export {

@@ -19,6 +19,7 @@ import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -83,6 +84,8 @@ export type ReelStripEngine = {
   onPrimaryBulbPhaseChange: (phase: BulbRingPhase) => void;
   /** Programmatic claim — same as swipe-up when round is `won`. */
   requestAdvance: () => void;
+  /** 0 at rest, 0–1 while dragging toward the next reel page. */
+  stripScrollProgress: number;
 };
 
 /**
@@ -124,6 +127,7 @@ export function useReelStripEngine({
   const [isSpinning, setIsSpinning] = useState(false);
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [stripSpringing, setStripSpringing] = useState(false);
+  const [stripScrollProgress, setStripScrollProgress] = useState(0);
 
   const translateY = useSharedValue(0);
   const startTranslateY = useSharedValue(0);
@@ -160,6 +164,22 @@ export function useReelStripEngine({
   useEffect(() => {
     pageH.value = pageHStable;
   }, [pageHStable, pageH]);
+
+  const publishStripScrollProgress = useCallback((progress: number) => {
+    if (!mountedRef.current) return;
+    setStripScrollProgress(progress);
+  }, []);
+
+  useAnimatedReaction(
+    () => {
+      const h = Math.max(1, pageH.value);
+      return Math.min(1, Math.abs(translateY.value) / h);
+    },
+    (progress) => {
+      runOnJS(publishStripScrollProgress)(progress);
+    },
+    [publishStripScrollProgress]
+  );
 
   useEffect(() => {
     canSwipeNext.value = activeIndex < maxActive;
@@ -468,5 +488,6 @@ export function useReelStripEngine({
     setSpinningSafe,
     onPrimaryBulbPhaseChange,
     requestAdvance: executeStripAdvance,
+    stripScrollProgress,
   };
 }

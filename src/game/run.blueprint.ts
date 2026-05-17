@@ -7,7 +7,7 @@ import { RUN_DEFAULTS } from "./config/run.defaults";
 export const RUN_BLUEPRINT = {
   version: 1,
   wheelsPerFloor: WHEEL_COUNT,
-  phases: ["active", "won", "lost_money", "lost_boss"] as const,
+  phases: ["active", "won", "lost_money", "lost_blind", "lost_boss"] as const,
   loop: {
     /** After wheel index reaches count, if boss dead → next floor */
     infiniteFloors: true,
@@ -27,7 +27,7 @@ export const RUN_BLUEPRINT = {
   win: {
     /** Final pipeline wheel role */
     bossRole: "boss" as const,
-    /** Phase set to `won` when boss HP hits 0 */
+    /** Phase set to `won` after clearing wheel 9 */
     onBossDefeated: "won" as const,
   },
 } as const;

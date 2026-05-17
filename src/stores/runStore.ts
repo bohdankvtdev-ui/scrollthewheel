@@ -10,7 +10,7 @@ import { RunManager } from "../systems/RunManager";
 import { commitPendingWheelRebuild } from "../systems/PerkSystem";
 import { useMetaStore } from "./metaStore";
 import { toSliceDisplay } from "../utils/sliceDisplay";
-import { sliceAccentForKind } from "../utils/sliceAccent";
+import { getSliceVisualTheme, type SliceVisualTone } from "../game/content/sliceVisualTheme";
 import type { IconFamily } from "../schemas";
 
 export type RunUiEffect = {
@@ -19,6 +19,8 @@ export type RunUiEffect = {
   shortLabel: string;
   effectHint: string;
   accent: string;
+  iconColor: string;
+  tone: SliceVisualTone;
 };
 
 const emptyUi = {
@@ -96,12 +98,16 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const perkWasNew =
       perkId != null && !run.perks.includes(perkId) && next.perks.includes(perkId);
     const display = toSliceDisplay(slice);
+    const sliceIndex = wheel?.slices.findIndex((s) => s.id === sliceId) ?? 0;
+    const visual = getSliceVisualTheme(slice.kind, slice.weightTags, { sliceIndex });
     const lastEffect: RunUiEffect = {
       icon: display.icon,
       iconFamily: display.iconFamily,
       shortLabel: display.shortLabel,
       effectHint: display.effectHint,
-      accent: sliceAccentForKind(slice.kind),
+      accent: slice.presentation?.chipColor ?? visual.chipBg,
+      iconColor: slice.presentation?.iconColor ?? visual.iconColor,
+      tone: visual.tone,
     };
     set({
       run: next,

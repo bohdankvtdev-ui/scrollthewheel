@@ -35,6 +35,7 @@ export const GameContent = {
   validate(): { ok: boolean; errors: string[] } {
     const errors: string[] = [];
     for (const w of WHEEL_ROTATION) {
+      if (w.slicePoolId === "config") continue;
       if (SLICE_POOLS[w.slicePoolId as SlicePoolId] == null) {
         errors.push(`Wheel "${w.id}" → unknown pool "${w.slicePoolId}"`);
       }

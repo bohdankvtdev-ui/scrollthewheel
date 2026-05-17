@@ -50,7 +50,7 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "b_neutral", kind: "neutral", label: "Pass", icon: "remove", iconFamily: "MaterialIcons", baseWeight: 1, payload: {}, presentation: { colorIndex: 3 } },
 
-    { id: "b_perk_tease", kind: "perk", label: "Lucky", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" }, presentation: { rarity: "rare", colorIndex: 4 } },
+    { id: "b_perk_tease", kind: "perk", label: "Lucky Clover", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" }, presentation: { rarity: "rare", colorIndex: 4 } },
 
     { id: "b_booster", kind: "booster", label: "+$30", icon: "trending-up", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive"], payload: { moneyDelta: 30 }, presentation: { colorIndex: 5 } },
 
@@ -66,13 +66,13 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "y_money_md", kind: "money", label: "+$120", icon: "add-circle", iconFamily: "MaterialIcons", baseWeight: 3, weightTags: ["positive"], payload: { moneyDelta: 120 } },
 
-    { id: "y_perk", kind: "perk", label: "Gold+", icon: "trending-up", iconFamily: "MaterialIcons", baseWeight: 3, weightTags: ["positive", "rare"], payload: { perkId: "gold_rush" } },
+    { id: "y_perk", kind: "perk", label: "Gold Rush", icon: "trending-up", iconFamily: "MaterialIcons", baseWeight: 3, weightTags: ["positive", "rare"], payload: { perkId: "gold_rush" } },
 
-    { id: "y_card", kind: "deck_add", label: "+Card", icon: "style", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive"], payload: { cardId: "copper_chip" } },
+    { id: "y_card", kind: "deck_add", label: "+ Copper Chip", icon: "paid", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive"], payload: { cardId: "copper_chip" } },
 
     { id: "y_loss", kind: "money_loss", label: "-$60", icon: "remove-circle", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["negative"], payload: { moneyDelta: -60 } },
 
-    { id: "y_perk_lucky", kind: "perk", label: "Lucky", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
+    { id: "y_perk_lucky", kind: "perk", label: "Lucky Clover", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
 
     { id: "y_perk_safe", kind: "perk", label: "Safe Harbor", icon: "security", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "safe_harbor" } },
 
@@ -80,15 +80,15 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
   deck: [
 
-    { id: "d_add_copper", kind: "deck_add", label: "Copper Chip", icon: "paid", iconFamily: "MaterialIcons", baseWeight: 3, weightTags: ["positive"], payload: { cardId: "copper_chip" } },
+    { id: "d_add_copper", kind: "deck_add", label: "+ Copper Chip", icon: "paid", iconFamily: "MaterialIcons", baseWeight: 3, weightTags: ["positive"], payload: { cardId: "copper_chip" } },
 
     { id: "d_add_die", kind: "deck_add", label: "Loaded Die", icon: "casino", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { cardId: "weighted_die" } },
 
     { id: "d_add_vault", kind: "deck_add", label: "Vault Token", icon: "security", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { cardId: "purity_charm" } },
 
-    { id: "d_upgrade", kind: "deck_upgrade", label: "Upgrade Chip", icon: "upgrade", iconFamily: "MaterialCommunityIcons", baseWeight: 2, payload: {} },
+    { id: "d_upgrade", kind: "deck_upgrade", label: "Promote Mod", icon: "upgrade", iconFamily: "MaterialCommunityIcons", baseWeight: 2, payload: {} },
 
-    { id: "d_remove", kind: "deck_remove", label: "Burn Chip", icon: "delete", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["negative"], payload: {} },
+    { id: "d_remove", kind: "deck_remove", label: "Scrap Last", icon: "delete", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["negative"], payload: {} },
 
     { id: "d_money", kind: "money", label: "+$80", icon: "add-circle", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive"], payload: { moneyDelta: 80 } },
 
@@ -124,7 +124,7 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "s_shield", kind: "perk", label: "Iron Reserve", icon: "shield", iconFamily: "MaterialCommunityIcons", baseWeight: 3, weightTags: ["positive", "rare"], payload: { perkId: "iron_reserve" } },
 
-    { id: "s_perk_lucky", kind: "perk", label: "Lucky", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
+    { id: "s_perk_lucky", kind: "perk", label: "Lucky Clover", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
 
     { id: "s_loss", kind: "money_loss", label: "-$50", icon: "remove-circle", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["negative"], payload: { moneyDelta: -50 } },
 
@@ -137,7 +137,7 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
     { id: "mb_big_loss", kind: "money_loss", label: "-$150", icon: "remove-circle", iconFamily: "MaterialIcons", baseWeight: 3, weightTags: ["negative", "stakes"], payload: { moneyDelta: -150 } },
     { id: "mb_win", kind: "money", label: "+$200", icon: "attach-money", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive"], payload: { moneyDelta: 200 } },
     { id: "mb_perk", kind: "perk", label: "Gold Rush", icon: "trending-up", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "gold_rush" } },
-    { id: "mb_lucky", kind: "perk", label: "Lucky", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
+    { id: "mb_lucky", kind: "perk", label: "Lucky Clover", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
     { id: "mb_neutral", kind: "neutral", label: "Hold", icon: "pan-tool", iconFamily: "MaterialIcons", baseWeight: 1, payload: {} },
 
     { id: "mb_vip", kind: "perk", label: "VIP Roller", icon: "workspace-premium", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "vip_roller" } },
@@ -234,7 +234,7 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "x_debuff", kind: "debuff", label: "Debt Mark", icon: "skull", iconFamily: "MaterialCommunityIcons", baseWeight: 1, weightTags: ["negative"], payload: { debuffId: "debt_mark" } },
 
-    { id: "x_perk_lucky", kind: "perk", label: "Lucky", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
+    { id: "x_perk_lucky", kind: "perk", label: "Lucky Clover", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
 
     { id: "x_neutral", kind: "neutral", label: "Extra", icon: "more-horiz", iconFamily: "MaterialIcons", baseWeight: 1, payload: {} },
 

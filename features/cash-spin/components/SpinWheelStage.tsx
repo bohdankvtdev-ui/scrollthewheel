@@ -13,6 +13,7 @@ import { Neo, NeoBulbRingLayoutChrome, NeoWheel } from "../../../theme/neoBrutal
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import type { SpinWheelItem } from "../../../types/spin";
 import type { WheelPhysicsConfig } from "../../../lib/wheel";
+import type { BulbRingPalette } from "../../../src/game/content/sliceVisualTheme";
 import type { BulbRingPhase } from "../bulbRingPhase";
 import { NeoBulbRing } from "./NeoBulbRing";
 import { NeoKnob } from "./NeoKnob";
@@ -57,6 +58,9 @@ export type SpinWheelStageProps = {
   onHubClaimPress?: () => void;
   sliceLabelMode?: "text" | "icons" | "both";
   hubAnimSubtle?: boolean;
+  bulbRingPalette?: BulbRingPalette;
+  onSlicePress?: (index: number) => void;
+  slicePressEnabled?: boolean;
 };
 
 export function SpinWheelStage({
@@ -81,6 +85,9 @@ export function SpinWheelStage({
   onHubClaimPress,
   sliceLabelMode = "text",
   hubAnimSubtle = false,
+  bulbRingPalette,
+  onSlicePress,
+  slicePressEnabled = true,
 }: SpinWheelStageProps) {
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const victoryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -221,7 +228,7 @@ export function SpinWheelStage({
             transform: [{ scale: chromeDiscScale }],
           }}
         >
-          <NeoBulbRing layout={layout} phase={ringPhase} />
+          <NeoBulbRing layout={layout} phase={ringPhase} palette={bulbRingPalette} />
         </Animated.View>
 
         <View style={{ zIndex: 1, alignItems: "center" }}>
@@ -252,7 +259,7 @@ export function SpinWheelStage({
               segmentPadAngle={NeoWheel.segmentPadAngle}
               segmentCornerRadius={NeoWheel.segmentCornerRadius}
               textColor={textColor}
-              textSize={Math.round(textSize * 1.28)}
+              textSize={Math.round(textSize * 1.48)}
               textFontWeight="400"
               labelFontFamily={FONT_BEBAS_NEUE}
               hubLabelFontFamily={FONT_BEBAS_NEUE}
@@ -269,6 +276,8 @@ export function SpinWheelStage({
               onHubClaimPress={onHubClaimPress}
               sliceLabelMode={sliceLabelMode}
               hubAnimSubtle={hubAnimSubtle}
+              onSlicePress={onSlicePress}
+              slicePressEnabled={slicePressEnabled}
               externalSpinControl={externalSpinControl}
               hubLoadEpoch={hubLoadEpoch}
               onHubImageLoad={onHubImageReady}

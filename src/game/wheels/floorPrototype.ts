@@ -7,10 +7,7 @@ import {
 } from "./database";
 import type { PrototypeWheelTemplate } from "./types";
 
-/**
- * 10-wheel floor prototype — scroll spin → scroll … → boss.
- * Maps archetypes to existing slice pools in `game/prizes.ts`.
- */
+/** 9-wheel cycle — scroll spin → … → boss. */
 export const FLOOR_PROTOTYPE_WHEELS: PrototypeWheelTemplate[] = [
   {
     id: "w_money",
@@ -41,7 +38,7 @@ export const FLOOR_PROTOTYPE_WHEELS: PrototypeWheelTemplate[] = [
   {
     id: "w_joker",
     archetype: "joker_offer",
-    title: "Joker Offer Wheel",
+    title: "Perk Wheel",
     role: "power",
     slicePoolId: "power",
     physicsProfileId: "default",
@@ -73,22 +70,13 @@ export const FLOOR_PROTOTYPE_WHEELS: PrototypeWheelTemplate[] = [
     physicsProfileId: "default",
   },
   {
-    id: "w_jackpot",
-    archetype: "jackpot",
-    title: "Jackpot Wheel",
-    role: "jackpot",
-    slicePoolId: "jackpot",
-    physicsProfileId: "default",
-    modifiers: { perkBoost: 0.1 },
-  },
-  {
-    id: "w_curse",
-    archetype: "curse",
-    title: "Curse Wheel",
-    role: "stabilizer",
+    id: "w_chaos",
+    archetype: "chaos",
+    title: "Chaos Wheel",
+    role: "risk",
     slicePoolId: "curse",
-    physicsProfileId: "default",
-    modifiers: { forceNegativeBias: 0.12 },
+    physicsProfileId: "boss",
+    modifiers: { forceNegativeBias: 0.22, stakesBoost: 0.15 },
   },
   {
     id: "w_boss",
@@ -111,12 +99,10 @@ export function getArchetypeForWheelIndex(index: number): PrototypeWheelTemplate
   return getArchetypeForWheelIndexFromDb(index);
 }
 
-/** Map scroll index → config id (`wheel_1`, `wheel_2`, …). */
 export function getWheelConfigIdForIndex(index: number): string | null {
   return FLOOR_WHEEL_ORDER[index] ?? null;
 }
 
-/** @deprecated Use `getWheelConfig` from `./database` */
 export function getPrototypeMetaForIndex(index: number): PrototypeWheelTemplate | null {
   const configId = FLOOR_WHEEL_ORDER[index];
   if (configId == null) return null;
@@ -131,3 +117,4 @@ export function getPrototypeMetaForIndex(index: number): PrototypeWheelTemplate 
     modifiers: entry.modifiers,
   };
 }
+

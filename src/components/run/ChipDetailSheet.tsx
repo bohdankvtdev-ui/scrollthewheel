@@ -51,9 +51,11 @@ export function ChipDetailSheet({ chipId, visible, onClose }: ChipDetailSheetPro
             <Glyph family={chip.iconFamily} name={chip.icon} />
           </View>
           <Text style={[styles.name, { fontFamily: FONT_BEBAS_NEUE }]}>{chip.name}</Text>
-          <Text style={styles.rarity}>{chip.rarity} casino chip</Text>
+          <Text style={styles.rarity}>{chip.rarity} loadout modifier</Text>
           <Text style={styles.desc}>{chipEffectHint(chip.id)}</Text>
-          <Text style={styles.note}>Passive modifier — not a playable card.</Text>
+          <Text style={styles.note}>
+            Passive modifier row — not shop chips (currency) or a spell card.
+          </Text>
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Text style={[styles.closeLbl, { fontFamily: FONT_BEBAS_NEUE }]}>Close</Text>
           </Pressable>

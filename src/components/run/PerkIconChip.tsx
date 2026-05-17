@@ -78,6 +78,8 @@ export function PerkIconChip({
           iconFamily={iconFamily}
           size="sm"
           tint={TIER_TINT[tier] ?? TIER_TINT[0]}
+          tone="perk"
+          iconColor="#4C1D95"
           style={selected ? styles.selectedRing : undefined}
         />
       </Animated.View>
