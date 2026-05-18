@@ -18,6 +18,11 @@ import {
 
 const MAX_SLICES = RUN_DEFAULTS.maxSliceCapacity;
 
+function appendShieldPerk(run: RunState, perkId: string): string[] {
+  const list = run.shieldPerks ?? [];
+  return list.includes(perkId) ? list : [...list, perkId];
+}
+
 export function getEffectiveSliceCapacity(run: RunState): SliceCount {
   const fromAdv = getRunMaxSliceCount(run.floor, run.advancements ?? []);
   return Math.max(run.sliceCapacity, fromAdv) as SliceCount;
@@ -28,10 +33,12 @@ export function addSliceSlots(run: RunState, delta: number = 1): RunState {
     MAX_SLICES,
     Math.max(RUN_DEFAULTS.minSliceCapacity, run.sliceCapacity + delta)
   ) as SliceCount;
-  if (nextCap <= run.sliceCapacity) return run;
+  if (nextCap <= run.sliceCapacity && delta <= 0) return run;
+  const wedgeBonus = (run.permanentWedgeBonus ?? 0) + Math.max(0, delta);
   return {
     ...run,
-    sliceCapacity: nextCap,
+    sliceCapacity: nextCap > run.sliceCapacity ? nextCap : run.sliceCapacity,
+    permanentWedgeBonus: wedgeBonus,
     pendingWheelRebuild: true,
   };
 }
@@ -48,6 +55,23 @@ export function commitPendingWheelRebuild(run: RunState): RunState {
 export function applyPerkAcquisition(run: RunState, perkId: string): RunState {
   if (PERK_CATALOG[perkId] == null) return run;
 
+  if (perkId === "iron_reserve") {
+    return {
+      ...run,
+      shields: (run.shields ?? 0) + 1,
+      shieldPerks: appendShieldPerk(run, perkId),
+    };
+  }
+
+  if (perkId === "safe_harbor") {
+    return {
+      ...run,
+      shields: (run.shields ?? 0) + 1,
+      shieldPerks: appendShieldPerk(run, perkId),
+      runEffects: { ...run.runEffects, safeHarborActive: true },
+    };
+  }
+
   const isSlice =
     perkId === "extra_slice" || perkId === "slice_expander";
   if (!isSlice && run.perks.includes(perkId)) return run;
@@ -60,10 +84,6 @@ export function applyPerkAcquisition(run: RunState, perkId: string): RunState {
 
   if (isSlice) {
     next = addSliceSlots(next, 1);
-  }
-
-  if (perkId === "iron_reserve" || perkId === "safe_harbor") {
-    next = { ...next, shields: (next.shields ?? 0) + 1 };
   }
 
   if (perkId === "double_down") {
@@ -101,19 +121,16 @@ export function applyMoneyDelta(
 
   if (delta > 0) {
     delta = applyPerkMoneyPayout(delta, run.perks, run.floorsCleared ?? 0);
+    for (const debuffId of run.debuffs) {
+      const d = DEBUFF_CATALOG[debuffId];
+      if (d?.moneyTax != null) delta = Math.floor(delta * (1 - d.moneyTax));
+    }
   }
 
   let doubleDownPending = run.doubleDownPending;
   if (delta > 0 && doubleDownPending) {
     delta *= 2;
     doubleDownPending = false;
-  }
-
-  if (delta < 0) {
-    for (const debuffId of run.debuffs) {
-      const d = DEBUFF_CATALOG[debuffId];
-      if (d?.moneyTax != null) delta = Math.floor(delta * (1 - d.moneyTax));
-    }
   }
 
   return { ...run, money: Math.max(0, run.money + delta), doubleDownPending };

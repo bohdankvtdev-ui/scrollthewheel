@@ -38,7 +38,7 @@ function EffectRow({
         </Text>
       </View>
       {showClaimCue ? (
-        <MaterialIcons name="keyboard-double-arrow-down" size={26} color={Neo.neonYellow} />
+        <MaterialIcons name="keyboard-double-arrow-up" size={26} color={Neo.neonYellow} />
       ) : (
         <View style={styles.cueSpacer} />
       )}

@@ -2,13 +2,9 @@ import type { RunState } from "../../schemas";
 import { clampSliceCount } from "../../schemas/wheel.schema";
 import type { WheelConfigId } from "../wheels/database/types";
 
-/** Wedges per wheel grow each cycle — cycle 1 → 6, cycle 10 → 24. */
-export function getSliceCountForCycle(cycle: number, advancements: string[] = []): number {
-  const c = Math.max(1, cycle);
-  const fromCycle = 6 + (c - 1) * 2;
-  let extra = 0;
-  if (advancements.includes("shop_extra")) extra += 0;
-  return clampSliceCount(fromCycle + extra);
+/** Base wedges per wheel — only builder / shop upgrades add more (`permanentWedgeBonus`). */
+export function getSliceCountForCycle(_cycle: number, _advancements: string[] = []): number {
+  return clampSliceCount(6);
 }
 
 export type CycleRewardPackage = {
@@ -29,7 +25,7 @@ export function getCycleRewardPackage(run: RunState): CycleRewardPackage {
     chips,
     money,
     headline: `Cycle ${cycle} cleared`,
-    detail: `+$${money} bank · +${chips} shop chips · next cycle has more wedges`,
+    detail: `+$${money} bank · +${chips} shop chips`,
   };
 }
 

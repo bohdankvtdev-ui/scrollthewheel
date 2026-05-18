@@ -1,6 +1,6 @@
 import { getPipelineForFloor } from "../game/loop";
 
-import { applyAdvancementsToSlices, getSliceCountForWheel } from "../game/advancements";
+import { applyAdvancementsToSlices } from "../game/advancements";
 import { getConfiguredWheelSlices } from "../game/wheels/database";
 import {
   WHEEL_DATABASE_REVISION,
@@ -10,6 +10,7 @@ import {
 import { SLICE_POOLS, type SlicePoolId } from "../game/prizes";
 
 import type { ResolvedWheel, RunState, SliceCount, SliceDefinition, WheelDefinition } from "../schemas";
+import { clampSliceCount } from "../schemas/wheel.schema";
 
 import { getSliceVisualTheme } from "../game/content/sliceVisualTheme";
 
@@ -18,6 +19,7 @@ import { getArchetypeForConfigId } from "../game/wheels/database";
 import { sliceWheelCaption } from "../utils/sliceWheelCaption";
 
 import { getEffectiveSliceCapacity } from "./PerkSystem";
+import { getPermanentWedgeBonus } from "../game/wheels/sliceCapacityBonus";
 
 import {
 
@@ -92,6 +94,9 @@ export function buildWheel(
       ownedPerks: run.perks,
       advancements: run.advancements,
       banishedPrizes: run.banishedPrizes?.[configKey] ?? [],
+      permanentWedgeBonus: getPermanentWedgeBonus(run),
+      wheelLaserCuts: run.wheelLaserCuts,
+      wheelInsureCuts: run.wheelInsureCuts,
     });
     rawSlices = applyAdvancementsToSlices(
       rawSlices,
@@ -198,7 +203,63 @@ export function buildWheel(
 
 }
 
+/** Rebuild spin items + colors after a wedge is lasered off in-run. */
+export function patchResolvedWheelSlices(
+  wheel: ResolvedWheel,
+  slices: SliceDefinition[]
+): ResolvedWheel {
+  const sliceCount = clampSliceCount(slices.length);
+  const wheelArchetype =
+    wheel.definition.wheelConfigId != null
+      ? getArchetypeForConfigId(wheel.definition.wheelConfigId)
+      : undefined;
 
+  const remapped = slices.map((s, sliceIndex) => {
+    const visual = getSliceVisualTheme(s.kind, s.weightTags, {
+      sliceIndex,
+      sliceCount,
+      wheelArchetype,
+    });
+    return {
+      ...s,
+      presentation: {
+        ...s.presentation,
+        colorIndex: sliceIndex,
+        segmentColor: visual.segmentBg,
+        iconColor: visual.iconColor,
+        captionColor: visual.captionColor,
+        chipColor: visual.chipBg,
+      },
+    };
+  });
+
+  const spinItems = remapped.map((s, sliceIndex) => {
+    const caption = sliceWheelCaption(s);
+    const visual = getSliceVisualTheme(s.kind, s.weightTags, {
+      sliceIndex,
+      sliceCount,
+      wheelArchetype,
+    });
+    return {
+      id: s.id,
+      label: s.label,
+      shortLabel: caption,
+      icon: s.icon,
+      iconFamily: s.iconFamily,
+      iconTint: visual.chipBg,
+      iconChipBg: visual.chipBg,
+      iconColor: visual.iconColor,
+      captionColor: visual.captionColor,
+      iconTone: visual.tone,
+    };
+  });
+
+  return {
+    definition: { ...wheel.definition, sliceCount },
+    slices: remapped,
+    spinItems,
+  };
+}
 
 export function buildFloorWheels(run: RunState): ResolvedWheel[] {
 
@@ -274,13 +335,25 @@ export function syncRunWheels(run: RunState): RunState {
 
   const cap = getEffectiveSliceCapacity(run);
 
-  const mismatch = run.wheels.some((w) => {
+  const mismatch = run.wheels.some((w, i) => {
     if (w.definition.wheelConfigId != null) {
-      const expected = getSliceCountForWheel(
+      const configId = w.definition.wheelConfigId as FloorWheelOrderId;
+      const raw = getConfiguredWheelSlices(configId, w.definition.id, {
+        runId: run.runId,
+        cycle: run.floor,
+        ownedPerks: run.perks,
+        advancements: run.advancements,
+        banishedPrizes: run.banishedPrizes?.[configId] ?? [],
+        permanentWedgeBonus: getPermanentWedgeBonus(run),
+        wheelLaserCuts: run.wheelLaserCuts,
+        wheelInsureCuts: run.wheelInsureCuts,
+      });
+      const expected = applyAdvancementsToSlices(
+        raw,
+        configId,
         run.floor,
-        run.advancements ?? [],
-        w.definition.wheelConfigId as FloorWheelOrderId
-      );
+        run.advancements ?? []
+      ).length;
       return w.slices.length !== expected;
     }
     return w.slices.length !== cap;

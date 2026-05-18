@@ -1,6 +1,6 @@
 import { StyleSheet, View } from "react-native";
-import { WHEEL_STAGES } from "../../game/loop";
 import { WHEEL_COUNT } from "../../game/loop";
+import { getWheelArchetypeMetaForIndex } from "../../data/wheelArchetypeMeta";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
 
@@ -14,8 +14,7 @@ export function RunStepDots({ run }: RunStepDotsProps) {
       {Array.from({ length: WHEEL_COUNT }, (_, i) => {
         const done = i < run.wheelIndex;
         const current = i === run.wheelIndex;
-        const role = run.wheels[i]?.definition.role ?? "base";
-        const accent = WHEEL_STAGES[role]?.accent ?? Neo.neonYellow;
+        const accent = getWheelArchetypeMetaForIndex(i).accent;
         return (
           <View
             key={i}

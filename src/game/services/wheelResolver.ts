@@ -10,6 +10,7 @@ import { applyChipGain } from "../runState/chipsScoring";
 import { winStreakChipBonus, updatePeakMoney } from "../runState/runStreaks";
 import { applyMoneyDelta } from "../../systems/PerkSystem";
 import { shouldDebtShieldBlock } from "../runState/runEffects";
+import { wouldRunShieldBlockLoss } from "../shields/shieldRules";
 import type { RunState } from "../runState/types";
 import type { SliceDefinition } from "../../schemas";
 import { RunManager } from "../../systems/RunManager";
@@ -21,6 +22,9 @@ import {
 export type WheelResolveResult = {
   run: RunState;
   moneyReveal?: { before: number; delta: number };
+  /** Bank hit absorbed by Iron Shield / Safe Harbor (no $ lost). */
+  shieldBlocked?: boolean;
+  debtShieldBlocked?: boolean;
 };
 
 export function buildWheelOutcome(
@@ -101,11 +105,13 @@ export function resolveAndApplyWheel(
   const adjusted = adjustSliceForRun(run, slice, wheelIndex);
   const outcome = buildWheelOutcome(run, adjusted, wheelIndex);
   const projectedDelta = computeSliceMoneyDelta(run, slice, wheelIndex);
-  const deferMoneyFx = projectedDelta !== 0;
+  const runShieldBlocks = wouldRunShieldBlockLoss(run, adjusted, wheelIndex);
+  const deferMoneyFx = projectedDelta !== 0 && !runShieldBlocks;
 
   if (shouldDebtShieldBlock(run, adjusted)) {
     return {
       run: RunManager.applySliceResult(run, wheelIndex, adjusted, moneyBefore) as RunState,
+      debtShieldBlocked: true,
     };
   }
 
@@ -158,6 +164,7 @@ export function resolveAndApplyWheel(
       ...next,
       pendingJokerOffers: outcome.perkOffers,
     },
+    shieldBlocked: runShieldBlocks,
   };
 
   if (deferMoneyFx) {

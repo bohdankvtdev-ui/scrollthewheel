@@ -46,6 +46,26 @@ export type RunEffectsPersisted = {
   debtShieldUsedThisCycle?: boolean;
   softLandingUsedThisCycle?: boolean;
   ironGritUsed?: boolean;
+  /** Safe Harbor bought or won — softer losses (not a visible perk slot). */
+  safeHarborActive?: boolean;
+  /** Insure tactic — strip worst negative wedge on next wheel. */
+  insureNextWheel?: boolean;
+  /** Wheel index where between-spin tactic was used (-1 = none). */
+  microChoiceWheelIndex?: number;
+  /** Which tactic was picked on `microChoiceWheelIndex`. */
+  tacticUsedId?: string;
+  /** Two tactic ids offered after the spin on `microChoiceOffersWheel`. */
+  microChoiceOffers?: string[];
+  microChoiceOffersWheel?: number;
+  /** Wheel indices (0–8) that show a tactic pick this cycle (~3 per run). */
+  tacticWheelIndices?: number[];
+  /** Show pick-1 pit stop before cycle reward overlay. */
+  pitStopPending?: boolean;
+  /** Clutch Cash perk paid out this cycle. */
+  clutchCashPaidCycle?: number;
+  /** Early-run chip grants after W1 / W2 (before Risk wheel). */
+  earlyChipBonus0?: boolean;
+  earlyChipBonus1?: boolean;
 };
 
 export type RunState = {
@@ -72,9 +92,13 @@ export type RunState = {
   peakMoney?: number;
   /** Blocks money-loss slices (Iron Reserve). */
   shields?: number;
+  /** Shield perks (iron_reserve, safe_harbor) — shown in loadout, not in `perks` slots. */
+  shieldPerks?: string[];
   debuffs: string[];
   relics: string[];
   sliceCapacity: SliceCount;
+  /** Builder +1 wedge wins — kept across cycles (separate from cycle slice scaling). */
+  permanentWedgeBonus?: number;
   /** Floors fully cleared before this one — for Compounder perk. */
   floorsCleared: number;
   /** Capacity bumped; rebuild wheels on next spin or wheel advance. */
@@ -89,6 +113,10 @@ export type RunState = {
   inventory?: { wedgeEraser?: number };
   /** Prize catalog ids removed from specific wheels (player choice). */
   banishedPrizes?: Partial<Record<string, string[]>>;
+  /** Wedges lasered off per wheel config this run (lowers slice count on rebuild). */
+  wheelLaserCuts?: Partial<Record<string, number>>;
+  /** Wedges removed by Insure tactic per config id (keeps sync/rebuild aligned). */
+  wheelInsureCuts?: Partial<Record<string, number>>;
   /** Last cycle reward shown on clear overlay. */
   lastCycleReward?: { cycle: number; chips: number; money: number };
 };

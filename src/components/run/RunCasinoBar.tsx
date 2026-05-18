@@ -31,6 +31,7 @@ type RunCasinoBarProps = {
   onMoneyRevealDone?: () => void;
   shopHighlighted?: boolean;
   onShop: () => void;
+  onYourWheel: () => void;
   onReset: () => void;
 };
 
@@ -40,11 +41,11 @@ export function RunCasinoBar({
   onMoneyRevealDone,
   shopHighlighted = false,
   onShop,
+  onYourWheel,
   onReset,
 }: RunCasinoBarProps) {
   const router = useRouter();
   const runChips = run.chipsEarnedThisRun ?? 0;
-  const winStreak = run.winStreak ?? 0;
   const pulse = useSharedValue(1);
   const moneyPop = useSharedValue(1);
   const [shownMoney, setShownMoney] = useState(run.money);
@@ -162,33 +163,21 @@ export function RunCasinoBar({
         ) : null}
       </Animated.View>
 
-      <View style={styles.slicePill} accessibilityLabel={`${run.sliceCapacity} slices`}>
-        <Text style={[styles.sliceText, { fontFamily: FONT_BEBAS_NEUE }]}>
-          {run.sliceCapacity}
-          {run.pendingWheelRebuild ? "→" : ""}
-        </Text>
-      </View>
-
-      {winStreak >= 2 ? (
-        <View style={styles.streakPill} accessibilityLabel={`Win streak ${winStreak}`}>
-          <MaterialIcons name="whatshot" size={14} color={Neo.ink} />
-          <Text style={[styles.streakText, { fontFamily: FONT_BEBAS_NEUE }]}>{winStreak}</Text>
-        </View>
-      ) : null}
-
-      {(run.shields ?? 0) > 0 ? (
-        <View style={styles.shieldPill}>
-          <MaterialIcons name="shield" size={14} color={Neo.ink} />
-          <Text style={[styles.shieldText, { fontFamily: FONT_BEBAS_NEUE }]}>{run.shields}</Text>
-        </View>
-      ) : null}
+      <Pressable
+        style={styles.yourWheelBtn}
+        onPress={onYourWheel}
+        accessibilityLabel="Your Wheel — view slices and odds"
+        hitSlop={6}
+      >
+        <MaterialIcons name="album" size={22} color={Neo.ink} />
+      </Pressable>
 
       <View style={styles.shopWrap}>
         <Animated.View pointerEvents="none" style={[styles.shopHighlightRing, shopRingStyle]} />
         <Pressable
           style={[styles.shopBtn, shopHighlighted && styles.shopBtnHighlighted]}
           onPress={onShop}
-          accessibilityLabel={shopHighlighted ? "Joker shop — tap to buy or reroll" : "Open shop"}
+          accessibilityLabel={shopHighlighted ? "Perk shop — tap to buy or reroll" : "Open shop"}
           accessibilityState={{ selected: shopHighlighted }}
           hitSlop={6}
         >
@@ -268,51 +257,15 @@ const styles = StyleSheet.create({
   moneyDeltaLoss: {
     color: LOSS_MONEY,
   },
-  slicePill: {
-    minWidth: 36,
-    height: 32,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: Neo.borderThin,
-    borderColor: "rgba(255,255,255,0.2)",
-    backgroundColor: "rgba(255,255,255,0.06)",
+  yourWheelBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#22D3EE",
+    borderWidth: Neo.borderBold,
+    borderColor: Neo.ink,
     alignItems: "center",
     justifyContent: "center",
-  },
-  sliceText: {
-    fontSize: 16,
-    color: Neo.textOnDark,
-    letterSpacing: 0.3,
-  },
-  streakPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 8,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: Neo.neonYellow,
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
-  },
-  streakText: {
-    fontSize: 14,
-    color: Neo.ink,
-  },
-  shieldPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 8,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: "#A7F3D0",
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
-  },
-  shieldText: {
-    fontSize: 14,
-    color: Neo.ink,
   },
   shopWrap: {
     position: "relative",

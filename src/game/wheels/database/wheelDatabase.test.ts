@@ -56,22 +56,21 @@ describe("wheelDatabase", () => {
     expect(c1.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
   });
 
-  it("percent wheel cycle 2+ adds ±30% to the pool", () => {
+  it("percent wheel cycle 2+ can roll ±30% prizes with six wedges", () => {
     const slots = getPrizeSlotsForWheel("wheel_2", 2);
-    expect(slots.some((s) => s.prize === "bank_gain_30")).toBe(true);
-    expect(slots.some((s) => s.prize === "bank_loss_30")).toBe(true);
+    expect(slots.length).toBe(6);
     const c2 = getConfiguredWheelSlices("wheel_2", "wheel_2_f2", 2);
-    expect(c2.length).toBeGreaterThanOrEqual(8);
+    expect(c2.length).toBe(6);
     expect(c2.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
   });
 
-  it("builder wheel uses six distinct deck labels (not generic Chip)", () => {
+  it("builder wheel has six +1 wedge choices (all wheels permanent)", () => {
     const slices = getConfiguredWheelSlices("wheel_7", "wheel_7");
     const labels = slices.map((s) => s.label);
     expect(labels).toHaveLength(6);
     expect(new Set(labels).size).toBe(6);
-    expect(labels.filter((l) => l.toLowerCase() === "chip" || l === "+Chip")).toHaveLength(0);
-    expect(labels.some((l) => l.includes("Chip") || l.includes("Mod") || l.includes("Die"))).toBe(true);
+    expect(labels.every((l) => l.includes("+1"))).toBe(true);
+    expect(slices.every((s) => s.payload.sliceDelta === 1)).toBe(true);
   });
 
   it("lucky_streak shifts odds on mixed-tag wheels when using database weights", () => {
@@ -179,20 +178,26 @@ describe("wheelDatabase", () => {
           s.kind === "bank_cut"
       )
     ).toBe(true);
-    const boss = getConfiguredWheelSlices("wheel_9", "wheel_9", {
+    const finalWheel = getConfiguredWheelSlices("wheel_9", "wheel_9", {
       runId: "__validate__",
       cycle: 2,
       ownedPerks: ["lucky_money", "iron_reserve"],
     });
+    const flatLosses = finalWheel.filter(
+      (s) => s.kind === "money_loss" || (s.payload.moneyDelta ?? 0) < 0
+    );
+    const flatWins = finalWheel.filter((s) => (s.payload.moneyDelta ?? 0) > 0);
+    expect(flatLosses.length).toBeGreaterThanOrEqual(3);
+    expect(flatLosses.length).toBeGreaterThan(flatWins.length);
     expect(
-      boss.some(
+      finalWheel.some(
         (s) =>
           s.payload.runEffectId === "boss_perk_tax" ||
           s.kind === "bank_cut" ||
           s.payload.runEffectId === "boss_overhead"
       )
     ).toBe(true);
-    expect(boss.some((s) => s.payload.moneyDelta === 800)).toBe(false);
+    expect(finalWheel.some((s) => s.payload.moneyDelta === 800)).toBe(false);
   });
 
   it("prints wheel_1 odds (manual inspect)", () => {

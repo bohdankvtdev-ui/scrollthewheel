@@ -50,7 +50,7 @@ const KIND_CATEGORY: Partial<Record<SliceKind, string>> = {
 
   money_loss: "Cash loss",
 
-  perk: "Joker perk",
+  perk: "Perk",
 
   debuff: "Curse",
 
@@ -228,9 +228,9 @@ export function getSliceTapDetail(slice: SliceDefinition): SliceTapDetail {
 
     return {
 
-      category: "Joker perk",
+      category: "Perk",
 
-      effectLine: perk != null ? `Win: ${perk.name}` : "New joker perk",
+      effectLine: perk != null ? `Win: ${perk.name}` : "New perk",
 
       bullets: display?.bullets.slice(0, 3) ?? [perk?.description ?? "Adds to your perk row for the rest of the run"],
 

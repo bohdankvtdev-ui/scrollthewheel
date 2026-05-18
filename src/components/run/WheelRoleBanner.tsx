@@ -1,17 +1,18 @@
+import { MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
-import { WHEEL_ROLE_META } from "../../data/wheelRoleMeta";
-import type { WheelRole } from "../../schemas";
+import type { WheelArchetype } from "../../game/wheels/types";
+import { getWheelArchetypeMeta } from "../../data/wheelArchetypeMeta";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { EffectIcon } from "./EffectIcon";
 
 type WheelRoleBannerProps = {
-  role: WheelRole;
+  archetype: WheelArchetype;
   floor: number;
 };
 
-export function WheelRoleBanner({ role, floor }: WheelRoleBannerProps) {
-  const meta = WHEEL_ROLE_META[role];
+export function WheelRoleBanner({ archetype, floor }: WheelRoleBannerProps) {
+  const meta = getWheelArchetypeMeta(archetype);
 
   return (
     <View style={styles.wrap}>
@@ -27,7 +28,8 @@ export function WheelRoleBanner({ role, floor }: WheelRoleBannerProps) {
           <Text style={[styles.pillText, { fontFamily: FONT_BEBAS_NEUE }]}>{meta.tag}</Text>
         </View>
         <View style={styles.pillMuted}>
-          <Text style={[styles.pillTextMuted, { fontFamily: FONT_BEBAS_NEUE }]}>F{floor}</Text>
+          <MaterialIcons name="autorenew" size={13} color={Neo.textOnDark} />
+          <Text style={[styles.pillTextMuted, { fontFamily: FONT_BEBAS_NEUE }]}>Cycle {floor}</Text>
         </View>
       </View>
     </View>
@@ -53,10 +55,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  pillBoss: {
-    backgroundColor: Neo.accent,
-  },
   pillMuted: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     borderWidth: Neo.borderThin,
     borderColor: "rgba(250,250,250,0.35)",
     borderRadius: 999,

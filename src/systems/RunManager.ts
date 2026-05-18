@@ -62,10 +62,25 @@ import {
 import { applyChipForgeToModifiers } from "../game/shop/chipForge";
 
 import { getCycleRewardPackage } from "../game/cycle/cycleProgression";
-import { getRunMaxSliceCount } from "../game/advancements/sliceCount";
+import {
+  applyPostBuilderSliceFloor,
+  sliceCapacityForNextCycle,
+} from "../game/wheels/sliceCapacityBonus";
 import { applyJokerEvent } from "../game/perks/jokerEngine";
 
+const FINAL_WHEEL_INDEX = 8;
 
+function applyClutchCashIfNeeded(run: RunState, wheelIndex: number): RunState {
+  if (wheelIndex !== FINAL_WHEEL_INDEX) return run;
+  if (!run.perks.includes("clutch_cash")) return run;
+  const paidCycle = run.runEffects?.clutchCashPaidCycle ?? 0;
+  if (paidCycle >= run.floor) return run;
+  return {
+    ...run,
+    money: run.money + 50,
+    runEffects: { ...run.runEffects, clutchCashPaidCycle: run.floor },
+  };
+}
 
 export class RunManager {
 
@@ -108,6 +123,8 @@ export class RunManager {
       advancements: [],
 
       shields: 0,
+
+      shieldPerks: [],
 
       debuffs: [],
 
@@ -320,6 +337,8 @@ export class RunManager {
 
 
     let next = tickRunEffectsOnWheelAdvance({ ...run, wheelIndex: nextIndex });
+    next = applyPostBuilderSliceFloor(next);
+    next = applyClutchCashIfNeeded(next, nextIndex);
 
     return RunManager.checkRunEnd(next);
 
@@ -362,6 +381,7 @@ export class RunManager {
       ...next,
       phase: "won",
       lastCycleReward: { cycle: reward.cycle, chips: reward.chips, money: reward.money },
+      runEffects: { ...next.runEffects, pitStopPending: true },
     };
 
   }
@@ -399,7 +419,7 @@ export class RunManager {
 
     next = {
       ...next,
-      sliceCapacity: getRunMaxSliceCount(nextFloor, next.advancements ?? []),
+      sliceCapacity: sliceCapacityForNextCycle(next),
       pendingWheelRebuild: true,
     };
 

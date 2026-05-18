@@ -16,7 +16,7 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
     scope: "perk_wheel",
     kind: "land_weight",
     value: 1.12,
-    line: "+12% chance to land jokers on Perk wheel (W4)",
+    line: "+12% chance to land perks on Perk wheel (W4)",
   },
   lucky_streak: {
     perkId: "lucky_streak",
@@ -95,6 +95,27 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
     kind: "payout_mult",
     value: 1,
     line: "+4 shop chips when you clear a cycle",
+  },
+  final_guard: {
+    perkId: "final_guard",
+    scope: "boss_wheel",
+    kind: "loss_mult",
+    value: 0.85,
+    line: "−15% damage on Final wheel (W9)",
+  },
+  final_tax_shield: {
+    perkId: "final_tax_shield",
+    scope: "boss_wheel",
+    kind: "payout_mult",
+    value: 0.15,
+    line: "Perk Tax on Final wheel capped at 15% of bank",
+  },
+  clutch_cash: {
+    perkId: "clutch_cash",
+    scope: "boss_wheel",
+    kind: "payout_mult",
+    value: 50,
+    line: "+$50 when you reach Final wheel each cycle",
   },
 };
 

@@ -5,7 +5,7 @@
 
 import type { WheelConfigEntry, WheelConfigId } from "./types";
 
-export const WHEEL_DATABASE_REVISION = 21;
+export const WHEEL_DATABASE_REVISION = 23;
 
 export const FLOOR_WHEEL_ORDER = [
   "wheel_1",
@@ -79,10 +79,10 @@ export const WHEEL_DATABASE: Record<FloorWheelOrderId, WheelConfigEntry> = {
   },
 
   wheel_9: {
-    title: "Showdown Wheel",
+    title: "Final Wheel",
     archetype: "boss",
     role: "boss",
     physicsProfileId: "boss",
-    modifiers: { stakesBoost: 0.55, forceNegativeBias: 0.28 },
+    modifiers: { stakesBoost: 0.65, forceNegativeBias: 0.35 },
   },
 };

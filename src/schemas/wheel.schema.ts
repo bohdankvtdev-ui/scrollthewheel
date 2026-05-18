@@ -14,6 +14,7 @@ export type WheelRole =
   | "boss";
 
 export type SliceCount =
+  | 5
   | 6
   | 7
   | 8
@@ -34,13 +35,13 @@ export type SliceCount =
   | 23
   | 24;
 
-export const MIN_SLICE_COUNT = 6;
+export const MIN_SLICE_COUNT = 5;
 export const MAX_SLICE_COUNT = 24;
 
 export function clampSliceCount(n: number): SliceCount {
   const v = Math.round(n);
-  if (v <= 6) return 6;
-  if (v >= 24) return 24;
+  if (v <= MIN_SLICE_COUNT) return MIN_SLICE_COUNT;
+  if (v >= MAX_SLICE_COUNT) return MAX_SLICE_COUNT;
   return v as SliceCount;
 }
 

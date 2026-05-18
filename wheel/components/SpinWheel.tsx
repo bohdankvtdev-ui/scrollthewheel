@@ -110,6 +110,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
     syncDiscScale: syncDiscScaleProp,
     onSlicePress,
     slicePressEnabled = true,
+    onSpinInterrupted,
   },
   ref
 ) {
@@ -120,7 +121,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   }
 
   const { angle, spin, spinToIndex, enabled, winnerIndex, lastRestAngleDeg, angleBySegment, angleOffset } =
-    useSpinWheel(data.length, wheelPhysics);
+    useSpinWheel(data.length, wheelPhysics, onSpinInterrupted);
 
   const wheelDegForLabels = lastRestAngleDeg ?? 0;
 

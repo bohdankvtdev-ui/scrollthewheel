@@ -114,6 +114,7 @@ export function useRunLogic() {
         awaitingClaim: false,
         lastEffect: null,
         lastWonPerkId: null,
+        lastWonDebuffId: null,
         lastRewardKind: null,
       },
     });

@@ -2,11 +2,8 @@ import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { PERK_CATALOG } from "../../data/perks";
 import { PERK_TIER_LABELS } from "../../game/gdd";
-import {
-  getPerkDisplay,
-  PERK_CATEGORY_COLORS,
-  PERK_CATEGORY_LABELS,
-} from "../../game/perks/perkDisplay";
+import { getPerkDisplay } from "../../game/perks/perkDisplay";
+import { PERK_FAMILY_COLORS, PERK_FAMILY_LABELS } from "../../game/perks/perkFamilies";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { IconFamily } from "../../schemas";
@@ -49,8 +46,8 @@ export function PerkDetailSheet({ perkId, visible, onClose }: PerkDetailSheetPro
   const display = perkId != null ? getPerkDisplay(perkId) : null;
   if (perk == null) return null;
 
-  const colors = PERK_CATEGORY_COLORS[perk.category];
-  const categoryLabel = PERK_CATEGORY_LABELS[perk.category];
+  const colors = PERK_FAMILY_COLORS[perk.family];
+  const categoryLabel = PERK_FAMILY_LABELS[perk.family];
   const bullets = display?.bullets ?? [perk.description];
 
   return (

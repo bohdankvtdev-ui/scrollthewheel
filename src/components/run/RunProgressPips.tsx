@@ -1,8 +1,8 @@
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, View } from "react-native";
-import { WHEEL_ROLE_META } from "../../data/wheelRoleMeta";
-import { RUN_PIPELINE } from "../../data/wheels/runPipeline";
+import { WHEEL_COUNT } from "../../game/loop";
+import { getWheelArchetypeMetaForIndex } from "../../data/wheelArchetypeMeta";
 import { Neo } from "../../../theme/neoBrutal";
+import { WheelMapIcon } from "./WheelMapIcon";
 
 type RunProgressPipsProps = {
   wheelIndex: number;
@@ -11,27 +11,23 @@ type RunProgressPipsProps = {
 export function RunProgressPips({ wheelIndex }: RunProgressPipsProps) {
   return (
     <View style={styles.row}>
-      {RUN_PIPELINE.map((w, i) => {
-        const meta = WHEEL_ROLE_META[w.role];
+      {Array.from({ length: WHEEL_COUNT }, (_, i) => {
+        const meta = getWheelArchetypeMetaForIndex(i);
         const done = i < wheelIndex;
         const current = i === wheelIndex;
-        const Icon =
-          meta.iconFamily === "MaterialCommunityIcons" ? MaterialCommunityIcons : MaterialIcons;
+        const iconColor = current ? Neo.ink : done ? Neo.ink : "rgba(250,250,250,0.45)";
+
         return (
           <View
-            key={w.id}
+            key={i}
             style={[
               styles.pip,
-              done && styles.pipDone,
+              done && [styles.pipDone, { backgroundColor: meta.accent }],
               current && [styles.pipCurrent, { backgroundColor: meta.accent }],
             ]}
             accessibilityLabel={`${meta.tag}${current ? ", current" : done ? ", done" : ""}`}
           >
-            <Icon
-              name={meta.icon as never}
-              size={current ? 16 : 13}
-              color={current ? Neo.ink : done ? Neo.ink : "rgba(250,250,250,0.45)"}
-            />
+            <WheelMapIcon meta={meta} size={current ? 16 : 13} color={iconColor} />
           </View>
         );
       })}
@@ -58,8 +54,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.2)",
   },
   pipDone: {
-    backgroundColor: Neo.neonCyan,
     borderColor: Neo.ink,
+    opacity: 0.72,
   },
   pipCurrent: {
     borderWidth: Neo.borderBold,

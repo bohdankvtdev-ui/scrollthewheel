@@ -80,9 +80,16 @@ function springUndershootDeg(angleBySegment: number): number {
   return Math.min(1.42, Math.max(0.62, sliceBased)) * (0.9 + Math.random() * 0.18);
 }
 
-export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
+export function useSpinWheel(
+  dataLength: number,
+  physics: WheelPhysicsConfig,
+  onSpinInterrupted?: () => void
+) {
   const angle = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
+  const spinInFlightRef = useRef(false);
+  const onInterruptedRef = useRef(onSpinInterrupted);
+  onInterruptedRef.current = onSpinInterrupted;
   const [enabled, setEnabled] = useState(true);
   const [winnerIndex, setWinnerIndex] = useState<number | null>(null);
   /** Wheel angle (deg) at last completed rest — for upright prize labels. */
@@ -93,12 +100,20 @@ export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
   useEffect(() => {
     mountedRef.current = true;
     return () => {
+      if (spinInFlightRef.current) {
+        onInterruptedRef.current?.();
+      }
+      spinInFlightRef.current = false;
       mountedRef.current = false;
       angle.stopAnimation();
     };
   }, [angle]);
 
   useEffect(() => {
+    if (spinInFlightRef.current) {
+      onInterruptedRef.current?.();
+    }
+    spinInFlightRef.current = false;
     angle.stopAnimation();
     angle.setValue(0);
     setWinnerIndex(null);
@@ -128,12 +143,14 @@ export function useSpinWheel(dataLength: number, physics: WheelPhysicsConfig) {
     const tailKind = wobbleCfg?.tailKind ?? "spring";
 
     setEnabled(false);
+    spinInFlightRef.current = true;
     setWinnerIndex(null);
     angle.stopAnimation();
     angle.setValue(0);
 
     const finish = () => {
       if (!mountedRef.current) return;
+      spinInFlightRef.current = false;
       setLastRestAngleDeg(finalAngle);
       setWinnerIndex(randomIndex);
       setEnabled(true);

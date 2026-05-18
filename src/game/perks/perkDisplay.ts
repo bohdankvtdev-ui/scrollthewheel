@@ -139,7 +139,7 @@ export const PERK_DISPLAY: Record<string, PerkDisplayCopy> = {
 
     tagline: "Cheaper shop",
 
-    shopLine: "Joker shop prices −15% (shop chips, not bank $)",
+    shopLine: "Perk shop prices −15% (shop chips, not bank $)",
 
     bullets: [
 
@@ -187,6 +187,24 @@ export const PERK_DISPLAY: Record<string, PerkDisplayCopy> = {
     bullets: [perkLine("compounder"), "Bonus shop chips each cycle end"],
   },
 
+  final_guard: {
+    tagline: "Survive Final",
+    shopLine: perkLine("final_guard"),
+    bullets: [perkLine("final_guard"), "Stacks with Safe Harbor on Risk/Chaos"],
+  },
+
+  final_tax_shield: {
+    tagline: "Beat Perk Tax",
+    shopLine: perkLine("final_tax_shield"),
+    bullets: [perkLine("final_tax_shield"), "Only affects Perk Tax on wheel 9"],
+  },
+
+  clutch_cash: {
+    tagline: "Final payday",
+    shopLine: perkLine("clutch_cash"),
+    bullets: [perkLine("clutch_cash"), "Once per cycle when you reach wheel 9"],
+  },
+
 };
 
 
@@ -221,6 +239,9 @@ export function perkPrizeLabel(perkId: string): string {
     compounder: "Compounder",
 
     coupon_king: "Coupon King",
+    final_guard: "Final Guard",
+    final_tax_shield: "Tax Shield",
+    clutch_cash: "Clutch Cash",
 
   };
 

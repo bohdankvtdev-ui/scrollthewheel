@@ -28,6 +28,9 @@ export const ICON_REGISTRY = {
     weighted_die: { icon: "dice-5", iconFamily: "MaterialCommunityIcons" },
     purity_charm: { icon: "heart", iconFamily: "MaterialCommunityIcons" },
     wide_wheel_card: { icon: "chart-donut", iconFamily: "MaterialCommunityIcons" },
+    final_guard: { icon: "shield-sword", iconFamily: "MaterialCommunityIcons" },
+    final_tax_shield: { icon: "shield-account", iconFamily: "MaterialCommunityIcons" },
+    clutch_cash: { icon: "cash-fast", iconFamily: "MaterialCommunityIcons" },
   },
   debuff: {
     debt_mark: { icon: "skull-crossbones", iconFamily: "MaterialCommunityIcons" },

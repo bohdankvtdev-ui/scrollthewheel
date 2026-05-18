@@ -1,28 +1,22 @@
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
-import { WHEEL_STAGES } from "../../game/loop";
+import { getWheelArchetypeMetaForIndex } from "../../data/wheelArchetypeMeta";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
+import { WheelMapIcon } from "./WheelMapIcon";
 
 type RunWheelBadgeProps = {
   run: RunState;
 };
 
 export function RunWheelBadge({ run }: RunWheelBadgeProps) {
-  const wheel = run.wheels[run.wheelIndex];
-  const role = wheel?.definition.role ?? "base";
-  const stage = WHEEL_STAGES[role];
+  const meta = getWheelArchetypeMetaForIndex(run.wheelIndex);
   const step = run.wheelIndex + 1;
 
   return (
-    <View style={[styles.badge, { backgroundColor: stage.accent }]} pointerEvents="none">
-      {stage.iconFamily === "MaterialCommunityIcons" ? (
-        <MaterialCommunityIcons name={stage.icon as never} size={18} color={Neo.ink} />
-      ) : (
-        <MaterialIcons name={stage.icon as never} size={18} color={Neo.ink} />
-      )}
-      <Text style={[styles.label, { fontFamily: FONT_BEBAS_NEUE }]}>{stage.label}</Text>
+    <View style={[styles.badge, { backgroundColor: meta.accent }]} pointerEvents="none">
+      <WheelMapIcon meta={meta} size={18} />
+      <Text style={[styles.label, { fontFamily: FONT_BEBAS_NEUE }]}>{meta.mapLabel}</Text>
       <Text style={styles.step}>{step}</Text>
     </View>
   );

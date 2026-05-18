@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
-import { useRunToastStore } from "../../stores/runToastStore";
+import { showRunNotice } from "../../game/notices/runNotices";
 import { CompactStatPill } from "./CompactStatPill";
 
 type RunHeaderProps = {
@@ -42,8 +42,6 @@ function HeaderActionBtn({
 
 export function RunHeader({ run, onReset }: RunHeaderProps) {
   const router = useRouter();
-  const showToast = useRunToastStore((s) => s.show);
-
   return (
     <View style={styles.wrap}>
       <View style={styles.statsRow}>
@@ -53,7 +51,12 @@ export function RunHeader({ run, onReset }: RunHeaderProps) {
           tint={Neo.neonYellow}
           accessibilityLabel={`Money ${run.money}`}
           onPress={() =>
-            showToast({ type: "info", title: `Bank: $${run.money}`, icon: "attach-money" })
+            showRunNotice({
+              type: "info",
+              title: "Bank",
+              body: `$${run.money}`,
+              icon: "attach-money",
+            })
           }
         />
         <CompactStatPill
@@ -62,9 +65,10 @@ export function RunHeader({ run, onReset }: RunHeaderProps) {
           tint="#EDE9FE"
           accessibilityLabel={`${run.perks.length} perks`}
           onPress={() =>
-            showToast({
+            showRunNotice({
               type: "info",
-              title: `${run.perks.length} perk${run.perks.length === 1 ? "" : "s"} owned`,
+              title: "Perks owned",
+              body: String(run.perks.length),
               icon: "stars",
             })
           }
@@ -75,7 +79,12 @@ export function RunHeader({ run, onReset }: RunHeaderProps) {
           tint={Neo.neonCyan}
           accessibilityLabel={`Floor ${run.floor}`}
           onPress={() =>
-            showToast({ type: "info", title: `Floor ${run.floor}`, icon: "stairs" })
+            showRunNotice({
+              type: "info",
+              title: "Floor",
+              body: String(run.floor),
+              icon: "stairs",
+            })
           }
         />
       </View>

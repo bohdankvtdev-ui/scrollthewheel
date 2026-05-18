@@ -8,6 +8,7 @@ import { BALATRO_ECONOMY } from "../game/balatroEconomy";
 import { SHOP_PERK_TREE } from "../game/loop";
 import { getSpendableChips, grantChipsInRun, shopChipCost, spendChips } from "../game/shop/chipEconomy";
 import { countJokers, isJokerSlotFull } from "../game/shop/jokerSlots";
+import { meetsShopPerkRequirement } from "../game/shields/shieldRules";
 import { getExtraShopOffers } from "../game/advancements/applyAdvancements";
 import { getRunMaxSliceCount } from "../game/advancements/sliceCount";
 import {
@@ -48,18 +49,18 @@ export class ShopSystem {
   static canBuy(run: RunState, perkId: string): ShopBuyResult {
     const node = SHOP_PERK_TREE.find((n) => n.perkId === perkId);
     if (node == null) return { ok: false, reason: "Not in shop" };
-    if (PERK_CATALOG[perkId] == null) return { ok: false, reason: "Unknown joker" };
+    if (PERK_CATALOG[perkId] == null) return { ok: false, reason: "Unknown perk" };
 
     if (run.perks.includes(perkId)) {
       return { ok: false, reason: "Already owned" };
     }
     if (isJokerSlotFull(run)) {
-      return { ok: false, reason: `Joker slots full (${BALATRO_ECONOMY.maxJokerSlots})` };
+      return { ok: false, reason: `Perk slots full (${BALATRO_ECONOMY.maxJokerSlots})` };
     }
 
     for (const req of node.requires) {
-      if (!run.perks.includes(req)) {
-        return { ok: false, reason: "Buy the required joker first" };
+      if (!meetsShopPerkRequirement(run, req)) {
+        return { ok: false, reason: "Buy the required perk first" };
       }
     }
 
@@ -264,7 +265,7 @@ export class ShopSystem {
 
   private static nodeView(run: RunState, node: (typeof SHOP_PERK_TREE)[number]) {
     const owned = run.perks.includes(node.perkId);
-    const locked = node.requires.some((r) => !run.perks.includes(r));
+    const locked = node.requires.some((r) => !meetsShopPerkRequirement(run, r));
     const catalog = PERK_CATALOG[node.perkId];
     const cost = shopChipCost(run, node.cost);
     const slotsFull = isJokerSlotFull(run) && !owned;

@@ -347,9 +347,10 @@ export const NeoBulbRing = memo(function NeoBulbRing({ layout, phase, palette: p
   }, false);
 
   useEffect(() => {
-    setActive(true);
+    const animating = phase !== "idle";
+    setActive(animating);
     return () => setActive(false);
-  }, [setActive]);
+  }, [phase, setActive]);
 
   const d = layout.outerDiameter;
   const hubX = d / 2;

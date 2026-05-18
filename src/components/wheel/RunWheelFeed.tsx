@@ -21,12 +21,13 @@ import {
 } from "../../../features/cash-spin/cashStripPerformance";
 import { useReelStripEngine } from "../../../features/cash-spin/hooks/useReelStripEngine";
 import { REEL_STRIP } from "../../../features/cash-spin/reelStripConstants";
-import { WHEEL_STAGES } from "../../game/loop";
+import { RUN_PAGE_BACKGROUND } from "../../game/runVisual";
 import {
   computeSpinWheelTextSize,
   computeWheelInnerSize,
 } from "../../../lib/layout/wheelFrame";
 import { CASH_SPIN_WHEEL_PROFILE } from "../../../lib/wheel/profiles";
+import { spinSafetyTimeoutMs } from "../../../lib/wheel";
 import { resolveWheelPhysics } from "../../../lib/wheel/resolveWheelPhysics";
 import { Neo } from "../../../theme/neoBrutal";
 import type { SpinWheelRef } from "../../../wheel/types";
@@ -38,7 +39,20 @@ import { getArchetypeForConfigId } from "../../game/wheels/database";
 import { RunManager } from "../../systems/RunManager";
 import { syncRunWheels } from "../../systems/WheelSystem";
 import type { RunState } from "../../schemas";
+import { deriveHubMode, deriveSpinLocked } from "../../game/tactics/wheelHubState";
+import {
+  buildGambleSlices,
+  getGambleSliceById,
+  overlayGambleWheel,
+} from "../../game/tactics/gambleWheel";
+import { runReelFeedKey } from "../../game/runState/runReelFeedKey";
+import { useRunWheelUi } from "../../hooks/useRunWheelUi";
 import { useRunStore } from "../../stores/runStore";
+import {
+  shouldDismissNoticeOnScroll,
+  showRunInfoNotice,
+  showRunNotice,
+} from "../../game/notices/runNotices";
 import { useRunToastStore } from "../../stores/runToastStore";
 import { sliceWheelCaptionForRun } from "../../utils/sliceMoneyDisplay";
 import type { SpinWheelItem } from "../../../wheel/types";
@@ -47,6 +61,8 @@ type RunWheelFeedProps = {
   run: RunState;
   pageHeight: number;
 };
+
+const NOOP = () => {};
 
 function physicsForProfile(profileId: string) {
   const base = CASH_SPIN_WHEEL_PROFILE.physics;
@@ -78,7 +94,11 @@ const RunWheelSlot = memo(function RunWheelSlot({
   scrollGrainOverlay,
   sliceEraseMode,
   isActiveWheel,
+  gambleFlipActive,
+  spinArmEpoch,
   onBanishSlice,
+  isSpinning,
+  clearSpinInteraction,
 }: {
   roundIndex: number;
   pageHeight: number;
@@ -97,16 +117,33 @@ const RunWheelSlot = memo(function RunWheelSlot({
   scrollGrainOverlay?: React.ReactNode;
   sliceEraseMode: boolean;
   isActiveWheel: boolean;
+  gambleFlipActive: boolean;
+  spinArmEpoch: number;
   onBanishSlice: (sliceIndex: number) => void;
+  isSpinning: boolean;
+  clearSpinInteraction: () => void;
 }) {
-  const wheel = run.wheels[roundIndex];
-  const isSpinning = useRunStore((s) => s.ui.isSpinning);
+  const baseWheel = run.wheels[roundIndex];
+  const wheel = useMemo(() => {
+    if (baseWheel == null || !gambleFlipActive || !isActiveWheel) return baseWheel;
+    return overlayGambleWheel(baseWheel);
+  }, [baseWheel, gambleFlipActive, isActiveWheel]);
   const [previewSliceIndex, setPreviewSliceIndex] = useState<number | null>(null);
   const eraseArmed = sliceEraseMode && isActiveWheel && !spinLocked && !isSpinning;
 
   useEffect(() => {
     if (isSpinning) setPreviewSliceIndex(null);
   }, [isSpinning]);
+
+  useEffect(() => {
+    if (!isActiveWheel) return;
+    return () => {
+      const st = useRunStore.getState();
+      if (st.ui.isSpinning && st.ui.spinWheelIndex === roundIndex) {
+        st.clearSpinInteraction();
+      }
+    };
+  }, [isActiveWheel, roundIndex]);
 
   const wheelPhysics = useMemo(
     () => physicsForProfile(wheel?.definition.physicsProfileId ?? "default"),
@@ -146,7 +183,7 @@ const RunWheelSlot = memo(function RunWheelSlot({
         shortLabel: sliceWheelCaptionForRun(run, slice, roundIndex),
       };
     });
-  }, [run, roundIndex, wheel]);
+  }, [run.money, run.winStreak, run.perks.length, roundIndex, wheel]);
 
   if (wheel == null) return <View style={{ height: pageHeight }} />;
 
@@ -164,7 +201,7 @@ const RunWheelSlot = memo(function RunWheelSlot({
         <View style={styles.eraseBanner} pointerEvents="none">
           <MaterialCommunityIcons name="eraser" size={18} color={Neo.ink} />
           <Text style={[styles.eraseBannerText, { fontFamily: FONT_BEBAS_NEUE }]}>
-            Tap a wedge to banish
+            Tap a wedge to laser
           </Text>
         </View>
       ) : null}
@@ -190,7 +227,9 @@ const RunWheelSlot = memo(function RunWheelSlot({
             onBulbRingPhaseChange={onBulbRingPhaseChange}
             onSpinComplete={(item) => onSpinComplete(roundIndex, item)}
             scrollGrainOverlay={scrollGrainOverlay}
-            slicePressEnabled={!spinLocked && !isSpinning}
+            spinArmEpoch={isActiveWheel ? spinArmEpoch : 0}
+            onSpinInterrupted={isActiveWheel ? clearSpinInteraction : undefined}
+            slicePressEnabled={eraseArmed || (!spinLocked && !isSpinning)}
             onSlicePress={(index) => {
               if (eraseArmed) {
                 onBanishSlice(index);
@@ -205,25 +244,31 @@ const RunWheelSlot = memo(function RunWheelSlot({
   );
 });
 
-export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
+export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
   const { width: winW, height: winH } = useWindowDimensions();
-  const awaitingClaim = useRunStore((s) => s.ui.awaitingClaim);
-  const isSpinning = useRunStore((s) => s.ui.isSpinning);
-  const sliceEraseMode = useRunStore((s) => s.ui.sliceEraseMode);
-  const applySpinResult = useRunStore((s) => s.applySpinResult);
-  const claimAndAdvance = useRunStore((s) => s.claimAndAdvance);
-  const commitWheelLayout = useRunStore((s) => s.commitWheelLayout);
-  const setSpinning = useRunStore((s) => s.setSpinning);
-  const banishSliceAt = useRunStore((s) => s.banishSliceAt);
-  const lastResultLabel = useRunStore((s) => s.ui.lastResultLabel);
-  const showToast = useRunToastStore((s) => s.show);
+  const {
+    awaitingClaim,
+    isSpinning,
+    gambleFlipActive,
+    sliceEraseMode,
+    lastResultLabel,
+  } = useRunWheelUi();
+  const [spinArmEpoch, setSpinArmEpoch] = useState(0);
+  const prevWheelIndexRef = useRef(run.wheelIndex);
+  const dismissToast = useRunToastStore((s) => s.dismiss);
+  const toastVisible = useRunToastStore((s) => s.toast != null);
+  const clearSpinInteraction = useCallback(
+    () => useRunStore.getState().clearSpinInteraction(),
+    []
+  );
 
-  const rounds = useRunReelRounds(run, awaitingClaim, lastResultLabel);
+  const rounds = useRunReelRounds(run, awaitingClaim, lastResultLabel, gambleFlipActive);
   const spinWheelRef = useRef<SpinWheelRef>(null);
   const pendingSliceRef = useRef<{
     wheelIndex: number;
     sliceId: string;
     sliceIndex: number;
+    isGambleFlip?: boolean;
   } | null>(null);
 
   const reduceMotionBoot = useReducedMotion();
@@ -252,27 +297,37 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
   const textSize = useMemo(() => computeSpinWheelTextSize(wheelInnerSize), [wheelInnerSize]);
   const textColor = Neo.wheelSliceLabel;
 
-  const onClaimed = useCallback(
-    (roundIndex: number) => {
-      const current = useRunStore.getState().run;
-      if (current == null || roundIndex !== current.wheelIndex) return;
-      claimAndAdvance();
-    },
-    [claimAndAdvance]
-  );
+  const reelEngineRef = useRef<ReturnType<typeof useReelStripEngine> | null>(null);
 
-  const handleBanishSlice = useCallback(
-    (wheelIndex: number, sliceIndex: number) => {
-      const result = banishSliceAt(wheelIndex, sliceIndex);
-      if (result.ok) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast({ type: "success", title: "Wedge banished", icon: "eraser" });
-        return;
-      }
-      showToast({ type: "info", title: result.reason, icon: "info" });
-    },
-    [banishSliceAt, showToast]
-  );
+  const onReelAdvanced = useCallback(() => {
+    const store = useRunStore.getState();
+    store.clearSpinInteraction();
+    reelEngineRef.current?.onPrimaryBulbPhaseChange("idle");
+    store.healRunUi();
+  }, []);
+
+  const onClaimed = useCallback((roundIndex: number): boolean => {
+    const store = useRunStore.getState();
+    const current = store.run;
+    if (current == null || roundIndex !== current.wheelIndex) return false;
+    if (!store.ui.awaitingClaim) return false;
+    return store.claimAndAdvance();
+  }, []);
+
+  const handleBanishSlice = useCallback((wheelIndex: number, sliceIndex: number) => {
+    const result = useRunStore.getState().banishSliceAt(wheelIndex, sliceIndex);
+    if (result.ok) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showRunNotice({
+        type: "success",
+        title: "Wedge removed",
+        body: "One fewer slice on this wheel",
+        icon: "ray-start",
+      });
+      return;
+    }
+    showRunInfoNotice(result.reason);
+  }, []);
 
   const reel = useReelStripEngine({
     pageHeight,
@@ -280,21 +335,16 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
     initialActiveIndex: run.wheelIndex,
     bootRunId: run.runId,
     onClaimed,
-    onPrepareAdvance: commitWheelLayout,
+    onPrepareAdvance: () => useRunStore.getState().commitWheelLayout(),
+    onReelAdvanced,
     stripVisualIntensity,
     wheelFrostVisualIntensity,
   });
-
-  const slotTint = useCallback((wheelIndex: number) => {
-    const r = run.wheels[wheelIndex]?.definition.role ?? "base";
-    return WHEEL_STAGES[r]?.pageTint ?? "#141018";
-  }, [run.wheels]);
-
-  const pageBgCurrent = slotTint(reel.activeIndex);
-  const pageBgNext =
-    reel.nextIndex != null ? slotTint(reel.nextIndex) : pageBgCurrent;
+  reelEngineRef.current = reel;
 
   const handleHubClaim = useCallback(() => {
+    const { ui } = useRunStore.getState();
+    if (ui.awaitingClaim || ui.isSpinning || ui.gambleFlipActive) return;
     reel.requestAdvance();
   }, [reel]);
 
@@ -309,91 +359,163 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
 
     const ri = current.wheelIndex;
     const wheel = current.wheels[ri];
-    if (wheel == null || !RunManager.canSpin(current, ri) || isSpinning || awaitingClaim) return;
+    const flipActive = useRunStore.getState().ui.gambleFlipActive;
+    if (wheel == null || !RunManager.canSpin(current, ri) || isSpinning) return;
+    if (awaitingClaim && !flipActive) return;
 
-    const ctx = buildResolveContext(current, wheel);
-    const { index, slice } = resolveSlice(wheel.slices, ctx);
-    pendingSliceRef.current = { wheelIndex: ri, sliceId: slice.id, sliceIndex: index };
-    setSpinning(true);
+    if (flipActive) {
+      const slices = buildGambleSlices();
+      const ctx = buildResolveContext(current, wheel);
+      const { index, slice } = resolveSlice(slices, ctx);
+      pendingSliceRef.current = {
+        wheelIndex: ri,
+        sliceId: slice.id,
+        sliceIndex: index,
+        isGambleFlip: true,
+      };
+    } else {
+      const ctx = buildResolveContext(current, wheel);
+      const { index, slice } = resolveSlice(wheel.slices, ctx);
+      pendingSliceRef.current = { wheelIndex: ri, sliceId: slice.id, sliceIndex: index };
+    }
+    setSpinArmEpoch((e) => e + 1);
+    useRunStore.getState().setSpinning(true);
     reel.setSpinningSafe(true);
-    spinWheelRef.current?.spinToIndex(index);
-  }, [awaitingClaim, isSpinning, reel, setSpinning]);
+    spinWheelRef.current?.spinToIndex(pendingSliceRef.current.sliceIndex);
+  }, [awaitingClaim, isSpinning, reel]);
 
   const handleSpinComplete = useCallback(
     (roundIndex: number, item: { id: string; label?: string }) => {
-      setSpinning(false);
+      const store = useRunStore.getState();
+      store.setSpinning(false);
       reel.setSpinningSafe(false);
       const current = useRunStore.getState().run;
       if (current == null || roundIndex !== current.wheelIndex) return;
-      const wheel = current.wheels[roundIndex];
       const pending = pendingSliceRef.current;
-      // Resolved slice from DB odds is authoritative — not the animation wedge id.
-      const slice =
-        pending?.wheelIndex === roundIndex
-          ? wheel?.slices[pending.sliceIndex] ??
-            wheel?.slices.find((s) => s.id === pending.sliceId)
-          : wheel?.slices.find((s) => s.id === item.id);
+      const slice = pending?.isGambleFlip
+        ? getGambleSliceById(pending.sliceId)
+        : (() => {
+            const wheel = current.wheels[roundIndex];
+            return pending?.wheelIndex === roundIndex
+              ? wheel?.slices[pending.sliceIndex] ??
+                  wheel?.slices.find((s) => s.id === pending.sliceId)
+              : wheel?.slices.find((s) => s.id === item.id);
+          })();
+      const wasGamble = pending?.isGambleFlip === true;
       pendingSliceRef.current = null;
       if (slice == null) {
-        setSpinning(false);
+        store.setSpinning(false);
+        reel.setSpinningSafe(false);
+        if (wasGamble) {
+          useRunStore.setState((s) => ({
+            ui: {
+              ...s.ui,
+              gambleFlipActive: false,
+              isSpinning: false,
+              spinWheelIndex: null,
+              awaitingClaim: true,
+            },
+          }));
+        }
         return;
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      applySpinResult(roundIndex, slice.id);
+      if (pending?.isGambleFlip) {
+        store.applyGambleFlipResult(roundIndex, slice.id);
+      } else {
+        store.applySpinResult(roundIndex, slice.id);
+      }
     },
-    [applySpinResult, reel, setSpinning]
+    [reel]
+  );
+
+  const activeWheelPhysics = useMemo(() => {
+    const w = run.wheels[run.wheelIndex];
+    return physicsForProfile(w?.definition.physicsProfileId ?? "default");
+  }, [run.wheelIndex, run.wheels]);
+
+  const spinGuardMs = useMemo(
+    () => spinSafetyTimeoutMs(activeWheelPhysics) + 400,
+    [activeWheelPhysics]
   );
 
   useEffect(() => {
     if (!isSpinning) return;
     const t = setTimeout(() => {
-      const { ui } = useRunStore.getState();
-      if (ui.isSpinning) {
-        setSpinning(false);
+      const state = useRunStore.getState();
+      if (state.ui.isSpinning) {
+        state.clearSpinInteraction();
         reel.setSpinningSafe(false);
+        state.healRunUi();
       }
-    }, 14000);
+    }, spinGuardMs);
     return () => clearTimeout(t);
-  }, [isSpinning, reel, setSpinning]);
+  }, [isSpinning, reel, spinGuardMs]);
+
+  useEffect(() => {
+    if (prevWheelIndexRef.current === run.wheelIndex) return;
+    prevWheelIndexRef.current = run.wheelIndex;
+    useRunStore.getState().clearSpinInteraction();
+    reel.setSpinningSafe(false);
+    reel.onPrimaryBulbPhaseChange("idle");
+  }, [reel, run.wheelIndex]);
+
+  useEffect(() => {
+    if (reel.interactionLocked) return;
+    if (reel.activeIndex === run.wheelIndex) return;
+    reel.snapToIndex(run.wheelIndex);
+    reel.setSpinningSafe(false);
+    useRunStore.getState().clearSpinInteraction();
+    reel.onPrimaryBulbPhaseChange("idle");
+  }, [reel, run.wheelIndex]);
+
+  useEffect(() => {
+    if (reel.activeIndex !== run.wheelIndex) return;
+    if (awaitingClaim || isSpinning) return;
+    useRunStore.getState().healRunUi();
+  }, [awaitingClaim, isSpinning, reel.activeIndex, run.wheelIndex]);
 
   const [revealNextSlot, setRevealNextSlot] = useState(false);
-  const scrolling = reel.stripScrollProgress > 0.02;
+  const scrolling = reel.stripScrolling;
 
   useEffect(() => {
     if (!scrolling) {
       setRevealNextSlot(false);
       return;
     }
+    if (toastVisible && shouldDismissNoticeOnScroll()) dismissToast();
     const t = setTimeout(() => setRevealNextSlot(true), 150);
     return () => clearTimeout(t);
-  }, [scrolling, reel.stripScrollProgress]);
+  }, [scrolling, dismissToast, toastVisible]);
+
+  useEffect(() => {
+    if (isSpinning && toastVisible) dismissToast();
+  }, [dismissToast, isSpinning, toastVisible]);
+
+  const mountNextStripSlot =
+    reel.nextIndex != null &&
+    (scrolling || revealNextSlot || reel.stripSpringing);
 
   const renderStripBuffer = useCallback(
     (buffer: "a" | "b") => {
       const roundIndex = buffer === "a" ? reel.activeIndex : reel.nextIndex;
-      if (buffer === "b" && roundIndex == null) {
+      if (buffer === "b" && (roundIndex == null || !mountNextStripSlot)) {
         return <View style={[styles.slotRow, { height: pageHeight }]} />;
       }
       const ri = roundIndex as number;
       const round = rounds[ri];
 
-      if (buffer === "b" && scrolling && !revealNextSlot) {
-        return <View style={[styles.slotRow, { height: pageHeight }]} />;
-      }
-
       const isActive = ri === reel.activeIndex;
-      const slotWheel = run.wheels[ri];
-      const hubMode: "spin" | "claim" | "busy" =
-        !isActive || round == null
-          ? "busy"
-          : awaitingClaim || round.status === "won"
-            ? "claim"
-            : isSpinning
-              ? "busy"
-              : round.status === "ready"
-                ? "spin"
-                : "busy";
-      const spinLocked = hubMode !== "claim" && (hubMode !== "spin" || isSpinning);
+      const hubMode = deriveHubMode({
+        run,
+        roundIndex: ri,
+        isSpinning,
+        awaitingClaim,
+        gambleFlipActive,
+        isReelActive: isActive,
+        round,
+      });
+      const spinLocked = deriveSpinLocked(hubMode, isSpinning);
       const listenBulb = buffer === "a";
       return (
         <RunWheelSlot
@@ -406,30 +528,38 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
           textColor={textColor}
           spinWheelRef={buffer === "a" ? spinWheelRef : { current: null }}
           onSpinComplete={handleSpinComplete}
-          onExternalSpinPress={buffer === "a" ? handleExternalSpinPress : () => {}}
-          onHubClaimPress={buffer === "a" ? handleHubClaim : () => {}}
+          onExternalSpinPress={buffer === "a" ? handleExternalSpinPress : NOOP}
+          onHubClaimPress={buffer === "a" ? handleHubClaim : NOOP}
+          isSpinning={isSpinning}
+          clearSpinInteraction={clearSpinInteraction}
           hubMode={buffer === "a" ? hubMode : "busy"}
           spinLocked={spinLocked}
           ringPhaseResetKey={ri}
           onBulbRingPhaseChange={listenBulb ? reel.onPrimaryBulbPhaseChange : undefined}
           sliceEraseMode={sliceEraseMode}
           isActiveWheel={isActive}
+          gambleFlipActive={gambleFlipActive && isActive}
+          spinArmEpoch={spinArmEpoch}
           onBanishSlice={(sliceIndex) => handleBanishSlice(ri, sliceIndex)}
         />
       );
     },
     [
       awaitingClaim,
+      gambleFlipActive,
+      spinArmEpoch,
       handleBanishSlice,
       handleExternalSpinPress,
       handleHubClaim,
       handleSpinComplete,
       isSpinning,
       pageHeight,
+      reel.stripSpringing,
       reel.activeIndex,
       reel.nextIndex,
       reel.onPrimaryBulbPhaseChange,
-      reel.stripScrollProgress,
+      reel.stripScrolling,
+      mountNextStripSlot,
       revealNextSlot,
       rounds,
       run,
@@ -441,18 +571,10 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
   );
 
   return (
-    <View style={[styles.root, styles.flexFill, { backgroundColor: pageBgCurrent }]}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFillObject,
-          { backgroundColor: pageBgNext, zIndex: 0 },
-          reel.stripPageBlendStyle,
-        ]}
-      />
+    <View style={[styles.root, styles.flexFill, { backgroundColor: RUN_PAGE_BACKGROUND }]}>
       <View
-        style={[styles.flexFill, { zIndex: 1 }]}
-        pointerEvents={reel.interactionLocked ? "none" : "auto"}
+        style={styles.flexFill}
+        pointerEvents={reel.interactionLocked || isSpinning ? "none" : "auto"}
       >
         <View
           style={[styles.clip, { height: pageHeight }]}
@@ -460,7 +582,11 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
             ? {
                 onWheel: (e: { nativeEvent?: { deltaY?: number }; deltaY?: number }) => {
                   const dy = e.nativeEvent?.deltaY ?? e.deltaY;
-                  if (dy != null) reel.pokeWebWheelScrollBlur(dy);
+                  if (dy == null) return;
+                  reel.pokeWebWheelScrollBlur(dy);
+                  if (Math.abs(dy) > 4 && shouldDismissNoticeOnScroll()) {
+                    dismissToast();
+                  }
                 },
               }
             : {})}
@@ -479,7 +605,7 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
                 collapsable={false}
                 style={[
                   styles.slotRow,
-                  { height: pageHeight, backgroundColor: slotTint(reel.activeIndex) },
+                  { height: pageHeight, backgroundColor: RUN_PAGE_BACKGROUND },
                 ]}
               >
                 {renderStripBuffer("a")}
@@ -489,11 +615,7 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
                 collapsable={false}
                 style={[
                   styles.slotRow,
-                  {
-                    height: pageHeight,
-                    backgroundColor:
-                      reel.nextIndex != null ? slotTint(reel.nextIndex) : slotTint(reel.activeIndex),
-                  },
+                  { height: pageHeight, backgroundColor: RUN_PAGE_BACKGROUND },
                 ]}
               >
                 {renderStripBuffer("b")}
@@ -514,7 +636,9 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
       </View>
     </View>
   );
-}
+}, (prev: RunWheelFeedProps, next: RunWheelFeedProps) =>
+  prev.pageHeight === next.pageHeight &&
+  runReelFeedKey(prev.run) === runReelFeedKey(next.run));
 
 const styles = StyleSheet.create({
   root: { flex: 1 },

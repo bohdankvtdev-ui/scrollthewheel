@@ -1,145 +1,99 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useRunStore } from "../../stores/runStore";
 import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
-import { CARD_CATALOG } from "../../data/cards";
 import { PERK_CATALOG } from "../../data/perks";
 import { DEBUFF_CATALOG } from "../../data/debuffs";
-import { RELIC_CATALOG } from "../../data/relics";
 import type { RunState } from "../../schemas";
-import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
-import { Neo, neoSubtitleOnDark } from "../../../theme/neoBrutal";
 import { PerkIconChip } from "./PerkIconChip";
 import { PerkDetailSheet } from "./PerkDetailSheet";
-import { ChipIconChip } from "./ChipIconChip";
-import { ChipDetailSheet } from "./ChipDetailSheet";
-import { CompactEffectChip } from "./CompactEffectChip";
+import { DebuffDetailSheet } from "./DebuffDetailSheet";
+import { getLoadoutPerkIds } from "../../game/shields/shieldRules";
 
 type RunLoadoutDockProps = {
   run: RunState;
   highlightPerkId?: string | null;
+  highlightDebuffId?: string | null;
 };
 
-/** Fixed-height loadout rail — always mounted so the wheel never jumps when the first perk lands. */
-export function RunLoadoutDock({ run, highlightPerkId }: RunLoadoutDockProps) {
+const HIGHLIGHT_MS = 1600;
+
+/** Perks (green) and curses (red) under the header — fixed height to avoid layout shift. */
+export function RunLoadoutDock({
+  run,
+  highlightPerkId,
+  highlightDebuffId,
+}: RunLoadoutDockProps) {
   const [perkDetailId, setPerkDetailId] = useState<string | null>(null);
-  const [chipDetailId, setChipDetailId] = useState<string | null>(null);
+  const [debuffDetailId, setDebuffDetailId] = useState<string | null>(null);
+  const clearLastWonPerk = useRunStore((s) => s.clearLastWonPerk);
+  const clearLastWonDebuff = useRunStore((s) => s.clearLastWonDebuff);
 
-  const sliceEraseMode = useRunStore((s) => s.ui.sliceEraseMode);
-  const setSliceEraseMode = useRunStore((s) => s.setSliceEraseMode);
-  const eraserCount = run.inventory?.wedgeEraser ?? 0;
+  const loadoutPerks = getLoadoutPerkIds(run);
+  const debuffs = run.debuffs;
+  const hasItems = loadoutPerks.length > 0 || debuffs.length > 0;
 
-  const hasItems =
-    run.perks.length > 0 ||
-    run.deck.length > 0 ||
-    run.debuffs.length > 0 ||
-    run.relics.length > 0 ||
-    eraserCount > 0;
+  useEffect(() => {
+    if (highlightPerkId == null && highlightDebuffId == null) return;
+    const t = setTimeout(() => {
+      clearLastWonPerk();
+      clearLastWonDebuff();
+    }, HIGHLIGHT_MS);
+    return () => clearTimeout(t);
+  }, [highlightPerkId, highlightDebuffId, clearLastWonPerk, clearLastWonDebuff]);
 
   return (
-    <View style={styles.wrap}>
-      {!hasItems ? (
-        <View style={styles.emptyRail}>
-          <Text style={[neoSubtitleOnDark(11), styles.emptyLabel, { fontFamily: FONT_BEBAS_NEUE }]}>
-            Loadout
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.row}
-        >
-          {eraserCount > 0 ? (
-            <Pressable
-              onPress={() => setSliceEraseMode(!sliceEraseMode)}
-              style={[styles.eraserChip, sliceEraseMode && styles.eraserChipActive]}
-              accessibilityLabel={`Wedge eraser ${eraserCount}. ${sliceEraseMode ? "Tap a wedge to remove" : "Tap to arm eraser"}`}
-            >
-              <MaterialCommunityIcons
-                name="eraser"
-                size={20}
-                color={sliceEraseMode ? Neo.ink : Neo.neonCyan}
-              />
-              <Text
-                style={[
-                  styles.eraserCount,
-                  sliceEraseMode && styles.eraserCountActive,
-                  { fontFamily: FONT_BEBAS_NEUE },
-                ]}
-              >
-                {eraserCount}
-              </Text>
-            </Pressable>
-          ) : null}
-          {run.perks.map((id) => {
-            const p = PERK_CATALOG[id];
-            if (p == null) return null;
-            return (
-              <PerkIconChip
-                key={`perk-${id}`}
-                icon={p.icon}
-                iconFamily={p.iconFamily}
-                tier={p.tier}
-                highlighted={id === highlightPerkId}
-                animateEnter={id === highlightPerkId}
-                onPress={() => setPerkDetailId(id)}
-              />
-            );
-          })}
-          {run.deck.map((id) => {
-            const c = CARD_CATALOG[id];
-            if (c == null) return null;
-            return (
-              <ChipIconChip
-                key={`chip-${id}`}
-                icon={c.icon}
-                iconFamily={c.iconFamily}
-                onPress={() => setChipDetailId(id)}
-              />
-            );
-          })}
-          {run.debuffs.map((id) => {
-            const d = DEBUFF_CATALOG[id];
-            if (d == null) return null;
-            return (
-              <CompactEffectChip
-                key={`debuff-${id}`}
-                icon={d.icon}
-                iconFamily={d.iconFamily}
-                accentBg="#FEE2E2"
-                label={d.name}
-                onPress={() => {}}
-              />
-            );
-          })}
-          {run.relics.map((id) => {
-            const r = RELIC_CATALOG[id];
-            if (r == null) return null;
-            return (
-              <CompactEffectChip
-                key={`relic-${id}`}
-                icon={r.icon}
-                iconFamily={r.iconFamily}
-                accentBg="#EDE9FE"
-                label={r.name}
-                onPress={() => {}}
-              />
-            );
-          })}
-        </ScrollView>
-      )}
+    <View style={styles.wrap} pointerEvents={hasItems ? "auto" : "none"}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+        scrollEnabled={hasItems}
+      >
+        {loadoutPerks.map((id) => {
+          const p = PERK_CATALOG[id];
+          if (p == null) return null;
+          return (
+            <PerkIconChip
+              key={`perk-${id}`}
+              icon={p.icon}
+              iconFamily={p.iconFamily}
+              variant="good"
+              tier={p.tier}
+              highlighted={id === highlightPerkId}
+              animateEnter={id === highlightPerkId}
+              onPress={() => setPerkDetailId(id)}
+              accessibilityLabel={`Perk: ${p.name}`}
+            />
+          );
+        })}
+        {debuffs.map((id) => {
+          const d = DEBUFF_CATALOG[id];
+          if (d == null) return null;
+          return (
+            <PerkIconChip
+              key={`debuff-${id}`}
+              icon={d.icon}
+              iconFamily={d.iconFamily}
+              variant="bad"
+              highlighted={id === highlightDebuffId}
+              animateEnter={id === highlightDebuffId}
+              onPress={() => setDebuffDetailId(id)}
+              accessibilityLabel={`Curse: ${d.name}`}
+            />
+          );
+        })}
+      </ScrollView>
 
       <PerkDetailSheet
         perkId={perkDetailId}
         visible={perkDetailId != null}
         onClose={() => setPerkDetailId(null)}
       />
-      <ChipDetailSheet
-        chipId={chipDetailId}
-        visible={chipDetailId != null}
-        onClose={() => setChipDetailId(null)}
+      <DebuffDetailSheet
+        debuffId={debuffDetailId}
+        visible={debuffDetailId != null}
+        onClose={() => setDebuffDetailId(null)}
       />
     </View>
   );
@@ -149,17 +103,7 @@ const styles = StyleSheet.create({
   wrap: {
     height: RUN_LAYOUT.loadout,
     justifyContent: "center",
-    borderBottomWidth: Neo.borderThin,
-    borderBottomColor: "rgba(255,255,255,0.08)",
-  },
-  emptyRail: {
-    height: RUN_LAYOUT.loadout - 8,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  emptyLabel: {
-    opacity: 0.35,
-    letterSpacing: 0.8,
+    overflow: "hidden",
   },
   row: {
     flexDirection: "row",
@@ -167,28 +111,6 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingRight: 18,
-    minHeight: RUN_LAYOUT.loadout - 8,
-  },
-  eraserChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    height: 40,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.neonCyan,
-    backgroundColor: "rgba(34,211,238,0.12)",
-  },
-  eraserChipActive: {
-    backgroundColor: Neo.neonCyan,
-    borderColor: Neo.ink,
-  },
-  eraserCount: {
-    fontSize: 16,
-    color: Neo.neonCyan,
-  },
-  eraserCountActive: {
-    color: Neo.ink,
+    height: RUN_LAYOUT.loadout,
   },
 });

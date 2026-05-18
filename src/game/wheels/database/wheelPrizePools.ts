@@ -37,6 +37,9 @@ export const PERK_WHEEL_POOL: PrizeCatalogId[] = [
   "perk_compounder",
   "perk_coupon_king",
   "perk_ante_insurance",
+  "perk_final_guard",
+  "perk_final_tax_shield",
+  "perk_clutch_cash",
 ];
 
 export const LUCKY_POOL: PoolPick[] = [
@@ -78,15 +81,21 @@ export const DRAIN_POOL: PoolPick[] = [
   { prize: "boss_ghost", weight: 8, minCycle: 3 },
 ];
 
-export const BUILDER_POOL: PoolPick[] = [
-  { prize: "deck_copper_chip", weight: 22 },
-  { prize: "deck_weighted_die", weight: 18 },
-  { prize: "deck_purity_charm", weight: 14 },
-  { prize: "deck_upgrade", weight: 16 },
-  { prize: "deck_remove", weight: 10 },
-  { prize: "neutral_calm", weight: 8 },
-  { prize: "neutral", weight: 6 },
-];
+/** Builder wheel — six fixed choices; each grants +1 wedge on every wheel (permanent). */
+export const BUILDER_WEDGE_PRIZES = [
+  "builder_wedge_money",
+  "builder_wedge_percent",
+  "builder_wedge_perk",
+  "builder_wedge_drain",
+  "builder_wedge_lucky",
+  "builder_wedge_chaos",
+] as const satisfies readonly PrizeCatalogId[];
+
+/** @deprecated use BUILDER_WEDGE_PRIZES */
+export const BUILDER_POOL: PoolPick[] = BUILDER_WEDGE_PRIZES.map((prize) => ({
+  prize,
+  weight: 1,
+}));
 
 export const CHAOS_POOL: PoolPick[] = [
   { prize: "bank_wipe", weight: 10, minCycle: 3 },
@@ -102,27 +111,36 @@ export const CHAOS_POOL: PoolPick[] = [
   { prize: "money_300", weight: 8, minCycle: 2 },
 ];
 
-/** Boss showdown — unique prizes + bank/joker taxes; rare modest cash. */
-export const BOSS_POOL: PoolPick[] = [
-  { prize: "boss_perk_tax", weight: 16 },
-  { prize: "boss_overhead", weight: 14 },
+/**
+ * Final wheel (wheel_9) — mostly flat $ losses; rare small flat wins; bank/perk taxes.
+ */
+export const FINAL_WHEEL_POOL: PoolPick[] = [
+  { prize: "money_loss_60", weight: 16 },
+  { prize: "money_loss_80", weight: 18 },
+  { prize: "money_loss_100", weight: 18 },
+  { prize: "money_loss_150", weight: 16 },
+  { prize: "money_loss_200", weight: 14, minCycle: 2 },
+  { prize: "money_loss_40", weight: 12 },
+  { prize: "money_loss_50", weight: 10 },
+  { prize: "boss_perk_tax", weight: 14 },
+  { prize: "boss_overhead", weight: 12 },
   { prize: "boss_shield_break", weight: 12 },
-  { prize: "bank_cut_half", weight: 14 },
-  { prize: "bank_cut_quarter", weight: 12 },
-  { prize: "boss_chip_cache", weight: 10 },
-  { prize: "boss_golden_seal", weight: 10, minCycle: 2 },
-  { prize: "boss_relic_crown", weight: 8, minCycle: 2 },
-  { prize: "boss_pay_150", weight: 8, minCycle: 2 },
-  { prize: "money_loss_150", weight: 10 },
-  { prize: "neutral_hold_line", weight: 10 },
+  { prize: "bank_cut_quarter", weight: 14 },
+  { prize: "bank_cut_half", weight: 12 },
+  { prize: "bank_cut_75", weight: 10, minCycle: 2 },
+  { prize: "debt_bomb", weight: 12 },
+  { prize: "debuff_debt_mark", weight: 10 },
+  { prize: "debuff_rusted", weight: 8, minCycle: 2 },
   { prize: "mega_curse", weight: 8, minCycle: 2 },
-  { prize: "debt_bomb", weight: 8, minCycle: 2 },
-  { prize: "boss_pay_100", weight: 6, minCycle: 1 },
-  { prize: "boss_mystery_perk", weight: 5, minCycle: 3 },
-  { prize: "bank_cut_75", weight: 6, minCycle: 3 },
+  { prize: "bank_wipe", weight: 5, minCycle: 3 },
   { prize: "doom_spiral", weight: 5, minCycle: 4 },
-  { prize: "bank_wipe", weight: 2, minCycle: 5 },
+  { prize: "neutral_hold_line", weight: 6 },
+  { prize: "boss_pay_100", weight: 5 },
+  { prize: "boss_pay_150", weight: 3, minCycle: 2 },
 ];
+
+/** @deprecated — use FINAL_WHEEL_POOL for wheel_9 */
+export const BOSS_POOL: PoolPick[] = FINAL_WHEEL_POOL;
 
 export const WHEEL_POOL_BY_CONFIG: Partial<Record<WheelConfigId, PoolPick[]>> = {
   wheel_1: [], // built from MONEY_TIER_PRIZES
@@ -132,5 +150,5 @@ export const WHEEL_POOL_BY_CONFIG: Partial<Record<WheelConfigId, PoolPick[]>> = 
   wheel_6: LUCKY_POOL,
   wheel_7: BUILDER_POOL,
   wheel_8: CHAOS_POOL,
-  wheel_9: BOSS_POOL,
+  wheel_9: FINAL_WHEEL_POOL,
 };

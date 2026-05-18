@@ -18,7 +18,16 @@ function normalizeLayoutContext(
   ctx?: number | WheelLayoutContext
 ): Required<WheelLayoutContext> {
   if (typeof ctx === "number") {
-    return { runId: VALIDATE_RUN_ID, cycle: ctx, ownedPerks: [], advancements: [] };
+    return {
+      runId: VALIDATE_RUN_ID,
+      cycle: ctx,
+      ownedPerks: [],
+      advancements: [],
+      banishedPrizes: [],
+      permanentWedgeBonus: 0,
+      wheelLaserCuts: {},
+      wheelInsureCuts: {},
+    };
   }
   return {
     runId: ctx?.runId ?? VALIDATE_RUN_ID,
@@ -26,6 +35,9 @@ function normalizeLayoutContext(
     ownedPerks: ctx?.ownedPerks ?? [],
     advancements: ctx?.advancements ?? [],
     banishedPrizes: ctx?.banishedPrizes ?? [],
+    permanentWedgeBonus: ctx?.permanentWedgeBonus ?? 0,
+    wheelLaserCuts: ctx?.wheelLaserCuts ?? {},
+    wheelInsureCuts: ctx?.wheelInsureCuts ?? {},
   };
 }
 
@@ -96,13 +108,25 @@ export function getPrizeSlotsForWheel(
   configId: WheelConfigId,
   ctx?: number | WheelLayoutContext
 ): WheelPrizeSlot[] {
-  const { runId, cycle, ownedPerks, advancements, banishedPrizes } = normalizeLayoutContext(ctx);
+  const {
+    runId,
+    cycle,
+    ownedPerks,
+    advancements,
+    banishedPrizes,
+    permanentWedgeBonus,
+    wheelLaserCuts,
+    wheelInsureCuts,
+  } = normalizeLayoutContext(ctx);
   return buildPrizeSlotsForWheel(configId, {
     runId,
     cycle,
     ownedPerks,
     advancements,
     banishedPrizes,
+    permanentWedgeBonus,
+    wheelLaserCuts,
+    wheelInsureCuts,
   });
 }
 

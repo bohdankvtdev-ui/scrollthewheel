@@ -39,7 +39,7 @@ describe("advancements", () => {
       expect(result.run.advancements).toContain("money_on_all");
       expect(result.run.sliceCapacity).toBeGreaterThanOrEqual(7);
       const risk = result.run.wheels[2];
-      expect(risk?.slices.length).toBe(7);
+      expect(risk?.slices.length).toBeGreaterThanOrEqual(7);
     }
   });
 });

@@ -61,6 +61,9 @@ export type SpinWheelStageProps = {
   bulbRingPalette?: BulbRingPalette;
   onSlicePress?: (index: number) => void;
   slicePressEnabled?: boolean;
+  /** Increment to arm bulb safety + sync external spins (parent-driven `spinToIndex`). */
+  spinArmEpoch?: number;
+  onSpinInterrupted?: () => void;
 };
 
 export function SpinWheelStage({
@@ -88,6 +91,8 @@ export function SpinWheelStage({
   bulbRingPalette,
   onSlicePress,
   slicePressEnabled = true,
+  spinArmEpoch,
+  onSpinInterrupted,
 }: SpinWheelStageProps) {
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const victoryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -173,11 +178,17 @@ export function SpinWheelStage({
     safetyTimer.current = setTimeout(() => {
       safetyTimer.current = null;
       if (!mountedRef.current) return;
+      onBulbRingPhaseChange?.("idle");
       if (bulbRingPhaseProp === undefined) {
         setInternalPhase((p) => (p === "spinning" ? "idle" : p));
       }
     }, spinSafetyTimeoutMs(wheelPhysics));
   }, [bulbRingPhaseProp, clearSafety, onBulbRingPhaseChange, wheelPhysics]);
+
+  useEffect(() => {
+    if (spinArmEpoch == null || spinArmEpoch <= 0) return;
+    armSafetyTimer();
+  }, [armSafetyTimer, spinArmEpoch]);
 
   const onLibrarySpinEnd = useCallback(
     (item: SpinWheelItem) => {
@@ -191,6 +202,7 @@ export function SpinWheelStage({
           victoryTimer.current = setTimeout(() => {
             victoryTimer.current = null;
             if (!mountedRef.current) return;
+            onBulbRingPhaseChange?.("idle");
             setInternalPhase("idle");
           }, VICTORY_UI_MS);
         }
@@ -253,7 +265,7 @@ export function SpinWheelStage({
               size={wheel}
               wheelPhysics={wheelPhysics}
               syncDiscScale={chromeDiscScale}
-              segmentBgColor={[...segmentColors]}
+              segmentBgColor={segmentColors}
               segmentStrokeColor={NeoWheel.segmentStroke}
               segmentStrokeWidth={NeoWheel.segmentStrokeWidth}
               segmentPadAngle={NeoWheel.segmentPadAngle}
@@ -291,6 +303,7 @@ export function SpinWheelStage({
               onSpinEnd={(item) => {
                 onLibrarySpinEnd(item);
               }}
+              onSpinInterrupted={onSpinInterrupted}
             />
             {scrollGrainOverlay != null ? (
               <View

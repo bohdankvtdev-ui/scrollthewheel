@@ -25,7 +25,7 @@ export function RunBossStrip({ run }: RunStakesStripProps) {
       <MaterialIcons name="warning" size={18} color={Neo.neonYellow} />
       <Text style={[styles.label, { fontFamily: FONT_BEBAS_NEUE }]}>
         {isFinal
-          ? "SHOWDOWN — taxes your bank & jokers you bought"
+          ? "FINAL WHEEL — taxes your bank & perks you own"
           : "STAKES WHEEL — % of bank on the line"}
       </Text>
     </View>

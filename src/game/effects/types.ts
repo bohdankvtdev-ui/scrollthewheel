@@ -7,6 +7,7 @@ export type EffectScope =
   | "perk_wheel"
   | "percent_wheel"
   | "risk_chaos"
+  | "boss_wheel"
   | "money_payout"
   | "percent_payout"
   | "shop"
@@ -46,6 +47,8 @@ export function archetypeMatchesScope(
       return archetype === "percent";
     case "risk_chaos":
       return archetype === "risk" || archetype === "chaos" || archetype === "drain";
+    case "boss_wheel":
+      return archetype === "boss";
     case "all_positive":
       return true;
     default:

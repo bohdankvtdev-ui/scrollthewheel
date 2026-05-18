@@ -1,4 +1,4 @@
-/** @deprecated Use WHEEL_STAGES from `src/game/loop` */
+/** @deprecated Use `getWheelArchetypeMetaForIndex` from `wheelArchetypeMeta.ts` for UI icons. */
 import { WHEEL_STAGES } from "../game/loop";
 import type { WheelRole } from "../schemas";
 

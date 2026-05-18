@@ -1,5 +1,6 @@
-/** Balatro-inspired pacing — shop, interest, joker cap, bankruptcy. */
+/** Run pacing — shop, interest, perk cap, bankruptcy. */
 export const BALATRO_ECONOMY = {
+  /** Max perks in loadout (non-shield). */
   maxJokerSlots: 5,
   maxAdvancements: 6,
   shopOfferCount: 4,

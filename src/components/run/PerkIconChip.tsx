@@ -1,86 +1,83 @@
-import { useEffect } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import Animated, {
-  FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withSpring,
-  ZoomIn,
-} from "react-native-reanimated";
+import { Pressable, StyleSheet } from "react-native";
+import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
 import { Neo } from "../../../theme/neoBrutal";
 import { PrizeGlyph } from "../../../lib/ui/PrizeGlyph";
 import type { IconFamily } from "../../schemas";
 
 const SLOT = 44;
 
-const TIER_TINT: Record<number, string> = {
-  0: "#FEF9C3",
-  1: "#BBF7D0",
-  2: "#E9D5FF",
-  3: "#FEF08A",
+export type LoadoutChipVariant = "good" | "bad";
+
+const VARIANT_STYLE: Record<
+  LoadoutChipVariant,
+  { tint: string; iconColor: string; highlightBorder: string; highlightBg: string }
+> = {
+  good: {
+    tint: "#BBF7D0",
+    iconColor: "#14532D",
+    highlightBorder: Neo.neonYellow,
+    highlightBg: "rgba(74,222,128,0.2)",
+  },
+  bad: {
+    tint: "#FECACA",
+    iconColor: "#991B1B",
+    highlightBorder: "#F87171",
+    highlightBg: "rgba(248,113,113,0.22)",
+  },
 };
 
 type PerkIconChipProps = {
   icon: string;
   iconFamily: IconFamily;
+  /** Green perk vs red curse styling */
+  variant?: LoadoutChipVariant;
   tier?: number;
   selected?: boolean;
   highlighted?: boolean;
-  /** Play a one-shot pop-in when this perk was just won. */
   animateEnter?: boolean;
   onPress: () => void;
+  accessibilityLabel?: string;
 };
 
 export function PerkIconChip({
   icon,
   iconFamily,
-  tier = 0,
+  variant = "good",
+  tier: _tier = 0,
   selected,
   highlighted,
   animateEnter = false,
   onPress,
+  accessibilityLabel = "View effect",
 }: PerkIconChipProps) {
-  const pulse = useSharedValue(1);
-
-  useEffect(() => {
-    if (!highlighted) {
-      pulse.value = 1;
-      return;
-    }
-    pulse.value = withRepeat(
-      withSequence(withSpring(1.08, { damping: 10, stiffness: 180 }), withSpring(1, { damping: 12 })),
-      2,
-      false
-    );
-  }, [highlighted, pulse]);
-
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-    opacity: highlighted ? 1 : 0,
-  }));
+  const palette = VARIANT_STYLE[variant];
+  const showAccent = selected || highlighted;
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="View perk"
+      accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [styles.slot, pressed && styles.pressed]}
     >
-      <Animated.View pointerEvents="none" style={[styles.highlightRing, ringStyle]} />
       <Animated.View
-        entering={animateEnter ? ZoomIn.springify().damping(14).stiffness(200).duration(340) : FadeIn.duration(120)}
-        style={styles.glyphWrap}
+        entering={
+          animateEnter
+            ? ZoomIn.springify().damping(16).stiffness(240).duration(280)
+            : FadeIn.duration(100)
+        }
+        style={[
+          styles.glyphWrap,
+          { borderColor: showAccent ? palette.highlightBorder : "transparent", backgroundColor: showAccent ? palette.highlightBg : "transparent" },
+        ]}
       >
         <PrizeGlyph
           icon={icon}
           iconFamily={iconFamily}
           size="sm"
-          tint={TIER_TINT[tier] ?? TIER_TINT[0]}
-          tone="perk"
-          iconColor="#4C1D95"
-          style={selected ? styles.selectedRing : undefined}
+          tint={palette.tint}
+          tone={variant === "bad" ? "curse" : "perk"}
+          iconColor={palette.iconColor}
         />
       </Animated.View>
     </Pressable>
@@ -93,21 +90,15 @@ const styles = StyleSheet.create({
     height: SLOT,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   glyphWrap: {
+    width: SLOT,
+    height: SLOT,
     alignItems: "center",
     justifyContent: "center",
-  },
-  highlightRing: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 13,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: Neo.neonYellow,
-    backgroundColor: "rgba(255,233,77,0.14)",
-  },
-  selectedRing: {
-    borderColor: Neo.neonYellow,
-    borderWidth: 3,
   },
   pressed: {
     opacity: 0.9,

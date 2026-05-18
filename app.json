@@ -1,41 +1,46 @@
 {
   "expo": {
-    "name": "spinwheel",
-    "slug": "spinwheel",
+    "name": "Scroll The Wheel",
+    "slug": "scroll-the-wheel",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "spinwheel",
+    "icon": "./assets/images/logow.png",
+    "scheme": "scrollthewheel",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.scrollthewheel.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleDisplayName": "Scroll The Wheel",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.scrollthewheel.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#6D28D9",
+        "foregroundImage": "./assets/images/logow.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logow.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/logow.png",
+          "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#6D28D9",
           "dark": {
-            "backgroundColor": "#000000"
+            "image": "./assets/images/logow.png",
+            "backgroundColor": "#6D28D9"
           }
         }
       ],
@@ -44,6 +49,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "42bd8603-7601-466c-892b-37e68017f607"
+      }
     }
   }
 }

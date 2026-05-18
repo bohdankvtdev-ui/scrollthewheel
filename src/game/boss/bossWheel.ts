@@ -7,10 +7,13 @@ function applyBossMoneyLoss(run: RunState, loss: number): RunState {
   return { ...run, money: Math.max(0, run.money - loss) };
 }
 
-/** Boss wheel land % — heavy weight on first (harshest) slices. */
+/** Boss / final wheel land % — heavy weight on first (harshest) slices. */
 export const BOSS_LAND_SHAPE = [30, 24, 18, 14, 9, 5] as const;
 
-/** Stakes scale with cycle and how loaded the player is with jokers. */
+/** Final wheel — even harsher odds on the worst wedges. */
+export const FINAL_LAND_SHAPE = [34, 26, 18, 12, 7, 3] as const;
+
+/** Stakes scale with cycle and how loaded the player is with perks. */
 export function getBossStakesMult(cycle: number, perkCount: number): number {
   const c = Math.max(1, cycle);
   const perkLoad = Math.min(0.25, perkCount * 0.04);
@@ -55,7 +58,10 @@ export function applyBossRunEffect(
   switch (effectId) {
     case "boss_perk_tax": {
       if (perks <= 0) break;
-      const rate = Math.min(0.35, 0.05 * perks);
+      let rate = Math.min(0.35, 0.05 * perks);
+      if (next.perks.includes("final_tax_shield")) {
+        rate = Math.min(rate, 0.15);
+      }
       const loss = Math.max(1, Math.floor(next.money * rate));
       next = applyBossMoneyLoss(next, loss);
       break;

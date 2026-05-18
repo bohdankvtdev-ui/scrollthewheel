@@ -5,7 +5,7 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
-import { getSliceCountForCycle } from "../../game/cycle/cycleProgression";
+import { getPermanentWedgeBonus, STARTING_WEDGE_COUNT } from "../../game/wheels/sliceCapacityBonus";
 
 type CycleRewardOverlayProps = {
   run: RunState;
@@ -15,7 +15,7 @@ type CycleRewardOverlayProps = {
 export function CycleRewardOverlay({ run, onContinue }: CycleRewardOverlayProps) {
   const reward = run.lastCycleReward;
   const nextCycle = run.floor + 1;
-  const nextSlices = getSliceCountForCycle(nextCycle);
+  const nextSlices = STARTING_WEDGE_COUNT + getPermanentWedgeBonus(run);
 
   useEffect(() => {
     const t = setTimeout(onContinue, 3200);

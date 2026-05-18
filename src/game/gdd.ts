@@ -32,7 +32,7 @@ export const RUN_EFFECT_LABELS: Record<RunEffectId, string> = {
   boss_ghost: "Boss Ghost — more bad slices this cycle",
   corruption_spread: "Corruption — 3 wheels get extra losses",
   doom_spiral: "Doom Spiral — next wheels are Chaos",
-  boss_perk_tax: "Joker Tax — lose 5% bank per joker you own",
+  boss_perk_tax: "Perk Tax — lose 5% bank per perk you own",
   boss_overhead: "Table Fee — lose 12% of bank",
   boss_shield_break: "Shield Break — lose 1 shield or 15% bank",
   boss_chip_cache: "Chip Cache — +shop chips (scales with cycle)",
@@ -45,7 +45,7 @@ export const PRIZE_TAXONOMY = {
   money_loss: "−$ from bank (shield blocks once)",
   bank_cut: "Lose % of bank",
   bank_wipe: "Lose all bank $ (shield blocks once)",
-  perk: "Free joker for your loadout",
+  perk: "Free perk for your loadout",
   debuff: "Bad effect until cleared",
   relic_offer: "Passive relic — always on",
   deck_add: "Passive chip in your row",
@@ -98,7 +98,7 @@ export function getWheelDifficultyBias(wheelIndex: number, cycleLevel: number): 
 }
 
 export const GDD_LOOP_SUMMARY = {
-  hook: "Start at $0. Spin 9 wheels per cycle; buy jokers and forge upgrades with chips.",
+  hook: "Start at $0. Spin 9 wheels per cycle; buy perks and forge upgrades with chips.",
   lose: "Bank hits $0 — run over.",
   win: "Clear wheel 9 → next cycle hits harder.",
   chipsNote:

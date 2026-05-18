@@ -15,9 +15,9 @@ export type ConsumableDef = {
 export const CONSUMABLE_CATALOG: Record<ConsumableId, ConsumableDef> = {
   wedge_eraser: {
     id: "wedge_eraser",
-    name: "Wedge Eraser",
-    line: "Tap in loadout → tap a wedge to banish it from that wheel",
-    icon: "eraser",
+    name: "Wedge Laser",
+    line: "Tap Laser below the map → tap a wedge to remove it from that wheel",
+    icon: "ray-start",
     baseCost: 9,
     maxStack: 8,
   },

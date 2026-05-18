@@ -1,5 +1,6 @@
 import type { RunPhase, RunState as SchemaRunState } from "../../schemas";
 
+import { withTacticWheelIndices } from "../tactics/tacticWheels";
 import { DEFAULT_RUN_MODIFIERS, type RunState } from "./types";
 
 
@@ -18,6 +19,14 @@ function normalizePhase(phase: RunPhase): RunPhase {
 
 
 
+function backfillShieldPerks(run: SchemaRunState): string[] {
+  const ids = [...(run.shieldPerks ?? [])];
+  if (run.runEffects?.safeHarborActive === true && !ids.includes("safe_harbor")) {
+    ids.push("safe_harbor");
+  }
+  return ids;
+}
+
 /** Ensure roguelike fields exist on hydrated checkpoints. */
 
 export function normalizeRunState(raw: SchemaRunState): RunState {
@@ -32,7 +41,7 @@ export function normalizeRunState(raw: SchemaRunState): RunState {
 
 
 
-  return {
+  let normalized: RunState = {
 
     ...rest,
 
@@ -44,6 +53,8 @@ export function normalizeRunState(raw: SchemaRunState): RunState {
     chipForge: rest.chipForge ?? {},
     inventory: rest.inventory ?? { wedgeEraser: 0 },
     banishedPrizes: rest.banishedPrizes ?? {},
+    wheelLaserCuts: rest.wheelLaserCuts ?? {},
+    wheelInsureCuts: rest.wheelInsureCuts ?? {},
 
     modifiers: { ...DEFAULT_RUN_MODIFIERS, ...rest.modifiers },
 
@@ -53,8 +64,21 @@ export function normalizeRunState(raw: SchemaRunState): RunState {
 
     shields: rest.shields ?? 0,
 
+    shieldPerks: backfillShieldPerks(rest),
+
     pendingWheelRebuild: rest.pendingWheelRebuild ?? false,
+    permanentWedgeBonus: rest.permanentWedgeBonus ?? 0,
     advancements: rest.advancements ?? [],
   };
+
+  if (
+    normalized.phase === "active" &&
+    (normalized.runEffects?.tacticWheelIndices == null ||
+      normalized.runEffects.tacticWheelIndices.length === 0)
+  ) {
+    normalized = withTacticWheelIndices(normalized);
+  }
+
+  return normalized;
 
 }

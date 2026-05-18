@@ -15,7 +15,7 @@ const DEBUFF_CATALOG_RAW: Record<string, DebuffDefinition> = {
   debt_mark: {
     id: "debt_mark",
     name: "Debt Mark",
-    icon: "skull",
+    icon: "skull-crossbones",
     iconFamily: "MaterialCommunityIcons",
     description: "-10% money on wins",
     moneyTax: 0.1,
@@ -23,7 +23,7 @@ const DEBUFF_CATALOG_RAW: Record<string, DebuffDefinition> = {
   rusted_gear: {
     id: "rusted_gear",
     name: "Rusted Gear",
-    icon: "alert-octagon",
+    icon: "cog-off",
     iconFamily: "MaterialCommunityIcons",
     description: "+20% negative slice weight",
     negativeWeightBonus: 0.2,
@@ -31,10 +31,10 @@ const DEBUFF_CATALOG_RAW: Record<string, DebuffDefinition> = {
   curse_of_greed: {
     id: "curse_of_greed",
     name: "Curse of Greed",
-    icon: "whatshot",
-    iconFamily: "MaterialIcons",
+    icon: "fire-alert",
+    iconFamily: "MaterialCommunityIcons",
     description: "Taxes 15% of money gains",
-    moneyTax: 0.05,
+    moneyTax: 0.15,
   },
 };
 

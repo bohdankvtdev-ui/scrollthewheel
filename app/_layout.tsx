@@ -19,7 +19,7 @@ export default function RootLayout() {
   }, [ready]);
 
   if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: "#4A2574" }} />;
+    return <View style={{ flex: 1, backgroundColor: "#6D28D9" }} />;
   }
 
   return (

@@ -13,7 +13,8 @@ import { PrizeGlyph } from "../../../lib/ui/PrizeGlyph";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunUiEffect } from "../../stores/runStore";
-import type { SliceKind } from "../../schemas";
+import type { RunState, SliceKind } from "../../schemas";
+import { TacticPickBar } from "./TacticPickBar";
 
 const ICON_SLOT = 42;
 
@@ -22,6 +23,9 @@ type RunPrizeFlashProps = {
   awaitingClaim: boolean;
   isSpinning: boolean;
   lastRewardKind?: SliceKind | string | null;
+  tacticPick?: boolean;
+  run?: RunState | null;
+  onDismissTactic?: () => void;
 };
 
 export function RunPrizeFlash({
@@ -29,7 +33,18 @@ export function RunPrizeFlash({
   awaitingClaim,
   isSpinning,
   lastRewardKind,
+  tacticPick = false,
+  run = null,
+  onDismissTactic,
 }: RunPrizeFlashProps) {
+  if (tacticPick && run != null && onDismissTactic != null) {
+    return (
+      <View style={[styles.wrap, styles.wrapTactic]}>
+        <TacticPickBar run={run} onDismiss={onDismissTactic} />
+      </View>
+    );
+  }
+
   const isPerkWin = lastRewardKind === "perk" && effect != null;
   const showResult = awaitingClaim && effect != null && !isSpinning;
 
@@ -43,7 +58,7 @@ export function RunPrizeFlash({
     accent = "rgba(34,211,238,0.1)";
   } else if (showResult) {
     line = effect.shortLabel;
-    sub = isPerkWin ? "New perk — swipe up" : effect.effectHint;
+    sub = isPerkWin ? "New perk — swipe up" : "Swipe up for next wheel";
     accent = isPerkWin ? "#EDE9FE" : effect.accent;
   } else if (effect != null) {
     line = effect.shortLabel;
@@ -66,7 +81,7 @@ export function RunPrizeFlash({
   const contentKey = showResult ? `result-${effect.shortLabel}` : isSpinning ? "spin" : "idle";
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, styles.wrapIdle]}>
       <View style={[StyleSheet.absoluteFillObject, styles.baseLayer]} />
       <Animated.View
         pointerEvents="none"
@@ -120,14 +135,23 @@ export function RunPrizeFlash({
 
 const styles = StyleSheet.create({
   wrap: {
-    height: RUN_LAYOUT.prizeFlash,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
     borderTopWidth: Neo.borderBold,
     borderTopColor: Neo.ink,
     overflow: "hidden",
+    alignItems: "center",
+  },
+  wrapIdle: {
+    height: RUN_LAYOUT.prizeFlash,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    width: "100%",
+  },
+  wrapTactic: {
+    height: RUN_LAYOUT.prizeFlash,
+    backgroundColor: "#FFFBEB",
+    width: "100%",
+    justifyContent: "center",
   },
   baseLayer: {
     backgroundColor: "rgba(255,255,255,0.06)",

@@ -78,6 +78,8 @@ export type SpinWheelProps = {
   /** Tap a wedge to preview its prize (disabled while spinning). */
   onSlicePress?: (index: number) => void;
   slicePressEnabled?: boolean;
+  /** Fired when the wheel unmounts or slice count changes mid-spin (animation aborted). */
+  onSpinInterrupted?: () => void;
 };
 
 export type SpinWheelRef = {

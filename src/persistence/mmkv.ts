@@ -37,7 +37,8 @@ let runCache: RunState | null = null;
 let initPromise: Promise<void> | null = null;
 
 /** Debounce disk writes during rapid spin/shop updates; memory cache stays synchronous. */
-const CHECKPOINT_DEBOUNCE_MS = 400;
+/** Longer debounce — fewer full-run JSON.stringify passes during rapid play. */
+const CHECKPOINT_DEBOUNCE_MS = 1500;
 let checkpointTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function readMetaFromDisk(): Promise<MetaPersist> {

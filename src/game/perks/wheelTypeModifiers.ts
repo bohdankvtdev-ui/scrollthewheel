@@ -44,7 +44,9 @@ export function getWheelTypeAdjustments(
   }
 
   if (archetype === "risk" || archetype === "chaos") {
-    if (run.perks.includes("safe_harbor")) moneyLossMult *= 0.8;
+    if (run.runEffects?.safeHarborActive || run.perks.includes("safe_harbor")) {
+      moneyLossMult *= 0.8;
+    }
     if (run.relics.includes("void_lens")) {
       ctx = { ...ctx, negativeWeightMult: (ctx.negativeWeightMult ?? 1) * 0.85 };
     }
@@ -53,6 +55,9 @@ export function getWheelTypeAdjustments(
   if (archetype === "boss") {
     moneyLossMult *= getBossLossMult(run);
     moneyGainMult *= 0.82;
+    if (run.perks.includes("final_guard")) {
+      moneyLossMult *= 0.85;
+    }
     if (run.relics.includes("boss_slayer")) {
       ctx = {
         ...ctx,

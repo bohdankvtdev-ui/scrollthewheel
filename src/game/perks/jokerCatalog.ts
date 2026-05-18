@@ -15,6 +15,9 @@ const TRIGGER_BY_ID: Record<string, JokerTrigger> = {
   vip_roller: "onGainMoney",
   double_down: "onGainMoney",
   compounder: "onFloorEnd",
+  final_guard: "passive",
+  final_tax_shield: "passive",
+  clutch_cash: "onFloorEnd",
 };
 
 const STACK: JokerDefinition["stackRule"] = "unique";

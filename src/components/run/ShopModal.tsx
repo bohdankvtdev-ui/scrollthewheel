@@ -12,6 +12,7 @@ import {
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { PERK_CATALOG } from "../../data/perks";
+import { PERK_FAMILY_LABELS } from "../../game/perks/perkFamilies";
 import { BALATRO_ECONOMY } from "../../game/balatroEconomy";
 import { PERK_TIER_LABELS } from "../../game/gdd";
 import { getSpendableChips } from "../../game/shop/chipEconomy";
@@ -217,7 +218,7 @@ export function ShopModal({
               <Text style={[styles.statValue, { fontFamily: FONT_BEBAS_NEUE }]}>
                 {jokers}/{BALATRO_ECONOMY.maxJokerSlots}
               </Text>
-              <Text style={styles.statLabel}>jokers</Text>
+              <Text style={styles.statLabel}>perks</Text>
             </View>
             <View style={styles.statPill}>
               <MaterialIcons name="upgrade" size={20} color={SHOP.advAccent} />
@@ -238,7 +239,7 @@ export function ShopModal({
                 Consumables
               </Text>
               <Text style={styles.sectionHint}>
-                Buy to inventory — arm eraser in loadout, tap a wedge to remove it
+                Wedge Laser — tap the square button under the wheel map, then tap a wedge
               </Text>
               <ShopCard
                 title={eraserNode.name}
@@ -312,13 +313,16 @@ export function ShopModal({
             ) : null}
 
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Jokers</Text>
-              <Text style={styles.sectionHint}>Perks that change odds & payouts</Text>
-              {jokerNodes.map((node: JokerNode) => (
+              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Perks</Text>
+              <Text style={styles.sectionHint}>Run modifiers — odds, payouts, guards</Text>
+              {jokerNodes.map((node: JokerNode) => {
+                const perk = PERK_CATALOG[node.perkId];
+                const familyLabel = perk != null ? PERK_FAMILY_LABELS[perk.family] : "Perk";
+                return (
                 <ShopCard
                   key={`${node.perkId}-${node.tier}`}
                   title={node.name}
-                  subtitle={node.tagline || PERK_TIER_LABELS[PERK_CATALOG[node.perkId]?.tier ?? 0]}
+                  subtitle={`${familyLabel} · ${node.tagline || PERK_TIER_LABELS[perk?.tier ?? 0]}`}
                   description={node.description}
                   icon={node.icon}
                   iconFamily={
@@ -327,7 +331,7 @@ export function ShopModal({
                       : "MaterialIcons"
                   }
                   accent={SHOP.jokerAccent}
-                  badge="JOKER"
+                  badge={familyLabel.toUpperCase()}
                   cost={node.cost}
                   owned={node.owned}
                   locked={node.locked}
@@ -335,7 +339,8 @@ export function ShopModal({
                   onPress={() => onBuy(node.perkId)}
                   fullWidth={cardFull}
                 />
-              ))}
+              );
+              })}
             </View>
 
             {ownedAdv.length > 0 ? (
@@ -353,7 +358,7 @@ export function ShopModal({
 
             {owned.length > 0 ? (
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Sell jokers</Text>
+                <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Sell perks</Text>
                 <View style={styles.ownedRow}>
                   {owned.map((j) => (
                     <Pressable key={j.perkId} style={styles.sellChip} onPress={() => onSell(j.perkId)}>

@@ -148,6 +148,7 @@ export function tickRunEffectsOnWheelAdvance(run: RunState): RunState {
 export function resetCycleRunEffects(run: RunState): RunEffectsState {
   return {
     negativeBiasBonus: run.runEffects?.negativeBiasBonus,
+    safeHarborActive: run.runEffects?.safeHarborActive,
     forcedArchetypeByIndex: undefined,
     corruptionRemainingWheels: undefined,
     doomSpiralRemainingWheels: undefined,

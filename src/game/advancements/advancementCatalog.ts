@@ -26,7 +26,7 @@ export type AdvancementDef = {
   value?: number;
 };
 
-/** Run upgrades — separate from jokers; bought with shop chips. */
+/** Run upgrades — separate from perks; bought with shop chips. */
 export const ADVANCEMENT_CATALOG: Record<string, AdvancementDef> = {
   money_on_all: {
     id: "money_on_all",
@@ -41,8 +41,8 @@ export const ADVANCEMENT_CATALOG: Record<string, AdvancementDef> = {
   },
   perk_on_all: {
     id: "perk_on_all",
-    name: "Extra Joker Slice",
-    line: "+1 joker wedge on wheels 1–3, 5–9",
+    name: "Extra Perk Slice",
+    line: "+1 perk wedge on wheels 1–3, 5–9",
     cost: 16,
     tier: 1,
     kind: "inject_perk",
@@ -94,7 +94,7 @@ export const ADVANCEMENT_CATALOG: Record<string, AdvancementDef> = {
   shop_extra: {
     id: "shop_extra",
     name: "Bigger Shop",
-    line: "+1 joker & upgrade card each shop visit",
+    line: "+1 perk & upgrade card each shop visit",
     cost: 15,
     tier: 2,
     kind: "extra_shop_offers",

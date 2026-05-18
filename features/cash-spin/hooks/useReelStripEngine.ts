@@ -39,7 +39,8 @@ export type UseReelStripEngineArgs = {
   initialActiveIndex?: number;
   /** When this changes, snap strip index (new run) without mid-game resync. */
   bootRunId?: string;
-  onClaimed: (roundIndex: number) => void;
+  /** Return false to cancel reel advance (store did not commit the claim). */
+  onClaimed: (roundIndex: number) => boolean;
   /** Commit pending wheel layout before swipe spring (avoids slice-count pop mid-transition). */
   onPrepareAdvance?: () => void;
   growToMinLength?: (minLength: number) => void;
@@ -84,8 +85,12 @@ export type ReelStripEngine = {
   onPrimaryBulbPhaseChange: (phase: BulbRingPhase) => void;
   /** Programmatic claim — same as swipe-up when round is `won`. */
   requestAdvance: () => void;
-  /** 0 at rest, 0–1 while dragging toward the next reel page. */
-  stripScrollProgress: number;
+  /** Snap strip to a wheel index without advance animation (heal store/reel desync). */
+  snapToIndex: (index: number) => void;
+  /** True while the user is dragging the strip past the scroll threshold. */
+  stripScrolling: boolean;
+  /** True while the strip spring animation is running after a swipe. */
+  stripSpringing: boolean;
 };
 
 /**
@@ -127,7 +132,8 @@ export function useReelStripEngine({
   const [isSpinning, setIsSpinning] = useState(false);
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [stripSpringing, setStripSpringing] = useState(false);
-  const [stripScrollProgress, setStripScrollProgress] = useState(0);
+  const [stripScrolling, setStripScrolling] = useState(false);
+  const stripScrollingRef = useRef(false);
 
   const translateY = useSharedValue(0);
   const startTranslateY = useSharedValue(0);
@@ -165,20 +171,24 @@ export function useReelStripEngine({
     pageH.value = pageHStable;
   }, [pageHStable, pageH]);
 
-  const publishStripScrollProgress = useCallback((progress: number) => {
-    if (!mountedRef.current) return;
-    setStripScrollProgress(progress);
+  const publishStripScrolling = useCallback((scrolling: boolean) => {
+    if (!mountedRef.current || stripScrollingRef.current === scrolling) return;
+    stripScrollingRef.current = scrolling;
+    setStripScrolling(scrolling);
   }, []);
 
+  /** Only bridge scroll start/stop to React — not every pan frame (avoids 30–60 Hz re-renders). */
   useAnimatedReaction(
     () => {
       const h = Math.max(1, pageH.value);
-      return Math.min(1, Math.abs(translateY.value) / h);
+      return Math.abs(translateY.value) / h > 0.02;
     },
-    (progress) => {
-      runOnJS(publishStripScrollProgress)(progress);
+    (scrolling, prev) => {
+      if (scrolling !== prev) {
+        runOnJS(publishStripScrolling)(scrolling);
+      }
     },
-    [publishStripScrollProgress]
+    [publishStripScrolling]
   );
 
   useEffect(() => {
@@ -299,17 +309,30 @@ export function useReelStripEngine({
       /* isolate failures */
     }
 
+    let claimed = false;
     batchedUpdates(() => {
       try {
-        onClaimedRef.current(i);
+        claimed = onClaimedRef.current(i) === true;
       } catch {
-        /* isolate native bridge failures */
+        claimed = false;
+      }
+      if (!claimed) {
+        return;
       }
       const nextIndex = Math.min(i + 1, Math.max(0, len - 1));
       activeIndexRef.current = nextIndex;
       setActiveIndex(nextIndex);
       onReelAdvancedRef.current?.();
     });
+
+    if (!claimed) {
+      advanceBusyRef.current = false;
+      busy.value = false;
+      setStripSpringing(false);
+      setAdvanceBusy(false);
+      translateY.value = 0;
+      return;
+    }
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -458,6 +481,17 @@ export function useReelStripEngine({
     };
   });
 
+  const snapToIndex = useCallback(
+    (index: number) => {
+      if (advanceBusyRef.current) return;
+      const next = Math.max(0, Math.min(index, Math.max(0, roundsRef.current.length - 1)));
+      activeIndexRef.current = next;
+      setActiveIndex(next);
+      translateY.value = 0;
+    },
+    [translateY]
+  );
+
   const setSpinningSafe = useCallback((spinning: boolean) => {
     if (!mountedRef.current) return;
     setIsSpinning(spinning);
@@ -471,7 +505,7 @@ export function useReelStripEngine({
   );
 
   const nextIndex = activeIndex + 1 < roundCount ? activeIndex + 1 : null;
-  const interactionLocked = advanceBusy || isSpinning || stripSpringing;
+  const interactionLocked = advanceBusy || stripSpringing;
 
   return {
     activeIndex,
@@ -488,6 +522,8 @@ export function useReelStripEngine({
     setSpinningSafe,
     onPrimaryBulbPhaseChange,
     requestAdvance: executeStripAdvance,
-    stripScrollProgress,
+    snapToIndex,
+    stripScrolling,
+    stripSpringing,
   };
 }

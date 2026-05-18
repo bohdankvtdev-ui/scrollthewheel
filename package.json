@@ -1,5 +1,5 @@
 {
-  "name": "spinwheel",
+  "name": "scroll-the-wheel",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
