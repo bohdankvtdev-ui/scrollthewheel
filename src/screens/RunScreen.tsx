@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { WHEEL_STAGES } from "../game/loop";
 import { RunCasinoBar } from "../components/run/RunCasinoBar";
+import { CycleRewardOverlay } from "../components/run/CycleRewardOverlay";
 import { RunEndModal } from "../components/run/RunEndModal";
 import { RunLoadoutDock } from "../components/run/RunLoadoutDock";
 import { RunLoadingShell } from "../components/run/RunLoadingShell";
@@ -16,7 +17,6 @@ import { RunWheelFeed } from "../components/wheel/RunWheelFeed";
 import { useRunLifecycle } from "../hooks/useRunLifecycle";
 import { ADVANCEMENT_CATALOG } from "../game/advancements";
 import { PERK_CATALOG } from "../data/perks";
-import { RunManager } from "../systems/RunManager";
 import { shopRerollCost } from "../game/shop/offers";
 import { ShopSystem } from "../systems/ShopSystem";
 import { useRunStore } from "../stores/runStore";
@@ -39,6 +39,10 @@ export function RunScreen() {
   const lastWonPerkId = useRunStore((s) => s.ui.lastWonPerkId);
   const lastRewardKind = useRunStore((s) => s.ui.lastRewardKind);
   const startRun = useRunStore((s) => s.startRun);
+  const showCycleReward = useRunStore((s) => s.ui.showCycleReward);
+  const continueAfterCycleReward = useRunStore((s) => s.continueAfterCycleReward);
+  const moneyReveal = useRunStore((s) => s.ui.moneyReveal);
+  const commitMoneyReveal = useRunStore((s) => s.commitMoneyReveal);
   const showToast = useRunToastStore((s) => s.show);
 
   const role = run?.wheels[run.wheelIndex]?.definition.role ?? "base";
@@ -160,24 +164,20 @@ export function RunScreen() {
     showToast({ type: "info", title: `Rerolled (−${cost} chips)`, icon: "refresh" });
   }, [shopRerolls, showToast]);
 
-  const handleContinueInfinite = useCallback(() => {
-    const current = useRunStore.getState().run;
-    if (current == null) return;
-    const next = RunManager.onBossClearedContinue(current);
-    useRunStore.setState({
-      run: next,
-      ui: {
-        ...useRunStore.getState().ui,
-        activeWheelIndex: 0,
-        awaitingClaim: false,
-        lastResultLabel: null,
-        lastSliceId: null,
-        lastEffect: null,
-        lastWonPerkId: null,
-        lastRewardKind: null,
-      },
-    });
-  }, []);
+  const handleBuyConsumable = useCallback(
+    (consumableId: "wedge_eraser") => {
+      const current = useRunStore.getState().run;
+      if (current == null) return;
+      const result = ShopSystem.buyConsumable(current, consumableId);
+      if (!result.ok) {
+        showToast({ type: "info", title: result.reason, icon: "info" });
+        return;
+      }
+      useRunStore.setState({ run: result.run });
+      showToast({ type: "success", title: "Wedge Eraser added to inventory", icon: "eraser" });
+    },
+    [showToast]
+  );
 
   if (!ready || run == null) {
     return (
@@ -193,6 +193,8 @@ export function RunScreen() {
       <RunToastHost />
       <RunCasinoBar
         run={run}
+        moneyReveal={moneyReveal}
+        onMoneyRevealDone={commitMoneyReveal}
         shopHighlighted={shopPending && awaitingClaim}
         onShop={handleShopOpen}
         onReset={handleReset}
@@ -215,15 +217,16 @@ export function RunScreen() {
         onBuy={handleBuy}
         onBuyAdvancement={handleBuyAdvancement}
         onBuyForge={handleBuyForge}
+        onBuyConsumable={handleBuyConsumable}
         onSell={handleSell}
         onReroll={handleReroll}
       />
-      <RunEndModal
-        phase={run.phase}
-        floor={run.floor}
-        onRestart={handleReset}
-        onContinueInfinite={run.phase === "won" ? handleContinueInfinite : undefined}
-      />
+      {showCycleReward && run.phase === "won" ? (
+        <CycleRewardOverlay run={run} onContinue={continueAfterCycleReward} />
+      ) : null}
+      {run.phase !== "active" && run.phase !== "won" && moneyReveal == null ? (
+        <RunEndModal phase={run.phase} floor={run.floor} onRestart={handleReset} />
+      ) : null}
     </SafeAreaView>
   );
 }

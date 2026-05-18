@@ -28,7 +28,7 @@ import Animated, {
 import { REEL_STRIP } from "../reelStripConstants";
 import type { BulbRingPhase } from "../bulbRingPhase";
 import { computeMaxActiveIndex } from "../reelStripModel";
-import type { ScrollWheelRound } from "./useScrollTheWheelRounds";
+import type { ScrollWheelRound } from "../reelStripModel";
 
 const { gesture: G, springs: S, visuals: V, commitTimingMs } = REEL_STRIP;
 
@@ -90,7 +90,7 @@ export type ReelStripEngine = {
 
 /**
  * Owns reel-strip shared values, pan gesture, advance-after-spring, and grow debounce.
- * Keeps `CashSpinScrollFeed` focused on layout + per-round rendering.
+ * Shared by the roguelike run reel (`RunWheelFeed`).
  */
 export function useReelStripEngine({
   pageHeight,

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { FONT_BEBAS_NEUE } from "../../theme/fonts";
@@ -43,7 +44,7 @@ function Glyph({
 }
 
 /** Wedge icons + captions — complementary colors, no glow. */
-export function SliceIconLayer({
+export const SliceIconLayer = memo(function SliceIconLayer({
   size,
   data,
   placements,
@@ -93,7 +94,7 @@ export function SliceIconLayer({
       })}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   layer: {

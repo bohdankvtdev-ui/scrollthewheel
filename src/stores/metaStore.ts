@@ -7,15 +7,21 @@ function persistMeta(state: MetaPersist): void {
     bestFloor: state.bestFloor,
     totalRuns: state.totalRuns,
     totalChips: state.totalChips,
+    bestPeakMoney: state.bestPeakMoney ?? 0,
     unlockedRelics: state.unlockedRelics,
     settings: state.settings,
   });
 }
 
+export type RunEndStats = {
+  floor: number;
+  peakMoney?: number;
+};
+
 type MetaStore = MetaPersist & {
   hydrated: boolean;
   hydrate: () => void;
-  recordRunEnd: (floor: number) => void;
+  recordRunEnd: (stats: number | RunEndStats) => void;
   grantChips: (amount: number) => number;
   setSetting: <K extends keyof MetaPersist["settings"]>(key: K, value: MetaPersist["settings"][K]) => void;
   unlockRelic: (relicId: string) => void;
@@ -27,19 +33,32 @@ export const useMetaStore = create<MetaStore>((set, get) => ({
 
   hydrate: () => {
     const meta = loadMeta();
-    set({ ...meta, totalChips: meta.totalChips ?? 0, hydrated: true });
+    set({
+      ...meta,
+      totalChips: meta.totalChips ?? 0,
+      bestPeakMoney: meta.bestPeakMoney ?? 0,
+      hydrated: true,
+    });
   },
 
-  recordRunEnd: (floor) => {
+  recordRunEnd: (stats) => {
     const state = get();
+    const floor = typeof stats === "number" ? stats : stats.floor;
+    const peakMoney = typeof stats === "number" ? 0 : (stats.peakMoney ?? 0);
     const bestFloor = Math.max(state.bestFloor, floor);
+    const bestPeakMoney = Math.max(state.bestPeakMoney ?? 0, peakMoney);
     const next = {
       ...state,
       bestFloor,
+      bestPeakMoney,
       totalRuns: state.totalRuns + 1,
     };
     persistMeta(next);
-    set({ bestFloor, totalRuns: next.totalRuns });
+    set({
+      bestFloor,
+      bestPeakMoney,
+      totalRuns: next.totalRuns,
+    });
   },
 
   grantChips: (amount) => {

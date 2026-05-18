@@ -23,7 +23,21 @@ import { useMetaStore } from "../stores/metaStore";
  */
 export function useRunLogic() {
   const run = useRunStore((s) => s.run);
-  const ui = useRunStore((s) => s.ui);
+  const awaitingClaim = useRunStore((s) => s.ui.awaitingClaim);
+  const isSpinning = useRunStore((s) => s.ui.isSpinning);
+  const activeWheelIndex = useRunStore((s) => s.ui.activeWheelIndex);
+  const lastResultLabel = useRunStore((s) => s.ui.lastResultLabel);
+  const shopPending = useRunStore((s) => s.ui.shopPending);
+  const ui = useMemo(
+    () => ({
+      awaitingClaim,
+      isSpinning,
+      activeWheelIndex,
+      lastResultLabel,
+      shopPending,
+    }),
+    [activeWheelIndex, awaitingClaim, isSpinning, lastResultLabel, shopPending]
+  );
   const startRunStore = useRunStore((s) => s.startRun);
   const applySpinResult = useRunStore((s) => s.applySpinResult);
   const claimAndAdvance = useRunStore((s) => s.claimAndAdvance);
@@ -82,7 +96,10 @@ export function useRunLogic() {
   const endRunAndGrantChips = useCallback(() => {
     if (normalizedRun == null) return null;
     const { result } = finalizeRunEnd(normalizedRun, (chips) => grantChips(chips));
-    useMetaStore.getState().recordRunEnd(normalizedRun.floor);
+    useMetaStore.getState().recordRunEnd({
+      floor: normalizedRun.floor,
+      peakMoney: normalizedRun.peakMoney ?? normalizedRun.money,
+    });
     return result;
   }, [grantChips, normalizedRun]);
 

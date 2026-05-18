@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SlicePrizeSheet } from "./SlicePrizeSheet";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   AccessibilityInfo,
   Platform,
@@ -9,6 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { GestureDetector } from "react-native-gesture-handler";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { SpinWheelStage } from "../../../features/cash-spin/components/SpinWheelStage";
@@ -32,12 +34,14 @@ import { useRunReelRounds } from "../../hooks/useRunReelRounds";
 import { buildResolveContext } from "../../hooks/useWheelModifiers";
 import { resolveSlice } from "../../systems/ProbabilityResolver";
 import { getBulbRingPalette, getWheelSegmentColors } from "../../game/content/sliceVisualTheme";
-import { getArchetypeForConfigId, WHEEL_DATABASE_REVISION } from "../../game/wheels/database";
-import { normalizeRunState } from "../../game/runState";
+import { getArchetypeForConfigId } from "../../game/wheels/database";
 import { RunManager } from "../../systems/RunManager";
-import { rebuildWheelsFromDatabase } from "../../systems/WheelSystem";
+import { syncRunWheels } from "../../systems/WheelSystem";
 import type { RunState } from "../../schemas";
 import { useRunStore } from "../../stores/runStore";
+import { useRunToastStore } from "../../stores/runToastStore";
+import { sliceWheelCaptionForRun } from "../../utils/sliceMoneyDisplay";
+import type { SpinWheelItem } from "../../../wheel/types";
 
 type RunWheelFeedProps = {
   run: RunState;
@@ -56,7 +60,7 @@ function physicsForProfile(profileId: string) {
   return base;
 }
 
-function RunWheelSlot({
+const RunWheelSlot = memo(function RunWheelSlot({
   roundIndex,
   pageHeight,
   run,
@@ -72,6 +76,9 @@ function RunWheelSlot({
   ringPhaseResetKey,
   onBulbRingPhaseChange,
   scrollGrainOverlay,
+  sliceEraseMode,
+  isActiveWheel,
+  onBanishSlice,
 }: {
   roundIndex: number;
   pageHeight: number;
@@ -88,10 +95,14 @@ function RunWheelSlot({
   ringPhaseResetKey: number;
   onBulbRingPhaseChange?: (phase: "idle" | "spinning" | "victory") => void;
   scrollGrainOverlay?: React.ReactNode;
+  sliceEraseMode: boolean;
+  isActiveWheel: boolean;
+  onBanishSlice: (sliceIndex: number) => void;
 }) {
   const wheel = run.wheels[roundIndex];
   const isSpinning = useRunStore((s) => s.ui.isSpinning);
   const [previewSliceIndex, setPreviewSliceIndex] = useState<number | null>(null);
+  const eraseArmed = sliceEraseMode && isActiveWheel && !spinLocked && !isSpinning;
 
   useEffect(() => {
     if (isSpinning) setPreviewSliceIndex(null);
@@ -125,6 +136,18 @@ function RunWheelSlot({
     [run, wheel, roundIndex]
   );
 
+  const wheelData = useMemo((): SpinWheelItem[] => {
+    if (wheel == null) return [];
+    return wheel.spinItems.map((item, i) => {
+      const slice = wheel.slices[i];
+      if (slice == null) return item;
+      return {
+        ...item,
+        shortLabel: sliceWheelCaptionForRun(run, slice, roundIndex),
+      };
+    });
+  }, [run, roundIndex, wheel]);
+
   if (wheel == null) return <View style={{ height: pageHeight }} />;
 
   return (
@@ -137,10 +160,18 @@ function RunWheelSlot({
         wheelSlices={wheel.slices}
         resolveContext={resolveContext}
       />
-      <View style={styles.wheelSlotShell}>
-        <View style={styles.wheelPad}>
+      {eraseArmed ? (
+        <View style={styles.eraseBanner} pointerEvents="none">
+          <MaterialCommunityIcons name="eraser" size={18} color={Neo.ink} />
+          <Text style={[styles.eraseBannerText, { fontFamily: FONT_BEBAS_NEUE }]}>
+            Tap a wedge to banish
+          </Text>
+        </View>
+      ) : null}
+      <View style={[styles.wheelSlotShell, eraseArmed && styles.wheelSlotErase]}>
+        <View style={[styles.wheelPad, eraseArmed && styles.wheelPadErase]}>
           <SpinWheelStage
-            data={wheel.spinItems}
+            data={wheelData}
             wheelInnerSize={wheelInnerSize}
             textSize={textSize}
             wheelPhysics={wheelPhysics}
@@ -160,23 +191,32 @@ function RunWheelSlot({
             onSpinComplete={(item) => onSpinComplete(roundIndex, item)}
             scrollGrainOverlay={scrollGrainOverlay}
             slicePressEnabled={!spinLocked && !isSpinning}
-            onSlicePress={(index) => setPreviewSliceIndex(index)}
+            onSlicePress={(index) => {
+              if (eraseArmed) {
+                onBanishSlice(index);
+                return;
+              }
+              setPreviewSliceIndex(index);
+            }}
           />
         </View>
       </View>
     </View>
   );
-}
+});
 
 export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
   const { width: winW, height: winH } = useWindowDimensions();
   const awaitingClaim = useRunStore((s) => s.ui.awaitingClaim);
   const isSpinning = useRunStore((s) => s.ui.isSpinning);
+  const sliceEraseMode = useRunStore((s) => s.ui.sliceEraseMode);
   const applySpinResult = useRunStore((s) => s.applySpinResult);
   const claimAndAdvance = useRunStore((s) => s.claimAndAdvance);
   const commitWheelLayout = useRunStore((s) => s.commitWheelLayout);
   const setSpinning = useRunStore((s) => s.setSpinning);
+  const banishSliceAt = useRunStore((s) => s.banishSliceAt);
   const lastResultLabel = useRunStore((s) => s.ui.lastResultLabel);
+  const showToast = useRunToastStore((s) => s.show);
 
   const rounds = useRunReelRounds(run, awaitingClaim, lastResultLabel);
   const spinWheelRef = useRef<SpinWheelRef>(null);
@@ -221,6 +261,19 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
     [claimAndAdvance]
   );
 
+  const handleBanishSlice = useCallback(
+    (wheelIndex: number, sliceIndex: number) => {
+      const result = banishSliceAt(wheelIndex, sliceIndex);
+      if (result.ok) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast({ type: "success", title: "Wedge banished", icon: "eraser" });
+        return;
+      }
+      showToast({ type: "info", title: result.reason, icon: "info" });
+    },
+    [banishSliceAt, showToast]
+  );
+
   const reel = useReelStripEngine({
     pageHeight,
     rounds,
@@ -248,10 +301,11 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
   const handleExternalSpinPress = useCallback(() => {
     let current = useRunStore.getState().run;
     if (current == null) return;
-    current = rebuildWheelsFromDatabase(
-      normalizeRunState({ ...current, wheelDbRevision: WHEEL_DATABASE_REVISION })
-    );
-    useRunStore.setState({ run: current });
+    const synced = syncRunWheels(current);
+    if (synced !== current) {
+      useRunStore.setState({ run: synced });
+      current = synced;
+    }
 
     const ri = current.wheelIndex;
     const wheel = current.wheels[ri];
@@ -358,11 +412,15 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
           spinLocked={spinLocked}
           ringPhaseResetKey={ri}
           onBulbRingPhaseChange={listenBulb ? reel.onPrimaryBulbPhaseChange : undefined}
+          sliceEraseMode={sliceEraseMode}
+          isActiveWheel={isActive}
+          onBanishSlice={(sliceIndex) => handleBanishSlice(ri, sliceIndex)}
         />
       );
     },
     [
       awaitingClaim,
+      handleBanishSlice,
       handleExternalSpinPress,
       handleHubClaim,
       handleSpinComplete,
@@ -376,6 +434,7 @@ export function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
       rounds,
       run,
       scrolling,
+      sliceEraseMode,
       textSize,
       wheelInnerSize,
     ]
@@ -472,5 +531,33 @@ const styles = StyleSheet.create({
   wheelPad: {
     alignItems: "center",
     paddingHorizontal: 16,
+  },
+  wheelSlotErase: {
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: Neo.neonCyan,
+    borderStyle: "dashed",
+  },
+  wheelPadErase: {
+    opacity: 1,
+  },
+  eraseBanner: {
+    position: "absolute",
+    top: 8,
+    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: Neo.neonCyan,
+    borderWidth: Neo.borderBold,
+    borderColor: Neo.ink,
+    borderRadius: 10,
+  },
+  eraseBannerText: {
+    fontSize: 15,
+    color: Neo.ink,
+    letterSpacing: 0.4,
   },
 });

@@ -102,19 +102,26 @@ export const CHAOS_POOL: PoolPick[] = [
   { prize: "money_300", weight: 8, minCycle: 2 },
 ];
 
+/** Boss showdown — unique prizes + bank/joker taxes; rare modest cash. */
 export const BOSS_POOL: PoolPick[] = [
-  { prize: "mega_money", weight: 16 },
-  { prize: "money_800", weight: 10, minCycle: 2 },
-  { prize: "money_500", weight: 12, minCycle: 1 },
-  { prize: "money_200", weight: 10, minCycle: 1 },
-  { prize: "triple_perk", weight: 12 },
-  { prize: "perk_gold_rush", weight: 8, minCycle: 1 },
-  { prize: "perk_compounder", weight: 8, minCycle: 3 },
-  { prize: "boss_relic", weight: 14 },
-  { prize: "doom_spiral", weight: 12, minCycle: 2 },
-  { prize: "mega_curse", weight: 10, minCycle: 2 },
-  { prize: "bank_wipe", weight: 8, minCycle: 3 },
-  { prize: "bank_double", weight: 8, minCycle: 4 },
+  { prize: "boss_perk_tax", weight: 16 },
+  { prize: "boss_overhead", weight: 14 },
+  { prize: "boss_shield_break", weight: 12 },
+  { prize: "bank_cut_half", weight: 14 },
+  { prize: "bank_cut_quarter", weight: 12 },
+  { prize: "boss_chip_cache", weight: 10 },
+  { prize: "boss_golden_seal", weight: 10, minCycle: 2 },
+  { prize: "boss_relic_crown", weight: 8, minCycle: 2 },
+  { prize: "boss_pay_150", weight: 8, minCycle: 2 },
+  { prize: "money_loss_150", weight: 10 },
+  { prize: "neutral_hold_line", weight: 10 },
+  { prize: "mega_curse", weight: 8, minCycle: 2 },
+  { prize: "debt_bomb", weight: 8, minCycle: 2 },
+  { prize: "boss_pay_100", weight: 6, minCycle: 1 },
+  { prize: "boss_mystery_perk", weight: 5, minCycle: 3 },
+  { prize: "bank_cut_75", weight: 6, minCycle: 3 },
+  { prize: "doom_spiral", weight: 5, minCycle: 4 },
+  { prize: "bank_wipe", weight: 2, minCycle: 5 },
 ];
 
 export const WHEEL_POOL_BY_CONFIG: Partial<Record<WheelConfigId, PoolPick[]>> = {

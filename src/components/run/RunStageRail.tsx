@@ -6,7 +6,6 @@ import { getScalingParams } from "../../game/loop";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
-import { formatMoney } from "../../utils/formatMoney";
 
 type RunStageRailProps = {
   run: RunState;
@@ -17,8 +16,6 @@ export function RunStageRail({ run }: RunStageRailProps) {
   const currentWheel = run.wheels[run.wheelIndex];
   const currentTitle = currentWheel?.definition.title ?? WHEEL_ROTATION[run.wheelIndex]?.title ?? "Wheel";
   const stage = WHEEL_STAGES[WHEEL_ROTATION[run.wheelIndex]?.role ?? "base"];
-  const quotaPct = Math.min(1, run.money / Math.max(1, run.blindQuota));
-  const quotaOk = run.money >= run.blindQuota;
 
   return (
     <View style={styles.wrap}>
@@ -36,27 +33,6 @@ export function RunStageRail({ run }: RunStageRailProps) {
             {currentTitle}
           </Text>
         </View>
-      </View>
-
-      <View style={styles.quotaRow}>
-        <Text style={[styles.quotaLabel, { fontFamily: FONT_BEBAS_NEUE }]}>Bank</Text>
-        <Text style={[styles.quotaNum, { fontFamily: FONT_BEBAS_NEUE, color: quotaOk ? Neo.neonCyan : Neo.textOnDark }]}>
-          {formatMoney(run.money)}
-        </Text>
-        <View style={styles.quotaTrack}>
-          <View
-            style={[
-              styles.quotaFill,
-              {
-                width: `${Math.max(4, Math.round(quotaPct * 100))}%`,
-                backgroundColor: quotaOk ? Neo.neonCyan : Neo.neonYellow,
-              },
-            ]}
-          />
-        </View>
-        <Text style={[styles.quotaTarget, { fontFamily: FONT_BEBAS_NEUE }]}>
-          Bonus {formatMoney(run.blindQuota)}
-        </Text>
       </View>
 
       <ScrollView
@@ -137,39 +113,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Neo.textOnDark,
     letterSpacing: 0.3,
-  },
-  quotaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  quotaLabel: {
-    fontSize: 11,
-    color: "rgba(250,250,250,0.45)",
-    width: 32,
-  },
-  quotaNum: {
-    fontSize: 13,
-    minWidth: 44,
-    textAlign: "right",
-  },
-  quotaTrack: {
-    flex: 1,
-    height: 8,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderRadius: 4,
-    borderWidth: Neo.borderThin,
-    borderColor: "rgba(250,250,250,0.15)",
-    overflow: "hidden",
-  },
-  quotaFill: {
-    height: "100%",
-    borderRadius: 3,
-  },
-  quotaTarget: {
-    fontSize: 13,
-    color: "rgba(250,250,250,0.55)",
-    minWidth: 44,
   },
   pipRow: {
     flexDirection: "row",

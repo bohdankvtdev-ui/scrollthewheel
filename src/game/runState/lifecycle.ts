@@ -1,4 +1,4 @@
-import { getBlindQuotaForRun, RUN_DEFAULTS } from "../loop";
+import { RUN_DEFAULTS } from "../loop";
 import { FLOOR_WHEEL_COUNT } from "../wheels";
 import type { RunEndResult, RunState } from "./types";
 import { DEFAULT_RUN_MODIFIERS } from "./types";
@@ -25,7 +25,7 @@ export function resolveWheelSpin(
   run: RunState,
   wheelIndex: number,
   slice: SliceDefinition
-): RunState {
+) {
   return resolveAndApplyWheel(run, wheelIndex, slice);
 }
 
@@ -58,10 +58,3 @@ export function startNextFloor(run: RunState): RunState {
   return RunManager.enterInfiniteFloor(run) as RunState;
 }
 
-/** Recompute blind quota when perks change. */
-export function refreshBlindQuota(run: RunState): RunState {
-  return {
-    ...run,
-    blindQuota: getBlindQuotaForRun(run.floor, run.perks),
-  };
-}

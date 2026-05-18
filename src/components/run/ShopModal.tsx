@@ -39,6 +39,7 @@ type ShopModalProps = {
   onBuy: (perkId: string) => void;
   onBuyAdvancement: (advancementId: string) => void;
   onBuyForge: (forgeId: string) => void;
+  onBuyConsumable: (id: "wedge_eraser") => void;
   onSell: (perkId: string) => void;
   onReroll: () => void;
 };
@@ -142,6 +143,7 @@ export function ShopModal({
   onBuy,
   onBuyAdvancement,
   onBuyForge,
+  onBuyConsumable,
   onSell,
   onReroll,
 }: ShopModalProps) {
@@ -173,6 +175,7 @@ export function ShopModal({
   const owned = ShopSystem.listOwnedJokers(run);
   const ownedAdv = ShopSystem.listOwnedAdvancements(run);
   const forgeNodes = ShopSystem.listForgeNodes(run);
+  const eraserNode = ShopSystem.consumableNode(run, "wedge_eraser");
   const jokers = countJokers(run);
   const advCount = (run.advancements ?? []).length;
   const chips = getSpendableChips(run);
@@ -230,6 +233,30 @@ export function ShopModal({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
+                Consumables
+              </Text>
+              <Text style={styles.sectionHint}>
+                Buy to inventory — arm eraser in loadout, tap a wedge to remove it
+              </Text>
+              <ShopCard
+                title={eraserNode.name}
+                subtitle={`Owned · ${eraserNode.owned}/${eraserNode.maxStack}`}
+                description={eraserNode.description}
+                icon={eraserNode.icon}
+                iconFamily="MaterialCommunityIcons"
+                accent={SHOP.chip}
+                badge="TOOL"
+                cost={eraserNode.cost}
+                owned={eraserNode.owned >= eraserNode.maxStack}
+                locked={eraserNode.owned >= eraserNode.maxStack}
+                canAfford={eraserNode.canAfford}
+                onPress={() => onBuyConsumable("wedge_eraser")}
+                fullWidth={cardFull}
+              />
+            </View>
+
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
                 Chip forge

@@ -41,16 +41,16 @@ export function applyJokerEvent(run: RunState, event: JokerEvent): JokerEngineRe
   }
 
   if (event.type === "onBoss") {
-    chipsBonus += 6;
-    if (owns("iron_reserve") || owns("safe_harbor")) {
-      chipsBonus += 2;
-    }
+    chipsBonus += 1;
   }
 
   if (event.type === "onFloorEnd" && event.cleared) {
-    chipsBonus += 12 + event.floor * 4;
+    chipsBonus += 8 + event.floor * 3;
     if (owns("compounder")) {
       chipsBonus += Math.floor(event.floor * 2);
+    }
+    if (owns("ante_insurance")) {
+      chipsBonus += 4;
     }
   }
 

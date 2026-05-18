@@ -2,15 +2,12 @@
  * Game loop database — wheels rotation, economy, infinite scaling, shop tree.
  */
 import type { IconFamily, InfiniteScalingParams, SliceCount, WheelDefinition, WheelRole } from "../schemas";
-import { getBlindQuota, getCycleBonusChips } from "./gdd";
 import { FLOOR_WHEEL_COUNT, prototypeToWheelDefinitions } from "./wheels";
 
 export {
   GDD_PACING,
   GDD_LOOP_SUMMARY,
   PRIZE_TAXONOMY,
-  getBlindQuota,
-  getCycleBonusChips,
   getCycleParams,
   getWheelDifficultyBias,
 } from "./gdd";
@@ -21,7 +18,7 @@ export const RUN_DEFAULTS = {
   startingChips: 0,
   startingFloor: 1,
   startingSliceCapacity: 6 as SliceCount,
-  maxSliceCapacity: 12 as SliceCount,
+  maxSliceCapacity: 24 as SliceCount,
   minSliceCapacity: 6 as SliceCount,
   historyMaxEvents: 50,
   /** Run ends when bank is $0 or below. */
@@ -29,9 +26,9 @@ export const RUN_DEFAULTS = {
 } as const;
 
 export const INFINITE_SCALING = {
-  negativeWeightStep: 0.14,
-  stakesMultStep: 0.11,
-  moneyInflationStep: 0.06,
+  negativeWeightStep: 0.15,
+  stakesMultStep: 0.12,
+  moneyInflationStep: 0.065,
   /** Extra negative bias per wheel index within a floor (0–8) */
   wheelIndexNegativeStep: 0.035,
   sliceCapacityBonusFromFloor: 4,
@@ -86,16 +83,16 @@ export type WheelStageMeta = {
 };
 
 export const WHEEL_STAGES: Record<WheelRole, WheelStageMeta> = {
-  base: { role: "base", label: "W1", vibe: "Opening spin", icon: "casino", iconFamily: "MaterialIcons", accent: "#FFE94D", pageTint: "#1a1428" },
-  yield: { role: "yield", label: "W2", vibe: "Cash wheel", icon: "attach-money", iconFamily: "MaterialIcons", accent: "#4ADE80", pageTint: "#121f18" },
-  risk: { role: "risk", label: "W3", vibe: "Risk wheel", icon: "bolt", iconFamily: "MaterialIcons", accent: "#FF6B9D", pageTint: "#22121c" },
-  stabilizer: { role: "stabilizer", label: "W4", vibe: "Cooldown", icon: "healing", iconFamily: "MaterialIcons", accent: "#22D3EE", pageTint: "#101820" },
-  mini_boss: { role: "mini_boss", label: "W5", vibe: "Stakes wheel", icon: "local-fire-department", iconFamily: "MaterialIcons", accent: "#FF2D55", pageTint: "#241018" },
-  jackpot: { role: "jackpot", label: "W6", vibe: "Jackpot wheel", icon: "emoji-events", iconFamily: "MaterialIcons", accent: "#FACC15", pageTint: "#221c08" },
-  power: { role: "power", label: "W7", vibe: "Perk wheel", icon: "auto-awesome", iconFamily: "MaterialIcons", accent: "#C4B5FD", pageTint: "#1a1228" },
-  deck: { role: "deck", label: "W8", vibe: "Mod wheel", icon: "style", iconFamily: "MaterialIcons", accent: "#22D3EE", pageTint: "#121a22" },
-  preparation: { role: "preparation", label: "Prep", vibe: "Power up", icon: "stars", iconFamily: "MaterialIcons", accent: "#C4B5FD", pageTint: "#18122a" },
-  boss: { role: "boss", label: "W9", vibe: "Boss wheel", icon: "donut-large", iconFamily: "MaterialIcons", accent: "#FF2D55", pageTint: "#1c0810" },
+  base: { role: "base", label: "W1", vibe: "Cash — build bank", icon: "payments", iconFamily: "MaterialIcons", accent: "#FFE94D", pageTint: "#1a1428" },
+  yield: { role: "yield", label: "W2", vibe: "Percent — % of bank", icon: "percent", iconFamily: "MaterialIcons", accent: "#4ADE80", pageTint: "#121f18" },
+  risk: { role: "risk", label: "W3", vibe: "Risk — big swings", icon: "warning", iconFamily: "MaterialIcons", accent: "#FF6B9D", pageTint: "#22121c" },
+  stabilizer: { role: "stabilizer", label: "W4", vibe: "Joker — buy perks", icon: "stars", iconFamily: "MaterialIcons", accent: "#22D3EE", pageTint: "#101820" },
+  mini_boss: { role: "mini_boss", label: "W5", vibe: "Drain — cuts bank", icon: "trending-down", iconFamily: "MaterialIcons", accent: "#FF2D55", pageTint: "#241018" },
+  jackpot: { role: "jackpot", label: "W6", vibe: "Lucky — jackpots", icon: "emoji-events", iconFamily: "MaterialIcons", accent: "#FACC15", pageTint: "#221c08" },
+  power: { role: "power", label: "W7", vibe: "Builder — chips", icon: "build", iconFamily: "MaterialIcons", accent: "#C4B5FD", pageTint: "#1a1228" },
+  deck: { role: "deck", label: "W8", vibe: "Chaos — wild mix", icon: "shuffle", iconFamily: "MaterialIcons", accent: "#22D3EE", pageTint: "#121a22" },
+  preparation: { role: "preparation", label: "Prep", vibe: "Shop before boss", icon: "storefront", iconFamily: "MaterialIcons", accent: "#C4B5FD", pageTint: "#18122a" },
+  boss: { role: "boss", label: "W9", vibe: "Showdown — bank & joker tax", icon: "gavel", iconFamily: "MaterialIcons", accent: "#FF2D55", pageTint: "#1c0810" },
 };
 
 export type ShopPerkNode = {
@@ -122,10 +119,6 @@ export const SHOP_PERK_TREE: ShopPerkNode[] = [
   { perkId: "double_down", cost: 20, requires: ["gold_rush", "iron_reserve"], tier: 2, column: 3 },
   { perkId: "compounder", cost: 24, requires: ["hot_table", "coupon_king"], tier: 3, column: 1 },
 ];
-
-export function getBlindQuotaForRun(floor: number, perkIds: string[]): number {
-  return getBlindQuota(floor, perkIds);
-}
 
 export const RUN_LOOP = {
   wheelsPerFloor: WHEEL_COUNT,

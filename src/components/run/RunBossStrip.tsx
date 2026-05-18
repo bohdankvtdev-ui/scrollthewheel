@@ -24,7 +24,9 @@ export function RunBossStrip({ run }: RunStakesStripProps) {
     <View style={[styles.wrap, isFinal && styles.wrapFinal]}>
       <MaterialIcons name="warning" size={18} color={Neo.neonYellow} />
       <Text style={[styles.label, { fontFamily: FONT_BEBAS_NEUE }]}>
-        {isFinal ? "BOSS WHEEL — all or nothing" : "STAKES WHEEL — heavy losses possible"}
+        {isFinal
+          ? "SHOWDOWN — taxes your bank & jokers you bought"
+          : "STAKES WHEEL — % of bank on the line"}
       </Text>
     </View>
   );

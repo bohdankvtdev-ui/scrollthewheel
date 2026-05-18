@@ -13,6 +13,8 @@ export type MetaPersist = {
   totalRuns: number;
   /** Global meta score (chips) — persists across runs. */
   totalChips: number;
+  /** Highest bank $ reached in any run. */
+  bestPeakMoney: number;
   unlockedRelics: string[];
   settings: {
     haptics: boolean;
@@ -25,6 +27,7 @@ export const DEFAULT_META: MetaPersist = {
   bestFloor: 0,
   totalRuns: 0,
   totalChips: 0,
+  bestPeakMoney: 0,
   unlockedRelics: [],
   settings: { haptics: true, reducedMotion: false },
 };
@@ -32,6 +35,10 @@ export const DEFAULT_META: MetaPersist = {
 let metaCache: MetaPersist = { ...DEFAULT_META };
 let runCache: RunState | null = null;
 let initPromise: Promise<void> | null = null;
+
+/** Debounce disk writes during rapid spin/shop updates; memory cache stays synchronous. */
+const CHECKPOINT_DEBOUNCE_MS = 400;
+let checkpointTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function readMetaFromDisk(): Promise<MetaPersist> {
   const raw = await AsyncStorage.getItem(MMKV_KEYS.meta);
@@ -78,11 +85,35 @@ export function loadRunCheckpoint(): RunState | null {
   return runCache;
 }
 
-export function saveRunCheckpoint(run: RunState | null): void {
-  runCache = run;
+function writeRunCheckpointToDisk(run: RunState | null): void {
   if (run == null) {
     void AsyncStorage.removeItem(MMKV_KEYS.runCheckpoint);
     return;
   }
   void AsyncStorage.setItem(MMKV_KEYS.runCheckpoint, JSON.stringify(run));
+}
+
+/** Persist run checkpoint immediately (e.g. app background / unmount). */
+export function flushRunCheckpoint(): void {
+  if (checkpointTimer != null) {
+    clearTimeout(checkpointTimer);
+    checkpointTimer = null;
+  }
+  writeRunCheckpointToDisk(runCache);
+}
+
+export function saveRunCheckpoint(run: RunState | null): void {
+  runCache = run;
+  if (checkpointTimer != null) {
+    clearTimeout(checkpointTimer);
+    checkpointTimer = null;
+  }
+  if (run == null) {
+    writeRunCheckpointToDisk(null);
+    return;
+  }
+  checkpointTimer = setTimeout(() => {
+    checkpointTimer = null;
+    writeRunCheckpointToDisk(runCache);
+  }, CHECKPOINT_DEBOUNCE_MS);
 }

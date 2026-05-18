@@ -97,21 +97,12 @@ export const PERK_DISPLAY: Record<string, PerkDisplayCopy> = {
   },
 
   ante_insurance: {
-
-    tagline: "Easier cycle bonus",
-
-    shopLine: "Cycle bonus bank target −12%",
-
+    tagline: "Cycle chip bonus",
+    shopLine: perkLine("ante_insurance"),
     bullets: [
-
-      "Lowers the optional bank target for extra shop chips at cycle end",
-
-      "You still advance after the boss — this is not required to win",
-
-      "Helpful if you want the bonus without grinding cash",
-
+      perkLine("ante_insurance"),
+      "Stacks when you clear wheel 9 and start the next cycle",
     ],
-
   },
 
   high_roller: {

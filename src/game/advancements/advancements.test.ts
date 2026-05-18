@@ -24,7 +24,7 @@ describe("advancements", () => {
 
   it("stacking inject advancements yields up to 9 slices", () => {
     const adv = ["money_on_all", "perk_on_all", "percent_drip"];
-    expect(getSliceCountForWheel(adv, "wheel_3")).toBe(9);
+    expect(getSliceCountForWheel(1, adv, "wheel_3")).toBe(6);
     const base = getConfiguredWheelSlices("wheel_3", "wheel_3", 1);
     const out = applyAdvancementsToSlices(base, "wheel_3", 1, adv);
     expect(out.length).toBe(9);

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { initPersistence, loadRunCheckpoint } from "../persistence/mmkv";
 import { useMetaStore } from "../stores/metaStore";
 import type { RunState } from "../schemas";
-import { getBlindQuotaForRun } from "../game/loop";
 import { normalizeRunState } from "../game/runState";
 import { WHEEL_DATABASE_REVISION } from "../game/wheels/database/wheelDatabase";
 import { rebuildWheelsFromDatabase } from "../systems/WheelSystem";
@@ -21,8 +20,8 @@ function migrateRunCheckpoint(raw: RunState): RunState {
     next = rest as RunState;
   }
   if (next.pendingWheelRebuild == null) next = { ...next, pendingWheelRebuild: false };
-  if (next.blindQuota == null) {
-    next = { ...next, blindQuota: getBlindQuotaForRun(next.floor, next.perks) };
+  if (next.peakMoney == null) {
+    next = { ...next, peakMoney: next.money ?? 0 };
   }
   if (next.floorsCleared == null) {
     next = { ...next, floorsCleared: Math.max(0, next.floor - 1) };

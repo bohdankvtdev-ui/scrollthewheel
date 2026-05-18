@@ -13,7 +13,36 @@ export type WheelRole =
   | "preparation"
   | "boss";
 
-export type SliceCount = 6 | 7 | 8 | 9 | 10 | 12;
+export type SliceCount =
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
+  | 20
+  | 21
+  | 22
+  | 23
+  | 24;
+
+export const MIN_SLICE_COUNT = 6;
+export const MAX_SLICE_COUNT = 24;
+
+export function clampSliceCount(n: number): SliceCount {
+  const v = Math.round(n);
+  if (v <= 6) return 6;
+  if (v >= 24) return 24;
+  return v as SliceCount;
+}
 
 export type WheelDefinition = {
   id: string;

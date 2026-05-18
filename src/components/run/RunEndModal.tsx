@@ -11,8 +11,8 @@ type RunEndModalProps = {
 };
 
 const LOSS_COPY: Partial<Record<RunPhase, string>> = {
-  lost_money: "Your bank hit $0 — run over",
-  lost_blind: "Bank below cycle bonus target",
+  lost_money: "Bank hit $0 — run over",
+  lost_blind: "Run ended",
   lost_boss: "Boss ended the run",
 };
 

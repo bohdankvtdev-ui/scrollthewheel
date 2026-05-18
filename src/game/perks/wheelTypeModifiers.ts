@@ -1,3 +1,4 @@
+import { getBossLossMult } from "../boss/bossWheel";
 import type { WheelArchetype } from "../wheels/types";
 import type { ResolveContext } from "../../systems/types";
 import type { RunState } from "../runState/types";
@@ -49,11 +50,16 @@ export function getWheelTypeAdjustments(
     }
   }
 
-  if (archetype === "boss" && run.relics.includes("boss_slayer")) {
-    ctx = {
-      ...ctx,
-      negativeWeightMult: (ctx.negativeWeightMult ?? 1) * 0.88,
-    };
+  if (archetype === "boss") {
+    moneyLossMult *= getBossLossMult(run);
+    moneyGainMult *= 0.82;
+    if (run.relics.includes("boss_slayer")) {
+      ctx = {
+        ...ctx,
+        negativeWeightMult: (ctx.negativeWeightMult ?? 1) * 0.9,
+      };
+      moneyLossMult *= 0.92;
+    }
   }
 
   if (run.relics.includes("hot_hand") && spinCount > 0 && spinCount % 5 === 0) {

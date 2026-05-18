@@ -39,10 +39,11 @@ export function normalizeRunState(raw: SchemaRunState): RunState {
     phase: normalizePhase(rest.phase),
 
     chipsEarnedThisRun: rest.chipsEarnedThisRun ?? 0,
-    pressure: rest.pressure ?? 0,
     winStreak: rest.winStreak ?? 0,
-    lossStreak: rest.lossStreak ?? 0,
+    peakMoney: rest.peakMoney ?? rest.money ?? 0,
     chipForge: rest.chipForge ?? {},
+    inventory: rest.inventory ?? { wedgeEraser: 0 },
+    banishedPrizes: rest.banishedPrizes ?? {},
 
     modifiers: { ...DEFAULT_RUN_MODIFIERS, ...rest.modifiers },
 

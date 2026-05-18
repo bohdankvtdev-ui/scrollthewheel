@@ -6,33 +6,22 @@ import {
   jokerEventForBoss,
   jokerEventForSpin,
 } from "../perks/jokerEngine";
-import { getWheelTypeAdjustments } from "../perks/wheelTypeModifiers";
 import { applyChipGain } from "../runState/chipsScoring";
-import { winStreakChipBonus } from "../runState/runPressure";
+import { winStreakChipBonus, updatePeakMoney } from "../runState/runStreaks";
+import { applyMoneyDelta } from "../../systems/PerkSystem";
 import { shouldDebtShieldBlock } from "../runState/runEffects";
 import type { RunState } from "../runState/types";
 import type { SliceDefinition } from "../../schemas";
 import { RunManager } from "../../systems/RunManager";
+import {
+  adjustSliceForRun,
+  computeSliceMoneyDelta,
+} from "../../utils/sliceMoneyDisplay";
 
-function adjustSliceForWheelType(
-  slice: SliceDefinition,
-  moneyGainMult: number,
-  moneyLossMult: number
-): SliceDefinition {
-  const { payload } = slice;
-  if (payload.moneyDelta != null) {
-    const mult = payload.moneyDelta > 0 ? moneyGainMult : moneyLossMult;
-    return {
-      ...slice,
-      payload: { ...payload, moneyDelta: Math.round(payload.moneyDelta * mult) },
-    };
-  }
-  if (payload.bankPercent != null) {
-    const mult = payload.bankPercent >= 0 ? moneyGainMult : moneyLossMult;
-    return { ...slice, payload: { ...payload, bankPercent: payload.bankPercent * mult } };
-  }
-  return slice;
-}
+export type WheelResolveResult = {
+  run: RunState;
+  moneyReveal?: { before: number; delta: number };
+};
 
 export function buildWheelOutcome(
   run: RunState,
@@ -81,8 +70,8 @@ export function buildWheelOutcome(
   if (archetype === "lucky" && deltaMoney > 200) {
     deltaChips += 6;
   }
-  if (archetype === "boss") {
-    deltaChips += 3;
+  if (archetype === "boss" && deltaMoney > 0) {
+    deltaChips += 1;
   }
   if (archetype === "chaos") {
     deltaChips += 2;
@@ -107,24 +96,36 @@ export function resolveAndApplyWheel(
   run: RunState,
   wheelIndex: number,
   slice: SliceDefinition
-): RunState {
+): WheelResolveResult {
   const moneyBefore = run.money;
-  const archetype = getArchetypeForWheelIndex(wheelIndex);
-  const typeAdj = getWheelTypeAdjustments(run, archetype, run.history.length);
-  const adjusted = adjustSliceForWheelType(slice, typeAdj.moneyGainMult, typeAdj.moneyLossMult);
+  const adjusted = adjustSliceForRun(run, slice, wheelIndex);
   const outcome = buildWheelOutcome(run, adjusted, wheelIndex);
+  const projectedDelta = computeSliceMoneyDelta(run, slice, wheelIndex);
+  const deferMoneyFx = projectedDelta !== 0;
 
   if (shouldDebtShieldBlock(run, adjusted)) {
-    return RunManager.applySliceResult(run, wheelIndex, adjusted, moneyBefore) as RunState;
+    return {
+      run: RunManager.applySliceResult(run, wheelIndex, adjusted, moneyBefore) as RunState,
+    };
   }
-  let next = RunManager.applySliceResult(run, wheelIndex, adjusted, moneyBefore) as RunState;
 
-  const moneyDelta = next.money - moneyBefore;
+  let next = RunManager.applySliceResult(
+    run,
+    wheelIndex,
+    adjusted,
+    moneyBefore,
+    deferMoneyFx
+      ? { skipMoney: true, streakMoneyAfter: moneyBefore + projectedDelta }
+      : undefined
+  ) as RunState;
+
+  const moneyDelta = deferMoneyFx ? projectedDelta : next.money - moneyBefore;
+  const archetype = getArchetypeForWheelIndex(wheelIndex);
 
   let joker = applyJokerEvent(next, jokerEventForSpin(next, wheelIndex));
   next = joker.run;
 
-  if (moneyDelta > 0) {
+  if (moneyDelta > 0 && !deferMoneyFx) {
     const gain = applyJokerEvent(next, {
       type: "onGainMoney",
       amount: moneyDelta,
@@ -132,7 +133,7 @@ export function resolveAndApplyWheel(
     });
     next = gain.run;
     joker.chipsBonus += gain.chipsBonus;
-  } else if (moneyDelta < 0) {
+  } else if (moneyDelta < 0 && !deferMoneyFx) {
     const loss = applyJokerEvent(next, {
       type: "onLoseMoney",
       amount: moneyDelta,
@@ -152,10 +153,48 @@ export function resolveAndApplyWheel(
   const chipTotal = outcome.deltaChips + joker.chipsBonus + streakBonus;
   next = applyChipGain(next, chipTotal);
 
-  return {
-    ...next,
-    pendingJokerOffers: outcome.perkOffers,
+  const result: WheelResolveResult = {
+    run: {
+      ...next,
+      pendingJokerOffers: outcome.perkOffers,
+    },
   };
+
+  if (deferMoneyFx) {
+    result.moneyReveal = { before: moneyBefore, delta: projectedDelta };
+    const projectedBank = moneyBefore + projectedDelta;
+    if (projectedBank > 0 && result.run.phase === "lost_money") {
+      result.run = { ...result.run, phase: "active" };
+    }
+  }
+
+  return result;
+}
+
+export function commitDeferredMoney(run: RunState, delta: number, wheelIndex: number): RunState {
+  if (delta === 0) return run;
+
+  let next = applyMoneyDelta(run, delta) as RunState;
+
+  if (delta > 0) {
+    const gain = applyJokerEvent(next, {
+      type: "onGainMoney",
+      amount: delta,
+      wheelIndex,
+    });
+    next = gain.run;
+    next = applyChipGain(next, gain.chipsBonus);
+    return updatePeakMoney(next);
+  }
+
+  const loss = applyJokerEvent(next, {
+    type: "onLoseMoney",
+    amount: delta,
+    wheelIndex,
+  });
+  next = loss.run;
+  next = applyChipGain(next, loss.chipsBonus);
+  return RunManager.checkRunEnd(next) as RunState;
 }
 
 export { buildWheelOutcome as previewWheelOutcome };

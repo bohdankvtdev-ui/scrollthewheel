@@ -1,4 +1,3 @@
-import "../global.css";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { RunScreen } from "../src/screens/RunScreen";
 

@@ -17,6 +17,12 @@ import {
   forgeUpgradeCost,
   getForgeLevel,
 } from "../game/shop/chipForge";
+import {
+  buyConsumable as purchaseConsumable,
+  consumableCost,
+  CONSUMABLE_CATALOG,
+  type ConsumableId,
+} from "../game/shop/consumables";
 import { pickShopOfferIds, sellRefundAmount, shopRerollCost } from "../game/shop/offers";
 import type { RunState } from "../schemas";
 import { applyPerkAcquisition } from "./PerkSystem";
@@ -101,7 +107,7 @@ export class ShopSystem {
     const withAdv: RunState = {
       ...afterPay,
       advancements,
-      sliceCapacity: getRunMaxSliceCount(advancements),
+      sliceCapacity: getRunMaxSliceCount(afterPay.floor, advancements),
       pendingWheelRebuild: true,
     };
     return { ok: true, run: rebuildWheelsFromDatabase(withAdv) };
@@ -123,6 +129,26 @@ export class ShopSystem {
         },
         refund
       ),
+    };
+  }
+
+  static buyConsumable(run: RunState, id: ConsumableId): ShopBuyResult {
+    return purchaseConsumable(run, id);
+  }
+
+  static consumableNode(run: RunState, id: ConsumableId = "wedge_eraser") {
+    const def = CONSUMABLE_CATALOG[id];
+    const owned = run.inventory?.wedgeEraser ?? 0;
+    const cost = consumableCost(run, id);
+    return {
+      id,
+      name: def.name,
+      description: def.line,
+      icon: def.icon,
+      owned,
+      maxStack: def.maxStack,
+      cost,
+      canAfford: owned < def.maxStack && getSpendableChips(run) >= cost,
     };
   }
 

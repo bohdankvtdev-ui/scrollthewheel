@@ -6,7 +6,7 @@ import {
   applyPerkPercentGain,
 } from "../game/effects/applyPerkEffects";
 import { isJokerSlotFull } from "../game/shop/jokerSlots";
-import { getBlindQuotaForRun, RUN_DEFAULTS } from "../game/loop";
+import { RUN_DEFAULTS } from "../game/loop";
 import { getRunMaxSliceCount, hasAdvancement } from "../game/advancements";
 import { getArchetypeForWheelIndex } from "../game/wheels";
 import type { RunState, SliceCount } from "../schemas";
@@ -19,7 +19,7 @@ import {
 const MAX_SLICES = RUN_DEFAULTS.maxSliceCapacity;
 
 export function getEffectiveSliceCapacity(run: RunState): SliceCount {
-  const fromAdv = getRunMaxSliceCount(run.advancements);
+  const fromAdv = getRunMaxSliceCount(run.floor, run.advancements ?? []);
   return Math.max(run.sliceCapacity, fromAdv) as SliceCount;
 }
 
@@ -70,10 +70,7 @@ export function applyPerkAcquisition(run: RunState, perkId: string): RunState {
     next = { ...next, doubleDownPending: true };
   }
 
-  return {
-    ...next,
-    blindQuota: getBlindQuotaForRun(next.floor, next.perks),
-  };
+  return next;
 }
 
 export function applyMoneyDelta(

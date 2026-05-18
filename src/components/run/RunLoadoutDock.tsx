@@ -1,5 +1,7 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useState } from "react";
+import { useRunStore } from "../../stores/runStore";
 import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
 import { CARD_CATALOG } from "../../data/cards";
 import { PERK_CATALOG } from "../../data/perks";
@@ -24,11 +26,16 @@ export function RunLoadoutDock({ run, highlightPerkId }: RunLoadoutDockProps) {
   const [perkDetailId, setPerkDetailId] = useState<string | null>(null);
   const [chipDetailId, setChipDetailId] = useState<string | null>(null);
 
+  const sliceEraseMode = useRunStore((s) => s.ui.sliceEraseMode);
+  const setSliceEraseMode = useRunStore((s) => s.setSliceEraseMode);
+  const eraserCount = run.inventory?.wedgeEraser ?? 0;
+
   const hasItems =
     run.perks.length > 0 ||
     run.deck.length > 0 ||
     run.debuffs.length > 0 ||
-    run.relics.length > 0;
+    run.relics.length > 0 ||
+    eraserCount > 0;
 
   return (
     <View style={styles.wrap}>
@@ -44,6 +51,28 @@ export function RunLoadoutDock({ run, highlightPerkId }: RunLoadoutDockProps) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.row}
         >
+          {eraserCount > 0 ? (
+            <Pressable
+              onPress={() => setSliceEraseMode(!sliceEraseMode)}
+              style={[styles.eraserChip, sliceEraseMode && styles.eraserChipActive]}
+              accessibilityLabel={`Wedge eraser ${eraserCount}. ${sliceEraseMode ? "Tap a wedge to remove" : "Tap to arm eraser"}`}
+            >
+              <MaterialCommunityIcons
+                name="eraser"
+                size={20}
+                color={sliceEraseMode ? Neo.ink : Neo.neonCyan}
+              />
+              <Text
+                style={[
+                  styles.eraserCount,
+                  sliceEraseMode && styles.eraserCountActive,
+                  { fontFamily: FONT_BEBAS_NEUE },
+                ]}
+              >
+                {eraserCount}
+              </Text>
+            </Pressable>
+          ) : null}
           {run.perks.map((id) => {
             const p = PERK_CATALOG[id];
             if (p == null) return null;
@@ -139,5 +168,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingRight: 18,
     minHeight: RUN_LAYOUT.loadout - 8,
+  },
+  eraserChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 40,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: Neo.borderBold,
+    borderColor: Neo.neonCyan,
+    backgroundColor: "rgba(34,211,238,0.12)",
+  },
+  eraserChipActive: {
+    backgroundColor: Neo.neonCyan,
+    borderColor: Neo.ink,
+  },
+  eraserCount: {
+    fontSize: 16,
+    color: Neo.neonCyan,
+  },
+  eraserCountActive: {
+    color: Neo.ink,
   },
 });

@@ -19,31 +19,41 @@ export type RunEffectId =
   | "lock_drain"
   | "boss_ghost"
   | "corruption_spread"
-  | "doom_spiral";
+  | "doom_spiral"
+  | "boss_perk_tax"
+  | "boss_overhead"
+  | "boss_shield_break"
+  | "boss_chip_cache"
+  | "boss_golden_seal";
 
 export const RUN_EFFECT_LABELS: Record<RunEffectId, string> = {
-  debt_bomb: "Debt Bomb — lose 30% money + curse",
-  lock_drain: "Lock — next wheel forced to Drain",
-  boss_ghost: "Boss Ghost — negatives +20% this cycle",
-  corruption_spread: "Corruption — next 3 wheels get extra reds",
-  doom_spiral: "Doom Spiral — upcoming wheels forced to Chaos",
+  debt_bomb: "Debt Bomb — lose 30% bank + curse",
+  lock_drain: "Locked — next spin is Drain wheel",
+  boss_ghost: "Boss Ghost — more bad slices this cycle",
+  corruption_spread: "Corruption — 3 wheels get extra losses",
+  doom_spiral: "Doom Spiral — next wheels are Chaos",
+  boss_perk_tax: "Joker Tax — lose 5% bank per joker you own",
+  boss_overhead: "Table Fee — lose 12% of bank",
+  boss_shield_break: "Shield Break — lose 1 shield or 15% bank",
+  boss_chip_cache: "Chip Cache — +shop chips (scales with cycle)",
+  boss_golden_seal: "Golden Seal — +$ bank & +1 shield",
 };
 
 /** What each prize family does in the money loop */
 export const PRIZE_TAXONOMY = {
-  money: "Instant cash — run shop currency",
-  money_loss: "Cash hit — blocked by shields",
-  bank_cut: "Percent of bank lost — high stakes",
-  bank_wipe: "All-in risk — shield or bust",
-  perk: "Persistent run upgrade (tap loadout to read)",
-  debuff: "Negative modifier until cleared",
-  relic_offer: "Passive relic — weighted spins / economy",
-  deck_add: "Casino chip — passive modifier in chip row",
-  deck_remove: "Burn last chip — trim weak passives",
-  deck_upgrade: "Upgrade chip tier",
-  neutral: "No effect — breathing room on harsh wheels",
-  booster: "Small cash bump — filler on early wheels",
-  run_effect: "Meta slice — applies temporary run rules",
+  money: "+$ to your bank",
+  money_loss: "−$ from bank (shield blocks once)",
+  bank_cut: "Lose % of bank",
+  bank_wipe: "Lose all bank $ (shield blocks once)",
+  perk: "Free joker for your loadout",
+  debuff: "Bad effect until cleared",
+  relic_offer: "Passive relic — always on",
+  deck_add: "Passive chip in your row",
+  deck_remove: "Remove last chip",
+  deck_upgrade: "Upgrade your best chip",
+  neutral: "No change — safe slice",
+  booster: "Small +$ bump",
+  run_effect: "Special rule this cycle",
 } as const;
 
 export type PerkTier = 0 | 1 | 2 | 3;
@@ -70,26 +80,14 @@ export function getCycleParams(cycleLevel: number): CycleParams {
   const c = Math.max(1, cycleLevel);
   return {
     cycleLevel: c,
-    negativeSliceInject: c >= 2 ? 2 : 0,
-    shopPriceMult: 1 + (c - 1) * 0.12,
-    luckyWeightMult: c >= 2 ? Math.max(0.75, 1 - (c - 1) * 0.06) : 1,
-    globalNegativeBias: (c - 1) * 0.04 + (c >= 2 ? 0.08 : 0),
-    riskWheelIndices: c >= 3 ? [1, 5] : [],
-    doubleBossWheel: c >= 4,
+    negativeSliceInject: c >= 2 ? 2 : c === 1 ? 1 : 0,
+    shopPriceMult: 1 + (c - 1) * 0.1 + (c >= 3 ? (c - 2) * 0.03 : 0),
+    luckyWeightMult: c >= 2 ? Math.max(0.72, 1 - (c - 1) * 0.055) : 1,
+    globalNegativeBias:
+      (c === 1 ? 0.05 : 0) + (c - 1) * 0.045 + (c >= 2 ? 0.06 : 0),
+    riskWheelIndices: c >= 3 ? [1, 5] : c === 2 ? [1] : [],
+    doubleBossWheel: c >= 3,
   };
-}
-
-/** Optional cycle-end bonus — not required to advance */
-export function getBlindQuota(cycleLevel: number, perkIds: string[] = []): number {
-  const f = Math.max(1, cycleLevel);
-  const base = 180 + f * 140 + Math.floor(Math.pow(f - 1, 1.25) * 60);
-  if (perkIds.includes("ante_insurance")) return Math.floor(base * 0.88);
-  return base;
-}
-
-/** Bonus meta chips when bank meets cycle bonus at boss clear */
-export function getCycleBonusChips(cycleLevel: number): number {
-  return 8 + cycleLevel * 4;
 }
 
 /** Each wheel in the cycle gets slightly nastier — stacks with cycle scaling */
@@ -100,11 +98,11 @@ export function getWheelDifficultyBias(wheelIndex: number, cycleLevel: number): 
 }
 
 export const GDD_LOOP_SUMMARY = {
-  hook: "Start with bank cash. Spin 9 wheels per cycle; stack perks; beat the boss wheel to advance.",
+  hook: "Start at $0. Spin 9 wheels per cycle; buy jokers and forge upgrades with chips.",
   lose: "Bank hits $0 — run over.",
-  win: "Survive wheel 9 → cycle bonus chips → harder next cycle.",
+  win: "Clear wheel 9 → next cycle hits harder.",
   chipsNote:
-    "Chips are earned each spin and spent in the joker shop. Money is bank for wheel outcomes.",
+    "Chips = shop currency per run. Bank $ = wedge payouts. Win streaks earn bonus chips and cash.",
 } as const;
 
 /** Config id for a forced archetype override (e.g. Lock → drain wheel) */

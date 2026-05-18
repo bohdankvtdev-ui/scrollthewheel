@@ -1,5 +1,6 @@
 import type { SliceDefinition, SliceCount, WheelDefinition } from "../../../schemas";
-import { SLICES_PER_WHEEL } from "./constants";
+import { MIN_SLICE_COUNT, MAX_SLICE_COUNT } from "../../../schemas/wheel.schema";
+import { getSliceCountForWheel } from "../../advancements/sliceCount";
 import { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
 import type { PrizeDef, WheelConfigEntry, WheelConfigId, WheelPrizeSlot } from "./types";
 import {
@@ -24,6 +25,7 @@ function normalizeLayoutContext(
     cycle: ctx?.cycle ?? 1,
     ownedPerks: ctx?.ownedPerks ?? [],
     advancements: ctx?.advancements ?? [],
+    banishedPrizes: ctx?.banishedPrizes ?? [],
   };
 }
 
@@ -69,9 +71,9 @@ export function buildSlicesFromPrizes(
   wheelId: string,
   cycle: number = 1
 ): SliceDefinition[] {
-  if (prizes.length !== SLICES_PER_WHEEL) {
+  if (prizes.length < MIN_SLICE_COUNT || prizes.length > MAX_SLICE_COUNT) {
     throw new Error(
-      `Wheel "${wheelId}" must have exactly ${SLICES_PER_WHEEL} prizes (got ${prizes.length})`
+      `Wheel "${wheelId}" must have ${MIN_SLICE_COUNT}–${MAX_SLICE_COUNT} prizes (got ${prizes.length})`
     );
   }
   const hasWinner = prizes.some((slot) => slot.chance > 0);
@@ -94,8 +96,14 @@ export function getPrizeSlotsForWheel(
   configId: WheelConfigId,
   ctx?: number | WheelLayoutContext
 ): WheelPrizeSlot[] {
-  const { runId, cycle, ownedPerks, advancements } = normalizeLayoutContext(ctx);
-  return buildPrizeSlotsForWheel(configId, { runId, cycle, ownedPerks, advancements });
+  const { runId, cycle, ownedPerks, advancements, banishedPrizes } = normalizeLayoutContext(ctx);
+  return buildPrizeSlotsForWheel(configId, {
+    runId,
+    cycle,
+    ownedPerks,
+    advancements,
+    banishedPrizes,
+  });
 }
 
 /** Slices for a configured wheel (before floor scaling / capacity padding). */
@@ -117,7 +125,7 @@ export function wheelDefinitionFromConfig(configId: WheelConfigId, floor: number
     wheelConfigId: configId,
     role: entry.role,
     title: f > 1 ? `${entry.title} · F${f}` : entry.title,
-    sliceCount: SLICES_PER_WHEEL as SliceCount,
+    sliceCount: getSliceCountForWheel(f, [], configId as FloorWheelOrderId),
     slicePoolId: "config",
     physicsProfileId: entry.physicsProfileId ?? "default",
     modifiers: entry.modifiers,

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ScrollWheelRound } from "../../features/cash-spin/hooks/useScrollTheWheelRounds";
+import type { ScrollWheelRound } from "../../features/cash-spin/reelStripModel";
 import type { RunState } from "../schemas";
 import type { SpinWheelItem } from "../../types/spin";
 
@@ -10,8 +10,12 @@ export function useRunReelRounds(
 ): ScrollWheelRound[] {
   return useMemo(() => {
     if (run == null) return [];
+    const lastHistByWheel = new Map<number, (typeof run.history)[number]>();
+    for (const h of run.history) {
+      lastHistByWheel.set(h.wheelIndex, h);
+    }
     return run.wheels.map((wheel, i) => {
-      const hist = run.history.filter((h) => h.wheelIndex === i).pop();
+      const hist = lastHistByWheel.get(i);
       const prizeFromHist: SpinWheelItem | null =
         hist != null
           ? {

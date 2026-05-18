@@ -2,7 +2,6 @@ import type { InfiniteScalingParams, RunState, SliceDefinition, WheelDefinition 
 import { getCycleParams, getWheelDifficultyBias, getConfigIdForArchetype } from "../game/gdd";
 import {
   applySliceCapacityFromScaling,
-  getBlindQuotaForRun,
   getScalingParams,
   INFINITE_SCALING,
 } from "../game/loop";
@@ -16,8 +15,7 @@ export { getScalingParams, INFINITE_SCALING };
 export function applyScalingToRun(run: RunState, floor: number): RunState {
   const params = getScalingParams(floor);
   const capacity = applySliceCapacityFromScaling(run.sliceCapacity, params);
-  const blindQuota = getBlindQuotaForRun(floor, run.perks);
-  return { ...run, floor, sliceCapacity: capacity, blindQuota };
+  return { ...run, floor, sliceCapacity: capacity };
 }
 
 export function applyScalingToWheelDef(
@@ -47,7 +45,11 @@ export function applyScalingToWheelDef(
   }
 
   if (cycle.doubleBossWheel && wheel.role === "boss") {
-    forceNegative += 0.06;
+    forceNegative += 0.1;
+  }
+  if (wheel.role === "boss" && run != null) {
+    const perks = run.perks?.length ?? 0;
+    forceNegative += Math.min(0.12, perks * 0.025);
   }
 
   return {

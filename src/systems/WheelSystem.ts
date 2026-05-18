@@ -2,7 +2,10 @@ import { getPipelineForFloor } from "../game/loop";
 
 import { applyAdvancementsToSlices, getSliceCountForWheel } from "../game/advancements";
 import { getConfiguredWheelSlices } from "../game/wheels/database";
-import type { FloorWheelOrderId } from "../game/wheels/database/wheelDatabase";
+import {
+  WHEEL_DATABASE_REVISION,
+  type FloorWheelOrderId,
+} from "../game/wheels/database/wheelDatabase";
 
 import { SLICE_POOLS, type SlicePoolId } from "../game/prizes";
 
@@ -82,11 +85,13 @@ export function buildWheel(
 
   if (scaledDef.wheelConfigId != null) {
 
+    const configKey = scaledDef.wheelConfigId as FloorWheelOrderId;
     rawSlices = getConfiguredWheelSlices(scaledDef.wheelConfigId, scaledDef.id, {
       runId: run.runId,
       cycle: floor,
       ownedPerks: run.perks,
       advancements: run.advancements,
+      banishedPrizes: run.banishedPrizes?.[configKey] ?? [],
     });
     rawSlices = applyAdvancementsToSlices(
       rawSlices,
@@ -245,6 +250,10 @@ export function remapWheelsAfterCapacityChange(run: RunState): RunState {
 
 export function syncRunWheels(run: RunState): RunState {
 
+  if (run.wheelDbRevision !== WHEEL_DATABASE_REVISION) {
+    return { ...rebuildWheelsFromDatabase(run), wheelDbRevision: WHEEL_DATABASE_REVISION };
+  }
+
   if (run.pendingWheelRebuild) return rebuildWheelsFromDatabase(run);
 
   if (run.wheels.length === 0) return rebuildWheelsFromDatabase(run);
@@ -268,7 +277,8 @@ export function syncRunWheels(run: RunState): RunState {
   const mismatch = run.wheels.some((w) => {
     if (w.definition.wheelConfigId != null) {
       const expected = getSliceCountForWheel(
-        run.advancements,
+        run.floor,
+        run.advancements ?? [],
         w.definition.wheelConfigId as FloorWheelOrderId
       );
       return w.slices.length !== expected;

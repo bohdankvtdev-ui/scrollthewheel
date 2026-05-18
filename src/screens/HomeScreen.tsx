@@ -4,9 +4,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { Neo, neoPrimaryButtonStyle, neoSubtitleOnDark, neoTitleOnDark } from "../../theme/neoBrutal";
 import { FONT_BEBAS_NEUE } from "../../theme/fonts";
+import { useMetaStore } from "../stores/metaStore";
+import { formatMoney } from "../utils/formatMoney";
 
 export function HomeScreen() {
   const router = useRouter();
+  const bestFloor = useMetaStore((s) => s.bestFloor);
+  const bestPeakMoney = useMetaStore((s) => s.bestPeakMoney ?? 0);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
@@ -14,18 +18,18 @@ export function HomeScreen() {
         <Text style={[styles.logo, { fontFamily: FONT_BEBAS_NEUE }]}>SpinWheel</Text>
         <Text style={neoSubtitleOnDark(16)}>Pick your run</Text>
 
-        <View style={styles.buttons}>
-          <Pressable
-            style={({ pressed }) => [styles.btn, neoPrimaryButtonStyle(pressed)]}
-            onPress={() => router.push("/cash")}
-          >
-            <MaterialIcons name="attach-money" size={26} color={Neo.ink} />
-            <View style={styles.btnTextWrap}>
-              <Text style={[styles.btnTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Cash Spin</Text>
-              <Text style={styles.btnSub}>Classic reels · swipe & spin</Text>
-            </View>
-          </Pressable>
+        {(bestFloor > 0 || bestPeakMoney > 0) ? (
+          <View style={styles.records}>
+            {bestPeakMoney > 0 ? (
+              <Text style={styles.recordLine}>Best bank {formatMoney(bestPeakMoney)}</Text>
+            ) : null}
+            {bestFloor > 0 ? (
+              <Text style={styles.recordLine}>Best cycle {bestFloor}</Text>
+            ) : null}
+          </View>
+        ) : null}
 
+        <View style={styles.buttons}>
           <Pressable
             style={({ pressed }) => [styles.btn, styles.btnRun, neoPrimaryButtonStyle(pressed)]}
             onPress={() => router.push("/run")}
@@ -33,7 +37,7 @@ export function HomeScreen() {
             <MaterialCommunityIcons name="sword-cross" size={26} color={Neo.ink} />
             <View style={styles.btnTextWrap}>
               <Text style={[styles.btnTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Roguelike Run</Text>
-              <Text style={styles.btnSub}>10 wheels · jokers · meta chips</Text>
+              <Text style={styles.btnSub}>9 wheels · $0 = game over · chip shop</Text>
             </View>
           </Pressable>
 
@@ -68,6 +72,17 @@ const styles = StyleSheet.create({
   logo: {
     ...neoTitleOnDark(48),
     letterSpacing: 1,
+  },
+  records: {
+    marginTop: 8,
+    gap: 4,
+    alignItems: "center",
+  },
+  recordLine: {
+    fontSize: 14,
+    color: "rgba(250,250,250,0.72)",
+    fontFamily: FONT_BEBAS_NEUE,
+    letterSpacing: 0.4,
   },
   buttons: {
     width: "100%",

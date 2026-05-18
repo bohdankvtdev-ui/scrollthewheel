@@ -1,3 +1,4 @@
+import { applyBossRunEffect } from "../boss/bossWheel";
 import type { RunEffectId } from "../gdd";
 import { getConfigIdForArchetype } from "../gdd";
 import type { RunState } from "./types";
@@ -77,6 +78,13 @@ export function applyRunEffect(run: RunState, slice: SliceDefinition, wheelIndex
           },
         };
       }
+      break;
+    case "boss_perk_tax":
+    case "boss_overhead":
+    case "boss_shield_break":
+    case "boss_chip_cache":
+    case "boss_golden_seal":
+      next = applyBossRunEffect(next, effectId);
       break;
     case "doom_spiral": {
       const chaosId = getConfigIdForArchetype("chaos");

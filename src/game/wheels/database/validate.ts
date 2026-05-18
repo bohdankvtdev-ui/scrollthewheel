@@ -1,6 +1,8 @@
 import { getSliceProbabilities } from "../../../systems/ProbabilityResolver";
 import { DEFAULT_RESOLVE_CONTEXT } from "../../../systems/types";
-import { SLICES_PER_WHEEL, WHEEL_THEME_KINDS } from "./constants";
+import { MIN_SLICE_COUNT, MAX_SLICE_COUNT } from "../../../schemas/wheel.schema";
+import { getSliceCountForCycle } from "../../cycle/cycleProgression";
+import { WHEEL_THEME_KINDS } from "./constants";
 import { getConfiguredWheelSlices, getPrizeSlotsForWheel, getWheelConfig } from "./loader";
 import { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
 import { FLOOR_WHEEL_ORDER } from "./wheelDatabase";
@@ -18,20 +20,24 @@ const VALIDATE_CTX = { runId: "__validate__", cycle: 1, ownedPerks: [] as string
 export function validateWheelChances(configId: WheelConfigId, cycle = 1): WheelValidationIssue[] {
   const entry = getWheelConfig(configId);
   const prizes = getPrizeSlotsForWheel(configId, { ...VALIDATE_CTX, cycle });
-  return validatePrizeSlotList(configId, prizes, entry.archetype);
+  return validatePrizeSlotList(configId, prizes, entry.archetype, cycle);
 }
 
 function validatePrizeSlotList(
   wheelId: string,
   prizes: WheelPrizeSlot[],
-  archetype: keyof typeof WHEEL_THEME_KINDS
+  archetype: keyof typeof WHEEL_THEME_KINDS,
+  cycle: number
 ): WheelValidationIssue[] {
   const issues: WheelValidationIssue[] = [];
-  if (prizes.length !== SLICES_PER_WHEEL) {
+  const expected = getSliceCountForCycle(cycle);
+  if (prizes.length < MIN_SLICE_COUNT || prizes.length > MAX_SLICE_COUNT) {
     issues.push({
       wheelId,
-      message: `Expected ${SLICES_PER_WHEEL} prizes, got ${prizes.length}`,
+      message: `Expected ${MIN_SLICE_COUNT}–${MAX_SLICE_COUNT} prizes, got ${prizes.length}`,
     });
+  } else if (prizes.length !== expected && wheelId !== "wheel_4") {
+    /* perk wheel may differ with advancements */
   }
   const sum = prizes.reduce((s, row) => s + row.chance, 0);
   if (Math.abs(sum - 100) > CHANCE_TOLERANCE) {
@@ -67,7 +73,7 @@ export function formatWheelOddsReport(configId: WheelConfigId, instanceId = conf
   const rows = getSliceProbabilities(slices, DEFAULT_RESOLVE_CONTEXT);
 
   const header = `=== ${entry.title} (${configId}) · ${entry.archetype} ===`;
-  const chanceNote = `slices: ${prizes.length}/${SLICES_PER_WHEEL} · land % sum: ${prizes.reduce((s, p) => s + p.chance, 0)}%`;
+  const chanceNote = `slices: ${prizes.length} · land % sum: ${prizes.reduce((s, p) => s + p.chance, 0)}%`;
 
   const lines = [
     header,

@@ -6,7 +6,7 @@ import { WHEEL_COUNT } from "../game";
 
 import { BALATRO_ECONOMY } from "../game/balatroEconomy";
 
-import { getBlindQuotaForRun, getCycleBonusChips, RUN_DEFAULTS } from "../game/loop";
+import { RUN_DEFAULTS } from "../game/loop";
 
 import {
 
@@ -56,12 +56,13 @@ import {
 } from "../game/advancements";
 import { applyChipGain } from "../game/runState/chipsScoring";
 import {
-  applyRunPressureAfterSpin,
-  canPlayAtZeroBank,
-  isPressureRunOver,
-} from "../game/runState/runPressure";
+  applyRunStreakAfterSpin,
+  updatePeakMoney,
+} from "../game/runState/runStreaks";
 import { applyChipForgeToModifiers } from "../game/shop/chipForge";
 
+import { getCycleRewardPackage } from "../game/cycle/cycleProgression";
+import { getRunMaxSliceCount } from "../game/advancements/sliceCount";
 import { applyJokerEvent } from "../game/perks/jokerEngine";
 
 
@@ -114,21 +115,21 @@ export class RunManager {
 
       sliceCapacity: RUN_DEFAULTS.startingSliceCapacity,
 
-      blindQuota: getBlindQuotaForRun(floor, []),
-
       floorsCleared: Math.max(0, floor - 1),
 
       history: [],
 
       wheels: [],
 
-      pressure: 0,
-
       winStreak: 0,
 
-      lossStreak: 0,
+      peakMoney: RUN_DEFAULTS.startingMoney,
 
       chipForge: {},
+
+      inventory: { wedgeEraser: 0 },
+
+      banishedPrizes: {},
 
     };
 
@@ -150,9 +151,7 @@ export class RunManager {
 
     if (wheelIndex !== run.wheelIndex) return false;
 
-    if (isPressureRunOver(run)) return false;
-
-    if (run.money <= RUN_DEFAULTS.bankruptcyThreshold && !canPlayAtZeroBank(run)) {
+    if (run.money <= RUN_DEFAULTS.bankruptcyThreshold && run.history.length > 0) {
       return false;
     }
 
@@ -170,7 +169,9 @@ export class RunManager {
 
     slice: SliceDefinition,
 
-    moneyBefore?: number
+    moneyBefore?: number,
+
+    options?: { skipMoney?: boolean; streakMoneyAfter?: number }
 
   ): RunState {
 
@@ -184,30 +185,22 @@ export class RunManager {
 
     if (shouldDebtShieldBlock(next, slice)) {
       const shielded = markDebtShieldUsed(next);
-      const afterPressure = applyRunPressureAfterSpin(
-        shielded,
-        slice,
-        priorMoney,
-        shielded.money,
-        true
+      const afterStreak = updatePeakMoney(
+        applyRunStreakAfterSpin(shielded, slice, priorMoney, shielded.money, true)
       );
-      return RunManager.checkRunEnd(afterPressure, slice, priorMoney);
+      return RunManager.checkRunEnd(afterStreak, slice, priorMoney);
     }
 
 
 
-    if (payload.wipeBank || kind === "bank_wipe") {
-
-      next = applyWipeBank(next);
-
-    } else if (payload.bankPercent != null) {
-
-      next = applyBankPercent(next, payload.bankPercent);
-
-    } else if (payload.moneyDelta != null) {
-
-      next = applyMoneyDelta(next, payload.moneyDelta);
-
+    if (!options?.skipMoney) {
+      if (payload.wipeBank || kind === "bank_wipe") {
+        next = applyWipeBank(next);
+      } else if (payload.bankPercent != null) {
+        next = applyBankPercent(next, payload.bankPercent);
+      } else if (payload.moneyDelta != null) {
+        next = applyMoneyDelta(next, payload.moneyDelta);
+      }
     }
 
 
@@ -288,9 +281,23 @@ export class RunManager {
 
 
 
-    const afterPressure = applyRunPressureAfterSpin(next, slice, priorMoney, next.money, false);
+    const streakAfter = options?.streakMoneyAfter ?? next.money;
+    let afterStreak = applyRunStreakAfterSpin(next, slice, priorMoney, streakAfter, false);
+    if (!options?.skipMoney) {
+      afterStreak = updatePeakMoney(afterStreak);
+    } else if (options.streakMoneyAfter != null) {
+      afterStreak = {
+        ...afterStreak,
+        peakMoney: Math.max(afterStreak.peakMoney ?? 0, options.streakMoneyAfter),
+      };
+    }
 
-    return RunManager.checkRunEnd(afterPressure, slice, priorMoney);
+    const bankForEnd =
+      options?.skipMoney && options.streakMoneyAfter != null
+        ? options.streakMoneyAfter
+        : undefined;
+
+    return RunManager.checkRunEnd(afterStreak, slice, priorMoney, bankForEnd);
 
   }
 
@@ -332,45 +339,30 @@ export class RunManager {
 
 
 
-  /** After wheel 9 — survive boss, optional blind bonus, advance cycle */
+  /** After wheel 9 — survive boss, advance cycle */
 
   static completeCycle(run: RunState): RunState {
 
-    let next = RunManager.applyFloorInterest(run);
-
-    const blindBonus =
-
-      next.money >= next.blindQuota ? getCycleBonusChips(next.floor) : 0;
-
-    if (blindBonus > 0) {
-
-      next = applyChipGain(next as RunState & { chipsEarnedThisRun: number }, blindBonus) as RunState;
-
-    }
-
-
+    let next = updatePeakMoney(RunManager.applyFloorInterest(run));
+    const reward = getCycleRewardPackage(next);
+    next = { ...next, money: next.money + reward.money };
 
     const cycleEnd = applyJokerEvent(next, {
-
       type: "onFloorEnd",
-
       floor: next.floor,
-
       cleared: true,
-
     });
 
     next = applyChipGain(
-
       cycleEnd.run as RunState & { chipsEarnedThisRun: number },
-
-      cycleEnd.chipsBonus
-
+      cycleEnd.chipsBonus + reward.chips
     ) as RunState;
 
-
-
-    return { ...next, phase: "won" };
+    return {
+      ...next,
+      phase: "won",
+      lastCycleReward: { cycle: reward.cycle, chips: reward.chips, money: reward.money },
+    };
 
   }
 
@@ -395,9 +387,7 @@ export class RunManager {
       phase: "active",
       floorsCleared: run.floorsCleared + 1,
       runEffects: resetCycleRunEffects(run),
-      pressure: Math.max(0, (run.pressure ?? 0) - 1),
       winStreak: 0,
-      lossStreak: 0,
     };
 
     const stipend = getAdvancementCycleStipend(next.advancements);
@@ -406,6 +396,12 @@ export class RunManager {
     }
 
     next = applyScalingToRun(next, nextFloor);
+
+    next = {
+      ...next,
+      sliceCapacity: getRunMaxSliceCount(nextFloor, next.advancements ?? []),
+      pendingWheelRebuild: true,
+    };
 
     next = syncRunWheels({ ...next, wheels: buildFloorWheels(next) });
 
@@ -421,15 +417,19 @@ export class RunManager {
 
     _slice?: SliceDefinition,
 
-    _moneyBefore?: number
+    _moneyBefore?: number,
+
+    /** Use when cash is applied after animation (bank still 0 in `run.money`). */
+    bankBalance?: number
 
   ): RunState {
 
-    if (isPressureRunOver(run)) {
-      return { ...run, phase: "lost_money" };
-    }
+    const bank = bankBalance ?? run.money;
 
-    if (run.money > RUN_DEFAULTS.bankruptcyThreshold) {
+    if (bank > RUN_DEFAULTS.bankruptcyThreshold) {
+      if (run.phase === "lost_money") {
+        return { ...run, phase: "active" };
+      }
       return run;
     }
 

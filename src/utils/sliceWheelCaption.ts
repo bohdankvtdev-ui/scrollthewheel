@@ -23,11 +23,11 @@ export function sliceWheelCaption(slice: SliceDefinition): string {
   if (payload.wipeBank || kind === "bank_wipe") return "ALL";
 
   if (payload.bankPercent != null && payload.bankPercent < 0) {
-    return `-${Math.round(Math.abs(payload.bankPercent) * 100)}`;
+    return `-${Math.round(Math.abs(payload.bankPercent) * 100)}%`;
   }
 
   if (payload.bankPercent != null && payload.bankPercent > 0) {
-    return payload.bankPercent >= 1 ? "×2" : `+${Math.round(payload.bankPercent * 100)}`;
+    return payload.bankPercent >= 1 ? "×2" : `+${Math.round(payload.bankPercent * 100)}%`;
   }
 
   if (payload.moneyDelta != null && payload.moneyDelta > 0) {

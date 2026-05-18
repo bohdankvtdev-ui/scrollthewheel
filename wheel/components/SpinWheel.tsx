@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useId, useImperativeHandle, useMemo, useRef } from "react";
+import React, { forwardRef, memo, useEffect, useId, useImperativeHandle, useMemo, useRef } from "react";
 import {
   Animated,
   Dimensions,
@@ -273,13 +273,20 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   /** Nudge above rim so the pointer sits on the colored circle (higher = closer to top). */
   const pointerTop = discTopY - Math.round(12 + size * 0.014);
 
-  const arcs = d3Shape.pie<SpinWheelItem>().value(() => 1)(data);
-  const arcGenerator = d3Shape
-    .arc<d3Shape.PieArcDatum<SpinWheelItem>>()
-    .outerRadius(size / 2 - SPIN_WHEEL_PRIZE_RING_OUTER_INSET)
-    .innerRadius(innerRadius)
-    .cornerRadius(cornerR)
-    .padAngle(segmentPadAngle);
+  const arcs = useMemo(
+    () => d3Shape.pie<SpinWheelItem>().value(() => 1)(data),
+    [data]
+  );
+  const arcGenerator = useMemo(
+    () =>
+      d3Shape
+        .arc<d3Shape.PieArcDatum<SpinWheelItem>>()
+        .outerRadius(size / 2 - SPIN_WHEEL_PRIZE_RING_OUTER_INSET)
+        .innerRadius(innerRadius)
+        .cornerRadius(cornerR)
+        .padAngle(segmentPadAngle),
+    [cornerR, innerRadius, segmentPadAngle, size]
+  );
 
   const labelPull = showSliceIcons && showSliceText ? 1.22 : 1.08;
 
@@ -640,7 +647,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   );
 });
 
-export default SpinWheel;
+export default memo(SpinWheel);
 
 const styles = StyleSheet.create({
   container: {

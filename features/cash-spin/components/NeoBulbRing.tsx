@@ -332,7 +332,7 @@ export type NeoBulbRingProps = {
 /**
  * Bulb ring around the prize disc — chase + victory flash; ring tint follows active wheel.
  */
-export function NeoBulbRing({ layout, phase, palette: paletteProp }: NeoBulbRingProps) {
+export const NeoBulbRing = memo(function NeoBulbRing({ layout, phase, palette: paletteProp }: NeoBulbRingProps) {
   const palette = paletteProp ?? getBulbRingPalette("money");
   const gradId = useId().replace(/:/g, "");
   const bulbCount = layout.bulbs.length;
@@ -472,4 +472,4 @@ export function NeoBulbRing({ layout, phase, palette: paletteProp }: NeoBulbRing
       />
     </View>
   );
-}
+});

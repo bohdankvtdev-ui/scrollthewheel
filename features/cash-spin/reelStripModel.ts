@@ -1,4 +1,11 @@
-import type { ScrollWheelRound } from "./hooks/useScrollTheWheelRounds";
+import type { SpinWheelItem } from "../../types/spin";
+
+export type RoundStatus = "locked" | "ready" | "won" | "claimed";
+
+export type ScrollWheelRound = {
+  status: RoundStatus;
+  prize: SpinWheelItem | null;
+};
 
 /**
  * Furthest index the player may park the strip on (forward-only reel).

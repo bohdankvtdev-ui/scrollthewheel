@@ -9,8 +9,9 @@
  * Tuning: adjust `COMPACT_WINDOW_AREA` or `COMPACT_STRIP_INTENSITY` if QA reports a device class.
  */
 
-/** `width * height` (logical px²) below this ⇒ treat as compact / weaker GPU tier for strip extras. */
-export const COMPACT_WINDOW_AREA = 420_000;
+import { COMPACT_WINDOW_AREA, isCompactWindow } from "../../src/utils/deviceTier";
+
+export { COMPACT_WINDOW_AREA };
 
 /** Strip visual multiplier when compact (not reduce-motion): keep a hint of scrim, not full cost. */
 export const COMPACT_STRIP_INTENSITY = 0.55;
@@ -22,7 +23,7 @@ export const COMPACT_STRIP_INTENSITY = 0.55;
 export const WHEEL_FROST_INTENSITY_REDUCE_MOTION = 0.48;
 
 export function isCompactCashSpinWindow(width: number, height: number): boolean {
-  return Math.round(width * height) < COMPACT_WINDOW_AREA;
+  return isCompactWindow(width, height);
 }
 
 /**

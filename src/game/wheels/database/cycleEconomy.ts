@@ -8,7 +8,7 @@ export const CYCLE_ECONOMY = {
   /** Flat $ prizes: ~18% compound per cycle cleared */
   moneyGrowthPerCycle: 0.14,
   /** Losses scale closer to gains — wrong calls hurt more over time */
-  lossGrowthPerCycle: 0.13,
+  lossGrowthPerCycle: 0.14,
   /** Bank % gains: base at cycle 1, +0.8% per cycle */
   percentGainBase: 0.035,
   percentGainStep: 0.008,
@@ -98,6 +98,11 @@ export function applyCycleEconomyToPayload(
 
   if (typeof p.bankPercent === "number" && p.bankPercent > 0 && p.bankPercent < 1) {
     p.bankPercent = roundPercent(p.bankPercent + (cycle - 1) * CYCLE_ECONOMY.percentGainStep);
+  }
+  if (typeof p.bankPercent === "number" && p.bankPercent < 0 && p.bankPercent > -1) {
+    p.bankPercent = -roundPercent(
+      Math.abs(p.bankPercent) + (cycle - 1) * CYCLE_ECONOMY.percentGainStep * 0.65
+    );
   }
 
   return p;

@@ -3,7 +3,7 @@ import { CARD_CATALOG } from "../data/cards";
 import { DEBUFF_CATALOG } from "../data/debuffs";
 import { PERK_CATALOG } from "../data/perks";
 import { RELIC_CATALOG } from "../data/relics";
-import { GDD_LOOP_SUMMARY, GDD_PACING, PRIZE_TAXONOMY, getBlindQuota } from "./gdd";
+import { GDD_LOOP_SUMMARY, GDD_PACING, PRIZE_TAXONOMY } from "./gdd";
 import {
   getScalingParams,
   INFINITE_SCALING,
@@ -22,7 +22,6 @@ export type GameContentSnapshot = {
   runDefaults: typeof RUN_DEFAULTS;
   infiniteScaling: typeof INFINITE_SCALING;
   scalingPreview: ReturnType<typeof getScalingParams>[];
-  blindQuotaPreview: number[];
   wheelRotation: typeof WHEEL_ROTATION;
   shopTree: typeof SHOP_PERK_TREE;
   slicePoolIds: readonly string[];
@@ -45,7 +44,6 @@ export function buildGameContentSnapshot(): GameContentSnapshot {
     runDefaults: RUN_DEFAULTS,
     infiniteScaling: INFINITE_SCALING,
     scalingPreview: [1, 2, 3, 5, 10].map(getScalingParams),
-    blindQuotaPreview: [1, 2, 3, 5, 8].map((f) => getBlindQuota(f)),
     wheelRotation: WHEEL_ROTATION,
     shopTree: SHOP_PERK_TREE,
     slicePoolIds: SLICE_POOL_IDS,

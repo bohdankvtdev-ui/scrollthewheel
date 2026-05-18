@@ -3,7 +3,6 @@ export {
   GDD_PACING,
   GDD_LOOP_SUMMARY,
   PRIZE_TAXONOMY,
-  getBlindQuota,
   getWheelDifficultyBias,
   PERK_TIER_LABELS,
 } from "./gdd";

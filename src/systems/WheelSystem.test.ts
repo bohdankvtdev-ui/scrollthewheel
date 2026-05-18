@@ -17,6 +17,7 @@ describe("WheelSystem", () => {
 
   it("shop sells perks for chips without spending bank money", () => {
     let run = RunManager.createInitialRun(1);
+    run = { ...run, chipsEarnedThisRun: 20 };
     const moneyBefore = run.money;
     const bought = ShopSystem.buy(run, "lucky_streak");
     expect(bought.ok).toBe(true);

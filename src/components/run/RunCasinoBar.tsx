@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -14,22 +14,47 @@ import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import type { RunState } from "../../schemas";
-import { RUN_PRESSURE } from "../../game/runState/runPressure";
 import { formatMoney } from "../../utils/formatMoney";
+
+/** Bank count-up / count-down duration (ms). */
+const MONEY_COUNT_MS = 2200;
+/** Brief red flash on bank total after a loss (ms). */
+const LOSS_RED_HOLD_MS = 500;
+
+const LOSS_MONEY = "#FF5C5C";
+
+type MoneyReveal = { before: number; delta: number };
 
 type RunCasinoBarProps = {
   run: RunState;
+  moneyReveal?: MoneyReveal | null;
+  onMoneyRevealDone?: () => void;
   shopHighlighted?: boolean;
   onShop: () => void;
   onReset: () => void;
 };
 
-export function RunCasinoBar({ run, shopHighlighted = false, onShop, onReset }: RunCasinoBarProps) {
+export function RunCasinoBar({
+  run,
+  moneyReveal = null,
+  onMoneyRevealDone,
+  shopHighlighted = false,
+  onShop,
+  onReset,
+}: RunCasinoBarProps) {
   const router = useRouter();
   const runChips = run.chipsEarnedThisRun ?? 0;
-  const pressure = run.pressure ?? 0;
   const winStreak = run.winStreak ?? 0;
   const pulse = useSharedValue(1);
+  const moneyPop = useSharedValue(1);
+  const [shownMoney, setShownMoney] = useState(run.money);
+  const [lossTintActive, setLossTintActive] = useState(false);
+  const onDoneRef = useRef(onMoneyRevealDone);
+  onDoneRef.current = onMoneyRevealDone;
+
+  const revealKey =
+    moneyReveal != null ? `${moneyReveal.before}:${moneyReveal.delta}` : null;
+  const isLossReveal = moneyReveal != null && moneyReveal.delta < 0;
 
   useEffect(() => {
     if (!shopHighlighted) {
@@ -50,18 +75,92 @@ export function RunCasinoBar({ run, shopHighlighted = false, onShop, onReset }: 
     opacity: shopHighlighted ? 1 : 0,
   }));
 
+  useEffect(() => {
+    if (revealKey == null) {
+      setShownMoney(run.money);
+      return;
+    }
+
+    const sep = revealKey.indexOf(":");
+    const before = Number(revealKey.slice(0, sep));
+    const delta = Number(revealKey.slice(sep + 1));
+    const end = Math.max(0, before + delta);
+    const isLoss = delta < 0;
+    let raf = 0;
+    let finished = false;
+
+    setShownMoney(before);
+    setLossTintActive(false);
+
+    moneyPop.value = withSequence(
+      withTiming(1.1, { duration: 220 }),
+      withTiming(1, { duration: 280 })
+    );
+
+    const t0 = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / MONEY_COUNT_MS);
+      const eased = 1 - (1 - t) ** 3;
+      setShownMoney(Math.max(0, Math.round(before + delta * eased)));
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      if (finished) return;
+      finished = true;
+      setShownMoney(end);
+      if (isLoss) setLossTintActive(true);
+      onDoneRef.current?.();
+    };
+
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+    };
+  }, [revealKey, moneyPop]);
+
+  useEffect(() => {
+    if (!lossTintActive) return;
+    const t = setTimeout(() => setLossTintActive(false), LOSS_RED_HOLD_MS);
+    return () => clearTimeout(t);
+  }, [lossTintActive]);
+
+  const moneyAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: moneyPop.value }],
+  }));
+
+  const moneyColor = lossTintActive ? LOSS_MONEY : Neo.neonYellow;
+
   return (
     <View style={styles.wrap}>
       <View style={styles.chipBlock} accessibilityLabel={`${runChips} chips this run`}>
         <MaterialCommunityIcons name="poker-chip" size={18} color={Neo.neonCyan} />
         <Text style={[styles.chipVal, { fontFamily: FONT_BEBAS_NEUE }]}>{runChips}</Text>
       </View>
-      <View style={styles.moneyBlock}>
-        <Text style={[styles.moneyPrefix, { fontFamily: FONT_BEBAS_NEUE }]}>$</Text>
-        <Text style={[styles.moneyVal, { fontFamily: FONT_BEBAS_NEUE }]} numberOfLines={1}>
-          {formatMoney(run.money)}
+      <Animated.View style={[styles.moneyBlock, moneyAnimStyle]}>
+        <Text style={[styles.moneyPrefix, { fontFamily: FONT_BEBAS_NEUE, color: moneyColor }]}>
+          $
         </Text>
-      </View>
+        <Text
+          style={[styles.moneyVal, { fontFamily: FONT_BEBAS_NEUE, color: moneyColor }]}
+          numberOfLines={1}
+        >
+          {formatMoney(moneyReveal != null ? shownMoney : run.money)}
+        </Text>
+        {moneyReveal != null ? (
+          <Text
+            style={[
+              styles.moneyDelta,
+              isLossReveal ? styles.moneyDeltaLoss : styles.moneyDeltaGain,
+              { fontFamily: FONT_BEBAS_NEUE },
+            ]}
+          >
+            {isLossReveal ? "−" : "+"}
+            {formatMoney(Math.abs(moneyReveal.delta))}
+          </Text>
+        ) : null}
+      </Animated.View>
 
       <View style={styles.slicePill} accessibilityLabel={`${run.sliceCapacity} slices`}>
         <Text style={[styles.sliceText, { fontFamily: FONT_BEBAS_NEUE }]}>
@@ -70,17 +169,8 @@ export function RunCasinoBar({ run, shopHighlighted = false, onShop, onReset }: 
         </Text>
       </View>
 
-      <View style={styles.pressurePill} accessibilityLabel={`Heat ${pressure} of ${RUN_PRESSURE.max}`}>
-        {Array.from({ length: RUN_PRESSURE.max }, (_, i) => (
-          <View
-            key={i}
-            style={[styles.pressureDot, i < pressure && styles.pressureDotHot]}
-          />
-        ))}
-      </View>
-
       {winStreak >= 2 ? (
-        <View style={styles.streakPill}>
+        <View style={styles.streakPill} accessibilityLabel={`Win streak ${winStreak}`}>
           <MaterialIcons name="whatshot" size={14} color={Neo.ink} />
           <Text style={[styles.streakText, { fontFamily: FONT_BEBAS_NEUE }]}>{winStreak}</Text>
         </View>
@@ -154,63 +244,56 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   moneyPrefix: {
     fontSize: 20,
-    color: Neo.neonYellow,
     opacity: 0.85,
   },
   moneyVal: {
     fontSize: 28,
-    color: Neo.neonYellow,
     letterSpacing: 0.5,
     flexShrink: 1,
   },
-  slicePill: {
-    minWidth: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Neo.neonCyan,
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-  },
-  sliceText: {
+  moneyDelta: {
     fontSize: 15,
-    color: Neo.ink,
+    marginLeft: 6,
+    letterSpacing: 0.3,
   },
-  pressurePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
+  moneyDeltaGain: {
+    color: Neo.neonCyan,
+  },
+  moneyDeltaLoss: {
+    color: LOSS_MONEY,
+  },
+  slicePill: {
+    minWidth: 36,
     height: 32,
-    paddingHorizontal: 6,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: Neo.borderThin,
     borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  pressureDot: {
-    width: 7,
-    height: 14,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  pressureDotHot: {
-    backgroundColor: "#FB7185",
+  sliceText: {
+    fontSize: 16,
+    color: Neo.textOnDark,
+    letterSpacing: 0.3,
   },
   streakPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
-    height: 32,
-    paddingHorizontal: 6,
+    gap: 3,
+    paddingHorizontal: 8,
+    height: 28,
+    borderRadius: 8,
     backgroundColor: Neo.neonYellow,
     borderWidth: Neo.borderThin,
     borderColor: Neo.ink,
-    borderRadius: 8,
   },
   streakText: {
     fontSize: 14,
@@ -219,19 +302,20 @@ const styles = StyleSheet.create({
   shieldPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
-    height: 32,
+    gap: 3,
     paddingHorizontal: 8,
-    backgroundColor: "#FEF9C3",
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#A7F3D0",
     borderWidth: Neo.borderThin,
     borderColor: Neo.ink,
-    borderRadius: 8,
   },
   shieldText: {
     fontSize: 14,
     color: Neo.ink,
   },
   shopWrap: {
+    position: "relative",
     width: 40,
     height: 40,
     alignItems: "center",
@@ -239,12 +323,12 @@ const styles = StyleSheet.create({
   },
   shopHighlightRing: {
     position: "absolute",
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: Neo.borderBold,
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 3,
     borderColor: Neo.neonCyan,
-    backgroundColor: "rgba(34,211,238,0.2)",
+    backgroundColor: "rgba(34,211,238,0.15)",
   },
   shopBtn: {
     width: 40,
@@ -257,9 +341,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   shopBtnHighlighted: {
-    backgroundColor: "#FFF566",
-    borderColor: Neo.neonCyan,
-    borderWidth: Neo.borderBold + 1,
+    backgroundColor: Neo.neonCyan,
   },
   iconBtn: {
     width: 36,
@@ -267,5 +349,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: Neo.borderThin,
+    borderColor: "rgba(255,255,255,0.15)",
   },
 });

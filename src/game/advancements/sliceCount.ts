@@ -1,11 +1,13 @@
 import type { SliceCount } from "../../schemas";
+import { clampSliceCount } from "../../schemas/wheel.schema";
+import { getSliceCountForCycle } from "../cycle/cycleProgression";
 import { FLOOR_WHEEL_ORDER } from "../wheels/database/wheelDatabase";
 import type { WheelConfigId } from "../wheels/database/types";
 import { hasAdvancement } from "./advancementCatalog";
 
 export const BASE_SLICES_PER_WHEEL = 6;
 
-/** Extra wedges added by advancements on a given wheel (0–3). */
+/** Extra wedges from advancements on a given wheel (0–3). */
 export function getExtraSlicesForWheel(
   advancements: string[] = [],
   wheelConfigId: WheelConfigId
@@ -23,20 +25,21 @@ export function getExtraSlicesForWheel(
   return extra;
 }
 
+/** Base wedge count from cycle scaling; advancement injects add slices separately in `applyAdvancementsToSlices`. */
 export function getSliceCountForWheel(
-  advancements: string[] = [],
-  wheelConfigId: WheelConfigId
+  cycle: number,
+  _advancements: string[] = [],
+  _wheelConfigId: WheelConfigId
 ): number {
-  return BASE_SLICES_PER_WHEEL + getExtraSlicesForWheel(advancements, wheelConfigId);
+  return clampSliceCount(getSliceCountForCycle(cycle));
 }
 
-/** Run-wide max wedge count (drives wheel renderer + sliceCapacity). */
-export function getRunMaxSliceCount(advancements: string[] = []): SliceCount {
+/** Run-wide max wedge count (cycle scaling + advancement injects). */
+export function getRunMaxSliceCount(cycle: number, advancements: string[] = []): SliceCount {
+  const base = getSliceCountForCycle(cycle);
   const max = Math.max(
     BASE_SLICES_PER_WHEEL,
-    ...FLOOR_WHEEL_ORDER.map((id) => getSliceCountForWheel(advancements, id))
+    ...FLOOR_WHEEL_ORDER.map((id) => base + getExtraSlicesForWheel(advancements, id))
   );
-  const allowed: SliceCount[] = [6, 7, 8, 9, 10, 12];
-  const picked = allowed.filter((n) => n >= max).sort((a, b) => a - b)[0];
-  return (picked ?? 12) as SliceCount;
+  return clampSliceCount(max);
 }

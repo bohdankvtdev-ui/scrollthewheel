@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeMaxActiveIndex } from "./reelStripModel";
-import type { ScrollWheelRound } from "./hooks/useScrollTheWheelRounds";
+import type { ScrollWheelRound } from "./reelStripModel";
 
 function rounds(...statuses: ScrollWheelRound["status"][]): ScrollWheelRound[] {
   return statuses.map((status) => ({ status, prize: null }));

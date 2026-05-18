@@ -26,7 +26,15 @@ export type RunModifiersPersisted = {
 };
 
 export type ChipForgeLevels = Partial<
-  Record<"forge_cash" | "forge_guard" | "forge_chips" | "forge_barrier", number>
+  Record<
+    | "forge_cash"
+    | "forge_guard"
+    | "forge_chips"
+    | "forge_percent"
+    | "forge_barrier"
+    | "forge_hot",
+    number
+  >
 >;
 
 /** Temporary rules from complexity slices (Lock, Corruption, Doom Spiral, …). */
@@ -58,17 +66,15 @@ export type RunState = {
   /** Repeatable chip-forge levels (in-run shop). */
   chipForge?: ChipForgeLevels;
   forgeShieldsGranted?: number;
-  /** Heat 0–5 — lose at 5. Bad spins add; wins remove. */
-  pressure?: number;
+  /** Consecutive winning spins — chip/cash bonuses only. */
   winStreak?: number;
-  lossStreak?: number;
+  /** Highest bank $ reached this run (player record). */
+  peakMoney?: number;
   /** Blocks money-loss slices (Iron Reserve). */
   shields?: number;
   debuffs: string[];
   relics: string[];
   sliceCapacity: SliceCount;
-  /** Cash required to clear this floor after all 9 wheels. */
-  blindQuota: number;
   /** Floors fully cleared before this one — for Compounder perk. */
   floorsCleared: number;
   /** Capacity bumped; rebuild wheels on next spin or wheel advance. */
@@ -79,6 +85,12 @@ export type RunState = {
   history: SpinEvent[];
   /** Matches `WHEEL_DATABASE_REVISION` — rebuild wheels when stale. */
   wheelDbRevision?: number;
+  /** Consumables — tap in loadout, then tap a wedge to use. */
+  inventory?: { wedgeEraser?: number };
+  /** Prize catalog ids removed from specific wheels (player choice). */
+  banishedPrizes?: Partial<Record<string, string[]>>;
+  /** Last cycle reward shown on clear overlay. */
+  lastCycleReward?: { cycle: number; chips: number; money: number };
 };
 
 export type InfiniteScalingParams = {

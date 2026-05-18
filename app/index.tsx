@@ -1,4 +1,3 @@
-import "../global.css";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { HomeScreen } from "../src/screens/HomeScreen";
 

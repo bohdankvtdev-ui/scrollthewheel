@@ -1,20 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { GDD_PACING, getBlindQuota, getCycleParams, getWheelDifficultyBias } from "./gdd";
+import { GDD_PACING, getCycleParams, getWheelDifficultyBias } from "./gdd";
 
 describe("GDD pacing", () => {
   it("uses 9 wheels per cycle", () => {
     expect(GDD_PACING.wheelsPerCycle).toBe(9);
-  });
-
-  it("raises cycle bonus quota each cycle", () => {
-    expect(getBlindQuota(2)).toBeGreaterThan(getBlindQuota(1));
-    expect(getBlindQuota(5)).toBeGreaterThan(getBlindQuota(3));
-  });
-
-  it("ante insurance lowers quota", () => {
-    const base = getBlindQuota(3, []);
-    const insured = getBlindQuota(3, ["ante_insurance"]);
-    expect(insured).toBeLessThan(base);
   });
 
   it("wheel difficulty ramps within cycle", () => {

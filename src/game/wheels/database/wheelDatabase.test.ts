@@ -7,7 +7,7 @@ import {
 import { getSliceProbabilities } from "../../../systems/ProbabilityResolver";
 import { DEFAULT_RESOLVE_CONTEXT } from "../../../systems/types";
 import { SLICES_PER_WHEEL } from "./constants";
-import { buildSlicesFromPrizes, getConfiguredWheelSlices } from "./loader";
+import { buildSlicesFromPrizes, getConfiguredWheelSlices, getPrizeSlotsForWheel } from "./loader";
 import { validateAllWheels, formatWheelOddsReport } from "./validate";
 import { FLOOR_WHEEL_ORDER } from "./wheelDatabase";
 
@@ -42,20 +42,26 @@ describe("wheelDatabase", () => {
     expect(probs.find((p) => p.label === "+$120")?.probability).toBe(0);
   });
 
-  it("percent wheel cycle 1 uses +4/+5/+7 gains without −10%", () => {
+  it("percent wheel cycle 1 is ±5% / 10% / 15% of bank", () => {
     const c1 = getConfiguredWheelSlices("wheel_2", "wheel_2", 1);
+    expect(c1).toHaveLength(6);
     const labels = c1.map((s) => s.label);
-    expect(labels).toContain("+4%");
     expect(labels).toContain("+5%");
-    expect(labels).toContain("+7%");
+    expect(labels).toContain("+10%");
+    expect(labels).toContain("+15%");
+    expect(labels).toContain("−5%");
     expect(labels).toContain("−10%");
-    expect(c1.every((s) => s.kind !== "bank_cut" || s.icon === "percent")).toBe(true);
+    expect(labels).toContain("−15%");
+    expect(c1.every((s) => s.kind === "bank_cut")).toBe(true);
     expect(c1.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
   });
 
-  it("percent wheel cycle 2+ adds −10% loss wedge", () => {
+  it("percent wheel cycle 2+ adds ±30% to the pool", () => {
+    const slots = getPrizeSlotsForWheel("wheel_2", 2);
+    expect(slots.some((s) => s.prize === "bank_gain_30")).toBe(true);
+    expect(slots.some((s) => s.prize === "bank_loss_30")).toBe(true);
     const c2 = getConfiguredWheelSlices("wheel_2", "wheel_2_f2", 2);
-    expect(c2.map((s) => s.label)).toContain("−10%");
+    expect(c2.length).toBeGreaterThanOrEqual(8);
     expect(c2.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
   });
 
@@ -93,11 +99,10 @@ describe("wheelDatabase", () => {
     expect(rareLucky).toBeLessThan(rareBase);
   });
 
-  it("wheel_1 is money-only with same cash icon", () => {
+  it("wheel_1 is money-themed with same cash icon", () => {
     const slices = getConfiguredWheelSlices("wheel_1", "wheel_1");
     expect(slices).toHaveLength(6);
-    expect(slices.filter((s) => s.kind === "money").length).toBeGreaterThanOrEqual(5);
-    expect(slices.some((s) => s.kind === "money_loss")).toBe(true);
+    expect(slices.every((s) => s.kind === "money" || s.kind === "money_loss")).toBe(true);
     expect(slices.filter((s) => s.kind === "money").every((s) => s.icon === "attach-money")).toBe(
       true
     );
@@ -174,10 +179,20 @@ describe("wheelDatabase", () => {
           s.kind === "bank_cut"
       )
     ).toBe(true);
-    const boss = getConfiguredWheelSlices("wheel_9", "wheel_9", { runId: "__validate__", cycle: 2 });
+    const boss = getConfiguredWheelSlices("wheel_9", "wheel_9", {
+      runId: "__validate__",
+      cycle: 2,
+      ownedPerks: ["lucky_money", "iron_reserve"],
+    });
     expect(
-      boss.some((s) => s.payload.runEffectId === "doom_spiral" || s.kind === "relic_offer")
+      boss.some(
+        (s) =>
+          s.payload.runEffectId === "boss_perk_tax" ||
+          s.kind === "bank_cut" ||
+          s.payload.runEffectId === "boss_overhead"
+      )
     ).toBe(true);
+    expect(boss.some((s) => s.payload.moneyDelta === 800)).toBe(false);
   });
 
   it("prints wheel_1 odds (manual inspect)", () => {

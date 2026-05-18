@@ -1,12 +1,14 @@
 import { create } from "zustand";
 import type { RunState } from "../schemas";
-import { saveRunCheckpoint } from "../persistence/mmkv";
-import { RUN_LOOP } from "../game/loop";
+import { flushRunCheckpoint, saveRunCheckpoint } from "../persistence/mmkv";
+import { RUN_DEFAULTS, RUN_LOOP } from "../game/loop";
 import { createRunState, normalizeRunState, resolveWheelSpin } from "../game/runState";
+import { commitDeferredMoney } from "../game/services/wheelResolver";
 import { WHEEL_DATABASE_REVISION } from "../game/wheels/database/wheelDatabase";
 import { rebuildWheelsFromDatabase } from "../systems/WheelSystem";
 import { computeRunChipAward } from "../game/runState/chipsScoring";
 import { RunManager } from "../systems/RunManager";
+import { banishSliceOnWheel } from "../game/runState/banishSlice";
 import { commitPendingWheelRebuild } from "../systems/PerkSystem";
 import { useMetaStore } from "./metaStore";
 import { toSliceDisplay } from "../utils/sliceDisplay";
@@ -23,6 +25,20 @@ export type RunUiEffect = {
   tone: SliceVisualTone;
 };
 
+function applyPendingMoneyReveal(
+  run: RunState,
+  moneyReveal: { before: number; delta: number } | null
+): RunState {
+  if (moneyReveal == null) return run;
+  let next = commitDeferredMoney(run, moneyReveal.delta, run.wheelIndex);
+  return RunManager.checkRunEnd(next) as RunState;
+}
+
+function hasPendingSolventReveal(moneyReveal: { before: number; delta: number } | null): boolean {
+  if (moneyReveal == null) return false;
+  return moneyReveal.before + moneyReveal.delta > RUN_DEFAULTS.bankruptcyThreshold;
+}
+
 const emptyUi = {
   activeWheelIndex: 0,
   isSpinning: false,
@@ -34,6 +50,9 @@ const emptyUi = {
   lastWonPerkId: null as string | null,
   lastRewardKind: null as string | null,
   shopPending: false,
+  sliceEraseMode: false,
+  showCycleReward: false,
+  moneyReveal: null as { before: number; delta: number } | null,
 };
 
 type RunUiState = typeof emptyUi;
@@ -53,6 +72,14 @@ type RunStore = {
   advanceWheel: () => void;
   persist: () => void;
   reset: () => void;
+  setSliceEraseMode: (on: boolean) => void;
+  banishSliceAt: (
+    wheelIndex: number,
+    sliceIndex: number
+  ) => { ok: true } | { ok: false; reason: string };
+  continueAfterCycleReward: () => void;
+  dismissCycleReward: () => void;
+  commitMoneyReveal: () => void;
 };
 
 export const useRunStore = create<RunStore>((set, get) => ({
@@ -69,6 +96,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       ui: { ...emptyUi },
     });
     saveRunCheckpoint(run);
+    flushRunCheckpoint();
   },
 
   hydrateRun: (run) => {
@@ -94,7 +122,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const slice = wheel?.slices.find((s) => s.id === sliceId);
     if (slice == null) return;
     const perkId = slice.payload.perkId;
-    const next = resolveWheelSpin(normalizeRunState(run), wheelIndex, slice);
+    const resolved = resolveWheelSpin(normalizeRunState(run), wheelIndex, slice);
+    const next = resolved.run;
     const perkWasNew =
       perkId != null && !run.perks.includes(perkId) && next.perks.includes(perkId);
     const display = toSliceDisplay(slice);
@@ -119,17 +148,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
         awaitingClaim: next.phase === "active",
         shopPending:
           RUN_LOOP.shopHighlightAfterEachWheel && next.phase === "active",
+        sliceEraseMode: false,
         lastEffect,
         lastWonPerkId: perkWasNew ? perkId! : null,
         lastRewardKind: slice.kind,
+        moneyReveal: resolved.moneyReveal ?? null,
       },
     });
-    if (next.phase !== "active") {
+    if (next.phase === "won") {
+      set((s) => ({ ui: { ...s.ui, showCycleReward: true } }));
+    }
+    if (next.phase === "lost_money" && !hasPendingSolventReveal(resolved.moneyReveal ?? null)) {
       const chips = computeRunChipAward(next);
       useMetaStore.getState().grantChips(chips);
-      useMetaStore.getState().recordRunEnd(next.floor);
+      useMetaStore.getState().recordRunEnd({
+        floor: next.floor,
+        peakMoney: next.peakMoney ?? next.money,
+      });
     }
     saveRunCheckpoint(next);
+    if (next.phase !== "active") flushRunCheckpoint();
   },
 
   commitWheelLayout: () => {
@@ -143,12 +181,40 @@ export const useRunStore = create<RunStore>((set, get) => ({
   claimAndAdvance: () => {
     const { run, ui } = get();
     if (run == null || !ui.awaitingClaim || run.phase !== "active") return;
-    const committed = commitPendingWheelRebuild(run);
+    const afterMoney = applyPendingMoneyReveal(run, ui.moneyReveal);
+    if (afterMoney.phase !== "active") {
+      if (afterMoney.phase === "lost_money") {
+        const chips = computeRunChipAward(afterMoney);
+        useMetaStore.getState().grantChips(chips);
+        useMetaStore.getState().recordRunEnd({
+          floor: afterMoney.floor,
+          peakMoney: afterMoney.peakMoney ?? afterMoney.money,
+        });
+      }
+      set({
+        run: afterMoney,
+        ui: {
+          ...get().ui,
+          awaitingClaim: false,
+          moneyReveal: null,
+        },
+      });
+      saveRunCheckpoint(afterMoney);
+      flushRunCheckpoint();
+      return;
+    }
+    const committed = commitPendingWheelRebuild(afterMoney);
     const next = normalizeRunState(RunManager.advanceWheel(committed));
-    if (next.phase !== "active") {
+    if (next.phase === "won") {
+      set((s) => ({ ui: { ...s.ui, showCycleReward: true } }));
+    }
+    if (next.phase === "lost_money") {
       const chips = computeRunChipAward(next);
       useMetaStore.getState().grantChips(chips);
-      useMetaStore.getState().recordRunEnd(next.floor);
+      useMetaStore.getState().recordRunEnd({
+        floor: next.floor,
+        peakMoney: next.peakMoney ?? next.money,
+      });
     }
     set({
       run: next,
@@ -164,9 +230,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
         lastWonPerkId: null,
         lastRewardKind: null,
         shopPending: false,
+        sliceEraseMode: false,
+        moneyReveal: null,
       },
     });
     saveRunCheckpoint(next);
+    if (next.phase !== "active") flushRunCheckpoint();
   },
 
   clearShopPending: () => {
@@ -190,6 +259,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   persist: () => {
     saveRunCheckpoint(get().run);
+    flushRunCheckpoint();
   },
 
   reset: () => {
@@ -198,5 +268,53 @@ export const useRunStore = create<RunStore>((set, get) => ({
       run: null,
       ui: { ...emptyUi },
     });
+  },
+
+  setSliceEraseMode: (on) => {
+    set((s) => ({ ui: { ...s.ui, sliceEraseMode: on } }));
+  },
+
+  banishSliceAt: (wheelIndex, sliceIndex) => {
+    const { run } = get();
+    if (run == null) return { ok: false, reason: "No active run" };
+    const result = banishSliceOnWheel(run, wheelIndex, sliceIndex);
+    if (!result.ok) return result;
+    set({
+      run: result.run,
+      ui: { ...get().ui, sliceEraseMode: false },
+    });
+    saveRunCheckpoint(result.run);
+    return { ok: true };
+  },
+
+  continueAfterCycleReward: () => {
+    const { run } = get();
+    if (run == null || run.phase !== "won") return;
+    const next = normalizeRunState(RunManager.enterInfiniteFloor(run));
+    set({
+      run: next,
+      ui: {
+        ...emptyUi,
+        activeWheelIndex: 0,
+        scrollTarget: 0,
+        showCycleReward: false,
+      },
+    });
+    saveRunCheckpoint(next);
+  },
+
+  dismissCycleReward: () => {
+    set((s) => ({ ui: { ...s.ui, showCycleReward: false } }));
+  },
+
+  commitMoneyReveal: () => {
+    const { run, ui } = get();
+    if (run == null || ui.moneyReveal == null) return;
+    const next = applyPendingMoneyReveal(run, ui.moneyReveal);
+    set({
+      run: next,
+      ui: { ...ui, moneyReveal: null },
+    });
+    saveRunCheckpoint(next);
   },
 }));
