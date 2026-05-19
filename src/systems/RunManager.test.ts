@@ -63,6 +63,25 @@ describe("RunManager", () => {
     expect(pending.run.money).toBe(0);
   });
 
+  it("clears cycle 1 after wheel 9 and can start cycle 2", () => {
+    let run = {
+      ...RunManager.createInitialRun(1),
+      wheelIndex: 8,
+      money: 200,
+      history: [{ wheelIndex: 8, sliceId: "test", floor: 1, ts: 1 }],
+    };
+    const won = RunManager.advanceWheel(run);
+    expect(won.phase).toBe("won");
+    expect(won.lastCycleReward?.cycle).toBe(1);
+    expect(won.runEffects?.pitStopPending).toBe(true);
+
+    const cycle2 = RunManager.enterInfiniteFloor(won);
+    expect(cycle2.phase).toBe("active");
+    expect(cycle2.floor).toBe(2);
+    expect(cycle2.wheelIndex).toBe(0);
+    expect(cycle2.wheels).toHaveLength(9);
+  });
+
   it("iron grit saves once at $0 after playing", () => {
     const run = {
       ...RunManager.createInitialRun(1),

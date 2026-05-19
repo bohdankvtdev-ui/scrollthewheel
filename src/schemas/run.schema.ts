@@ -66,6 +66,8 @@ export type RunEffectsPersisted = {
   /** Early-run chip grants after W1 / W2 (before Risk wheel). */
   earlyChipBonus0?: boolean;
   earlyChipBonus1?: boolean;
+  /** Last-chance tactic prompt already shown this run. */
+  desperationOfferedThisRun?: boolean;
 };
 
 export type RunState = {

@@ -1,11 +1,14 @@
+import { DEBUFF_CATALOG } from "../../data/debuffs";
+import { PERK_CATALOG } from "../../data/perks";
 import { useRunToastStore, type RunToastType } from "../../stores/runToastStore";
+import type { CycleRewardPackage } from "../cycle/cycleProgression";
 import { MICRO_CHOICE_META, type MicroChoiceId } from "../tactics/microChoices";
 
 const BASE_NOTICE_MS = 3000;
 const MS_PER_CHAR = 35;
 const MAX_NOTICE_MS = 6000;
 
-/** Ignore reel-scroll dismiss briefly so tactic notices stay readable. */
+/** Ignore reel-scroll dismiss briefly so notices stay readable. */
 export const NOTICE_SCROLL_GRACE_MS = 700;
 
 /** How long a notice stays visible — scales with copy length. */
@@ -47,6 +50,52 @@ export function showTacticChosenNotice(id: MicroChoiceId): void {
   });
 }
 
+export function showPerkWonNotice(perkId: string): void {
+  const perk = PERK_CATALOG[perkId];
+  if (perk == null) return;
+  showRunNotice({
+    type: "success",
+    title: "Perk won",
+    body: perk.name,
+    icon: perk.icon,
+    durationMs: noticeDurationMs("Perk won", perk.name),
+  });
+}
+
+export function showShieldPerkNotice(perkId: string): void {
+  const perk = PERK_CATALOG[perkId];
+  if (perk == null) return;
+  showRunNotice({
+    type: "success",
+    title: "Shield perk",
+    body: perk.name,
+    icon: perk.icon,
+    durationMs: noticeDurationMs("Shield perk", perk.name),
+  });
+}
+
+export function showDebuffWonNotice(debuffId: string): void {
+  const debuff = DEBUFF_CATALOG[debuffId];
+  if (debuff == null) return;
+  showRunNotice({
+    type: "error",
+    title: "Curse gained",
+    body: debuff.name,
+    icon: debuff.icon,
+    durationMs: noticeDurationMs("Curse gained", debuff.name),
+  });
+}
+
 export function showRunInfoNotice(title: string, body?: string, icon = "info-outline"): void {
   showRunNotice({ type: "info", title, body, icon });
+}
+
+export function showCycleClearedNotice(reward: CycleRewardPackage): void {
+  showRunNotice({
+    type: "success",
+    title: reward.headline,
+    body: reward.detail,
+    icon: "emoji-events",
+    durationMs: noticeDurationMs(reward.headline, reward.detail),
+  });
 }

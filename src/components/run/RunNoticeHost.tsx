@@ -12,24 +12,9 @@ const TYPE_STYLE: Record<RunToastType, { bg: string; accent: string; icon: strin
   info: { bg: Neo.neonCyan, accent: "#67E8F9", icon: "info-outline" },
 };
 
-const MCI_ICONS = new Set([
-  "undo-variant",
-  "shield-check",
-  "dice-multiple",
-  "poker-chip",
-  "ray-start",
-  "shield",
-  "album",
-  "build",
-  "sell",
-  "stars",
-  "stairs",
-  "attach-money",
-]);
-
 function ToastIcon({ name, type }: { name?: string; type: RunToastType }) {
   const iconName = name ?? TYPE_STYLE[type].icon;
-  if (MCI_ICONS.has(iconName)) {
+  if (iconName in MaterialCommunityIcons.glyphMap) {
     return (
       <MaterialCommunityIcons
         name={iconName as keyof typeof MaterialCommunityIcons.glyphMap}
@@ -38,13 +23,16 @@ function ToastIcon({ name, type }: { name?: string; type: RunToastType }) {
       />
     );
   }
-  return (
-    <MaterialIcons
-      name={(iconName as keyof typeof MaterialIcons.glyphMap) ?? "info-outline"}
-      size={14}
-      color={Neo.ink}
-    />
-  );
+  if (iconName in MaterialIcons.glyphMap) {
+    return (
+      <MaterialIcons
+        name={iconName as keyof typeof MaterialIcons.glyphMap}
+        size={14}
+        color={Neo.ink}
+      />
+    );
+  }
+  return <MaterialIcons name="info-outline" size={14} color={Neo.ink} />;
 }
 
 /** Compact notice directly under the perk loadout (in `loadoutStack`). */
@@ -95,8 +83,8 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     top: RUN_LAYOUT.loadout + 2,
-    zIndex: 50,
-    elevation: 50,
+    zIndex: 150,
+    elevation: 150,
     alignItems: "center",
   },
   card: {
@@ -109,6 +97,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingLeft: 8,
     paddingRight: 8,
+    shadowColor: Neo.ink,
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 0,
+    elevation: 4,
   },
   iconDot: {
     width: 22,

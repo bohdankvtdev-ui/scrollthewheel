@@ -10,6 +10,7 @@ export function useRunWheelUi() {
       gambleFlipActive: s.ui.gambleFlipActive,
       sliceEraseMode: s.ui.sliceEraseMode,
       lastResultLabel: s.ui.lastResultLabel,
+      pendingBossCycleTransition: s.ui.pendingBossCycleTransition,
     }))
   );
 }

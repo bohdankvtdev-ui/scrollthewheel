@@ -3,20 +3,21 @@ import type { ScrollWheelRound } from "../../features/cash-spin/reelStripModel";
 import type { RunState } from "../schemas";
 import type { SpinWheelItem } from "../../types/spin";
 import { labelFromHistory } from "../game/tactics/wheelHubState";
+import { LAST_WHEEL_INDEX } from "../game/cycle/cycleTransition";
 
-export function useRunReelRounds(
-  run: RunState | null,
+export function buildRunReelRounds(
+  run: RunState,
   awaitingClaim: boolean,
   lastResultLabel: string | null,
-  gambleFlipActive: boolean
+  gambleFlipActive: boolean,
+  pendingBossCycleTransition = false
 ): ScrollWheelRound[] {
-  return useMemo(() => {
-    if (run == null) return [];
-    const lastHistByWheel = new Map<number, (typeof run.history)[number]>();
-    for (const h of run.history) {
-      lastHistByWheel.set(h.wheelIndex, h);
-    }
-    return run.wheels.map((wheel, i) => {
+  const lastHistByWheel = new Map<number, (typeof run.history)[number]>();
+  for (const h of run.history) {
+    if (h.floor !== run.floor) continue;
+    lastHistByWheel.set(h.wheelIndex, h);
+  }
+  return run.wheels.map((wheel, i) => {
       const hist = lastHistByWheel.get(i);
       const prizeFromHist: SpinWheelItem | null =
         hist != null
@@ -30,6 +31,18 @@ export function useRunReelRounds(
         return { status: "claimed" as const, prize: prizeFromHist };
       }
       if (i === run.wheelIndex) {
+        if (
+          pendingBossCycleTransition &&
+          i === LAST_WHEEL_INDEX &&
+          (hist != null || awaitingClaim)
+        ) {
+          const label =
+            lastResultLabel ?? labelFromHistory(run, i) ?? prizeFromHist?.label ?? "Result";
+          return {
+            status: "won" as const,
+            prize: { id: "last", label },
+          };
+        }
         if (gambleFlipActive) {
           return { status: "ready" as const, prize: prizeFromHist };
         }
@@ -48,11 +61,31 @@ export function useRunReelRounds(
       }
       return { status: "locked" as const, prize: null };
     });
+}
+
+export function useRunReelRounds(
+  run: RunState | null,
+  awaitingClaim: boolean,
+  lastResultLabel: string | null,
+  gambleFlipActive: boolean,
+  pendingBossCycleTransition = false
+): ScrollWheelRound[] {
+  return useMemo(() => {
+    if (run == null) return [];
+    return buildRunReelRounds(
+      run,
+      awaitingClaim,
+      lastResultLabel,
+      gambleFlipActive,
+      pendingBossCycleTransition
+    );
   }, [
     awaitingClaim,
     gambleFlipActive,
+    pendingBossCycleTransition,
     lastResultLabel,
     run?.wheelIndex,
+    run?.floor,
     run?.phase,
     run?.history.length,
     run?.wheels.length,

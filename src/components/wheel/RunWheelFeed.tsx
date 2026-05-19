@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SlicePrizeSheet } from "./SlicePrizeSheet";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -39,6 +38,10 @@ import { getArchetypeForConfigId } from "../../game/wheels/database";
 import { RunManager } from "../../systems/RunManager";
 import { syncRunWheels } from "../../systems/WheelSystem";
 import type { RunState } from "../../schemas";
+import {
+  LAST_WHEEL_INDEX,
+  previewNextCycleRun,
+} from "../../game/cycle/cycleTransition";
 import { deriveHubMode, deriveSpinLocked } from "../../game/tactics/wheelHubState";
 import {
   buildGambleSlices,
@@ -55,11 +58,15 @@ import {
 } from "../../game/notices/runNotices";
 import { useRunToastStore } from "../../stores/runToastStore";
 import { sliceWheelCaptionForRun } from "../../utils/sliceMoneyDisplay";
+import { runHapticImpact, runHapticNotification } from "../../utils/haptics";
+import * as Haptics from "expo-haptics";
 import type { SpinWheelItem } from "../../../wheel/types";
 
 type RunWheelFeedProps = {
   run: RunState;
   pageHeight: number;
+  /** Bust memo when claim / boss-pending UI changes without a run key change. */
+  reelUiKey: string;
 };
 
 const NOOP = () => {};
@@ -244,7 +251,11 @@ const RunWheelSlot = memo(function RunWheelSlot({
   );
 });
 
-export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunWheelFeedProps) {
+export const RunWheelFeed = memo(function RunWheelFeed({
+  run,
+  pageHeight,
+  reelUiKey: _reelUiKey,
+}: RunWheelFeedProps) {
   const { width: winW, height: winH } = useWindowDimensions();
   const {
     awaitingClaim,
@@ -252,6 +263,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
     gambleFlipActive,
     sliceEraseMode,
     lastResultLabel,
+    pendingBossCycleTransition,
   } = useRunWheelUi();
   const [spinArmEpoch, setSpinArmEpoch] = useState(0);
   const prevWheelIndexRef = useRef(run.wheelIndex);
@@ -262,7 +274,13 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
     []
   );
 
-  const rounds = useRunReelRounds(run, awaitingClaim, lastResultLabel, gambleFlipActive);
+  const rounds = useRunReelRounds(
+    run,
+    awaitingClaim,
+    lastResultLabel,
+    gambleFlipActive,
+    pendingBossCycleTransition
+  );
   const spinWheelRef = useRef<SpinWheelRef>(null);
   const pendingSliceRef = useRef<{
     wheelIndex: number;
@@ -299,6 +317,14 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
 
   const reelEngineRef = useRef<ReturnType<typeof useReelStripEngine> | null>(null);
 
+  const onStripSettled = useCallback(() => {
+    const store = useRunStore.getState();
+    if (store.ui.pendingBossCycleTransition) {
+      store.finishBossCycleTransition();
+    }
+    store.healRunUi();
+  }, []);
+
   const onReelAdvanced = useCallback(() => {
     const store = useRunStore.getState();
     store.clearSpinInteraction();
@@ -317,7 +343,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
   const handleBanishSlice = useCallback((wheelIndex: number, sliceIndex: number) => {
     const result = useRunStore.getState().banishSliceAt(wheelIndex, sliceIndex);
     if (result.ok) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      runHapticNotification(Haptics.NotificationFeedbackType.Success);
       showRunNotice({
         type: "success",
         title: "Wedge removed",
@@ -333,10 +359,11 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
     pageHeight,
     rounds,
     initialActiveIndex: run.wheelIndex,
-    bootRunId: run.runId,
+    bootRunId: `${run.runId}:${run.floor}`,
     onClaimed,
     onPrepareAdvance: () => useRunStore.getState().commitWheelLayout(),
     onReelAdvanced,
+    onStripSettled,
     stripVisualIntensity,
     wheelFrostVisualIntensity,
   });
@@ -344,7 +371,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
 
   const handleHubClaim = useCallback(() => {
     const { ui } = useRunStore.getState();
-    if (ui.awaitingClaim || ui.isSpinning || ui.gambleFlipActive) return;
+    if (ui.isSpinning || ui.gambleFlipActive) return;
     reel.requestAdvance();
   }, [reel]);
 
@@ -378,6 +405,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
       const { index, slice } = resolveSlice(wheel.slices, ctx);
       pendingSliceRef.current = { wheelIndex: ri, sliceId: slice.id, sliceIndex: index };
     }
+    runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
     setSpinArmEpoch((e) => e + 1);
     useRunStore.getState().setSpinning(true);
     reel.setSpinningSafe(true);
@@ -419,7 +447,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
         }
         return;
       }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      runHapticNotification(Haptics.NotificationFeedbackType.Success);
       if (pending?.isGambleFlip) {
         store.applyGambleFlipResult(roundIndex, slice.id);
       } else {
@@ -462,12 +490,37 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
 
   useEffect(() => {
     if (reel.interactionLocked) return;
+    const store = useRunStore.getState();
+    if (store.ui.pendingBossCycleTransition) {
+      if (reel.activeIndex === 0 && !reel.interactionLocked) {
+        store.finishBossCycleTransition();
+      }
+      return;
+    }
+    if (
+      run.phase === "won" &&
+      run.wheelIndex === 0 &&
+      reel.activeIndex === LAST_WHEEL_INDEX &&
+      !store.ui.showCycleReward
+    ) {
+      reel.snapToIndex(0);
+      reel.setSpinningSafe(false);
+      store.clearSpinInteraction();
+      reel.onPrimaryBulbPhaseChange("idle");
+      return;
+    }
     if (reel.activeIndex === run.wheelIndex) return;
     reel.snapToIndex(run.wheelIndex);
     reel.setSpinningSafe(false);
-    useRunStore.getState().clearSpinInteraction();
+    store.clearSpinInteraction();
     reel.onPrimaryBulbPhaseChange("idle");
-  }, [reel, run.wheelIndex]);
+  }, [reel, run.wheelIndex, run.phase, reel.activeIndex]);
+
+  useEffect(() => {
+    if (!pendingBossCycleTransition) return;
+    if (reel.activeIndex !== 0 || reel.interactionLocked) return;
+    useRunStore.getState().finishBossCycleTransition();
+  }, [pendingBossCycleTransition, reel.activeIndex, reel.interactionLocked]);
 
   useEffect(() => {
     if (reel.activeIndex !== run.wheelIndex) return;
@@ -488,22 +541,40 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
     return () => clearTimeout(t);
   }, [scrolling, dismissToast, toastVisible]);
 
+  const wasSpinningRef = useRef(false);
   useEffect(() => {
-    if (isSpinning && toastVisible) dismissToast();
-  }, [dismissToast, isSpinning, toastVisible]);
+    if (isSpinning && !wasSpinningRef.current) {
+      dismissToast();
+    }
+    wasSpinningRef.current = isSpinning;
+  }, [dismissToast, isSpinning]);
+
+  const cycleWrapReveal =
+    reel.activeIndex === LAST_WHEEL_INDEX &&
+    rounds[LAST_WHEEL_INDEX]?.status === "won" &&
+    (awaitingClaim || pendingBossCycleTransition);
+  const stripNextIndex = cycleWrapReveal ? 0 : reel.nextIndex;
 
   const mountNextStripSlot =
-    reel.nextIndex != null &&
-    (scrolling || revealNextSlot || reel.stripSpringing);
+    stripNextIndex != null && (scrolling || revealNextSlot || reel.stripSpringing);
+
+  const previewRun = useMemo(
+    () => (cycleWrapReveal && run != null ? previewNextCycleRun(run) : run),
+    [cycleWrapReveal, run]
+  );
 
   const renderStripBuffer = useCallback(
     (buffer: "a" | "b") => {
-      const roundIndex = buffer === "a" ? reel.activeIndex : reel.nextIndex;
+      const roundIndex = buffer === "a" ? reel.activeIndex : stripNextIndex;
       if (buffer === "b" && (roundIndex == null || !mountNextStripSlot)) {
         return <View style={[styles.slotRow, { height: pageHeight }]} />;
       }
       const ri = roundIndex as number;
-      const round = rounds[ri];
+      const slotRun = buffer === "b" && cycleWrapReveal && previewRun != null ? previewRun : run;
+      const round =
+        buffer === "b" && cycleWrapReveal
+          ? ({ status: "ready" as const, prize: null })
+          : rounds[ri];
 
       const isActive = ri === reel.activeIndex;
       const hubMode = deriveHubMode({
@@ -522,7 +593,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
           key={buffer === "a" ? "reel-slot-a" : "reel-slot-b"}
           roundIndex={ri}
           pageHeight={pageHeight}
-          run={run}
+          run={slotRun}
           wheelInnerSize={wheelInnerSize}
           textSize={textSize}
           textColor={textColor}
@@ -546,6 +617,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
     },
     [
       awaitingClaim,
+      cycleWrapReveal,
       gambleFlipActive,
       spinArmEpoch,
       handleBanishSlice,
@@ -554,9 +626,9 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
       handleSpinComplete,
       isSpinning,
       pageHeight,
+      previewRun,
       reel.stripSpringing,
       reel.activeIndex,
-      reel.nextIndex,
       reel.onPrimaryBulbPhaseChange,
       reel.stripScrolling,
       mountNextStripSlot,
@@ -565,6 +637,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
       run,
       scrolling,
       sliceEraseMode,
+      stripNextIndex,
       textSize,
       wheelInnerSize,
     ]
@@ -638,6 +711,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({ run, pageHeight }: RunW
   );
 }, (prev: RunWheelFeedProps, next: RunWheelFeedProps) =>
   prev.pageHeight === next.pageHeight &&
+  prev.reelUiKey === next.reelUiKey &&
   runReelFeedKey(prev.run) === runReelFeedKey(next.run));
 
 const styles = StyleSheet.create({

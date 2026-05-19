@@ -104,8 +104,6 @@ export function RunPrizeFlash({
               variant={isPerkWin ? "jackpot" : "default"}
             />
           </Animated.View>
-        ) : awaitingClaim && !isSpinning ? (
-          <MaterialIcons name="keyboard-double-arrow-up" size={26} color={Neo.ink} />
         ) : (
           <MaterialIcons name="casino" size={26} color="rgba(250,250,250,0.4)" />
         )}

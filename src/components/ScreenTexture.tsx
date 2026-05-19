@@ -11,8 +11,7 @@ type Props = {
 };
 
 /**
- * Matte paper overlay — skipped on compact windows to save ~1MB+ decoded bitmap RAM.
- * Uses expo-image disk cache when enabled.
+ * Matte paper overlay behind app content (must not sit above interactive UI / toasts).
  */
 export function ScreenTexture({ children, style }: Props) {
   const { width, height } = useWindowDimensions();
@@ -25,7 +24,6 @@ export function ScreenTexture({ children, style }: Props) {
 
   return (
     <View style={[styles.container, style]}>
-      {children}
       {showTexture ? (
         <Image
           source={APP_TEXTURE}
@@ -38,6 +36,9 @@ export function ScreenTexture({ children, style }: Props) {
           importantForAccessibility="no-hide-descendants"
         />
       ) : null}
+      <View style={styles.content} pointerEvents="box-none">
+        {children}
+      </View>
     </View>
   );
 }
@@ -47,6 +48,10 @@ const styles = StyleSheet.create({
   texture: {
     ...StyleSheet.absoluteFillObject,
     opacity: TEXTURE_OVERLAY_OPACITY,
-    zIndex: 9999,
+    zIndex: 0,
+  },
+  content: {
+    flex: 1,
+    zIndex: 1,
   },
 });

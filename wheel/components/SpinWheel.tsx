@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { runHapticImpact } from "../../src/utils/haptics";
 import { Image } from "expo-image";
 import Svg, { Defs, G, Image as SvgImage, Path, RadialGradient, Stop, Text as SvgText } from "react-native-svg";
 import * as d3Shape from "d3-shape";
@@ -326,7 +327,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   const handleSpin = () => {
     if (spinLocked) return;
     if (!enabled) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
     onSpinPress?.();
     if (externalSpinControl) return;
     spin((i) => onSpinEnd?.(data[i], i));
@@ -334,7 +335,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
 
   const handleHubPress = () => {
     if (hubMode === "claim") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
       onHubClaimPress?.();
       return;
     }
@@ -347,7 +348,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   const handleSpinToIndex = (index: number) => {
     if (spinLocked) return;
     if (!enabled) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
     // Parent already ran `onSpinPress` when `externalSpinControl` — avoid infinite loop.
     if (!externalSpinControl) {
       onSpinPress?.();

@@ -64,7 +64,7 @@ export function shouldShowTacticPicker(
 export function labelFromHistory(run: RunState, wheelIndex: number): string | null {
   for (let i = run.history.length - 1; i >= 0; i--) {
     const h = run.history[i]!;
-    if (h.wheelIndex !== wheelIndex) continue;
+    if (h.wheelIndex !== wheelIndex || h.floor !== run.floor) continue;
     const wheel = run.wheels[wheelIndex];
     const slice = wheel?.slices.find((s) => s.id === h.sliceId);
     return slice?.label ?? h.sliceId;
@@ -74,6 +74,7 @@ export function labelFromHistory(run: RunState, wheelIndex: number): string | nu
 
 export type RunUiTacticFields = {
   awaitingClaim: boolean;
+  pendingBossCycleTransition?: boolean;
   gambleFlipActive: boolean;
   isSpinning: boolean;
   /** Wheel index when `isSpinning` was set — stale spins clear when this ≠ current wheel. */
@@ -100,7 +101,7 @@ export function reconcileRunUi(run: RunState, ui: RunUiTacticFields): RunUiTacti
     next.awaitingClaim = false;
   }
 
-  const hasHistory = run.history.some((h) => h.wheelIndex === wi);
+  const hasHistory = run.history.some((h) => h.wheelIndex === wi && h.floor === run.floor);
 
   if (next.gambleFlipActive) {
     if (!hasHistory && !next.isSpinning) {
@@ -109,7 +110,12 @@ export function reconcileRunUi(run: RunState, ui: RunUiTacticFields): RunUiTacti
     return next;
   }
 
-  if (hasHistory && !next.isSpinning && !next.awaitingClaim) {
+  if (
+    hasHistory &&
+    !next.isSpinning &&
+    !next.awaitingClaim &&
+    !next.pendingBossCycleTransition
+  ) {
     next.awaitingClaim = true;
     if (next.lastResultLabel == null) {
       next.lastResultLabel = labelFromHistory(run, wi);

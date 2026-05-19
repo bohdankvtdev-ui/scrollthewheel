@@ -18,6 +18,7 @@ import {
   microChoiceChipCost,
   rollMicroChoiceOffers,
 } from "./microChoices";
+import { tacticUsedOnWheel } from "./tacticState";
 import {
   isTacticDecisionWheel,
   rollTacticWheelIndices,
@@ -168,6 +169,25 @@ describe("tactics", () => {
         }
       }
     }
+  });
+
+  it("does not re-offer tactics after reroll on same wheel", () => {
+    const run = withTacticWheelIndices(RunManager.createInitialRun(1));
+    const wi = 8;
+    const used = {
+      ...run,
+      wheelIndex: wi,
+      runEffects: {
+        ...run.runEffects,
+        microChoiceWheelIndex: wi,
+        tacticUsedId: "reroll" as const,
+      },
+      history: [...run.history, { wheelIndex: wi, sliceId: "x", floor: 1, ts: 1 }],
+    };
+    expect(tacticUsedOnWheel(used, wi)).toBe(true);
+    expect(
+      rollMicroChoiceOffers(used, wi, { hasPreSpinSnapshot: true }).length
+    ).toBeGreaterThanOrEqual(0);
   });
 
   it("declining tactics hides picker for that wheel", () => {

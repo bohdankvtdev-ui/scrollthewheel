@@ -13,13 +13,13 @@ import Animated, {
 import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
+import { isBankruptMoneyReveal, moneyRevealDurationMs } from "../../game/moneyReveal";
 import type { RunState } from "../../schemas";
 import { formatMoney } from "../../utils/formatMoney";
 
-/** Bank count-up / count-down duration (ms). */
-const MONEY_COUNT_MS = 2200;
 /** Brief red flash on bank total after a loss (ms). */
 const LOSS_RED_HOLD_MS = 500;
+const BANKRUPT_RED_HOLD_MS = 180;
 
 const LOSS_MONEY = "#FF5C5C";
 
@@ -87,6 +87,8 @@ export function RunCasinoBar({
     const delta = Number(revealKey.slice(sep + 1));
     const end = Math.max(0, before + delta);
     const isLoss = delta < 0;
+    const isBankrupt = isBankruptMoneyReveal({ before, delta });
+    const durationMs = moneyRevealDurationMs({ before, delta });
     let raf = 0;
     let finished = false;
 
@@ -94,13 +96,13 @@ export function RunCasinoBar({
     setLossTintActive(false);
 
     moneyPop.value = withSequence(
-      withTiming(1.1, { duration: 220 }),
-      withTiming(1, { duration: 280 })
+      withTiming(1.1, { duration: isBankrupt ? 140 : 220 }),
+      withTiming(1, { duration: isBankrupt ? 160 : 280 })
     );
 
     const t0 = performance.now();
     const tick = (now: number) => {
-      const t = Math.min(1, (now - t0) / MONEY_COUNT_MS);
+      const t = Math.min(1, (now - t0) / durationMs);
       const eased = 1 - (1 - t) ** 3;
       setShownMoney(Math.max(0, Math.round(before + delta * eased)));
       if (t < 1) {
@@ -123,9 +125,13 @@ export function RunCasinoBar({
 
   useEffect(() => {
     if (!lossTintActive) return;
-    const t = setTimeout(() => setLossTintActive(false), LOSS_RED_HOLD_MS);
+    const holdMs =
+      moneyReveal != null && isBankruptMoneyReveal(moneyReveal)
+        ? BANKRUPT_RED_HOLD_MS
+        : LOSS_RED_HOLD_MS;
+    const t = setTimeout(() => setLossTintActive(false), holdMs);
     return () => clearTimeout(t);
-  }, [lossTintActive]);
+  }, [lossTintActive, moneyReveal]);
 
   const moneyAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: moneyPop.value }],

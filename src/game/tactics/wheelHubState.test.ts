@@ -80,11 +80,33 @@ describe("wheelHubState", () => {
     expect(ui.spinWheelIndex).toBeNull();
   });
 
+  it("does not restore awaitingClaim from a previous cycle on the same wheel index", () => {
+    let run = RunManager.createInitialRun(1);
+    run = {
+      ...run,
+      floor: 2,
+      wheelIndex: 0,
+      history: [{ wheelIndex: 0, sliceId: "s1", floor: 1, ts: 1 }],
+    };
+    const ui = reconcileRunUi(run, {
+      awaitingClaim: false,
+      gambleFlipActive: false,
+      isSpinning: false,
+      spinWheelIndex: null,
+      lastResultLabel: null,
+      lastSliceId: null,
+      lastEffect: null,
+      lastRewardKind: null,
+      moneyReveal: null,
+    });
+    expect(ui.awaitingClaim).toBe(false);
+  });
+
   it("reconcile restores awaitingClaim when history exists", () => {
     let run = RunManager.createInitialRun(1);
     run = {
       ...run,
-      history: [{ wheelIndex: 0, sliceId: "s1", floor: 1, ts: 1 }],
+      history: [{ wheelIndex: 0, sliceId: "s1", floor: run.floor, ts: 1 }],
     };
     const ui = reconcileRunUi(run, {
       awaitingClaim: false,

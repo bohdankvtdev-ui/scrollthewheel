@@ -11,6 +11,19 @@ export type ScrollWheelRound = {
  * Furthest index the player may park the strip on (forward-only reel).
  * Stops on the first ready round, or the step after a won round.
  */
+/** Next strip index after a successful claim at `currentIndex` (wraps last → 0). */
+export function computeStripIndexAfterClaim(
+  currentIndex: number,
+  rounds: ScrollWheelRound[]
+): number | null {
+  const len = rounds.length;
+  if (len === 0 || currentIndex < 0 || currentIndex > len - 1) return null;
+  if (rounds[currentIndex]?.status !== "won") return null;
+  const last = len - 1;
+  if (currentIndex === last) return 0;
+  return Math.min(currentIndex + 1, last);
+}
+
 export function computeMaxActiveIndex(rounds: ScrollWheelRound[]): number {
   const n = rounds.length;
   if (n === 0) return 0;

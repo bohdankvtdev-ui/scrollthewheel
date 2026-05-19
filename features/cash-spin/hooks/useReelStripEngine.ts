@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { runHapticImpact, runHapticNotification } from "../../../src/utils/haptics";
 import type { ViewStyle } from "react-native";
 import { Platform, unstable_batchedUpdates as rnBatchedUpdates } from "react-native";
 
@@ -27,7 +28,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { REEL_STRIP } from "../reelStripConstants";
 import type { BulbRingPhase } from "../bulbRingPhase";
-import { computeMaxActiveIndex } from "../reelStripModel";
+import { computeMaxActiveIndex, computeStripIndexAfterClaim } from "../reelStripModel";
 import type { ScrollWheelRound } from "../reelStripModel";
 
 const { gesture: G, springs: S, visuals: V, commitTimingMs } = REEL_STRIP;
@@ -46,6 +47,8 @@ export type UseReelStripEngineArgs = {
   growToMinLength?: (minLength: number) => void;
   /** Fired after the strip commits to the next reel (successful swipe). */
   onReelAdvanced?: () => void;
+  /** Fired after swipe spring settles (translateY reset). */
+  onStripSettled?: () => void;
   /**
    * Multiplier for drag-time strip opacity + scrim (0 = off for reduce motion, 1 = full).
    * Updated on the UI thread via shared value for worklets.
@@ -106,6 +109,7 @@ export function useReelStripEngine({
   onPrepareAdvance,
   growToMinLength,
   onReelAdvanced,
+  onStripSettled,
   stripVisualIntensity = 1,
   wheelFrostVisualIntensity: wheelFrostVisualIntensityProp,
 }: UseReelStripEngineArgs): ReelStripEngine {
@@ -117,6 +121,8 @@ export function useReelStripEngine({
   onClaimedRef.current = onClaimed;
   const onReelAdvancedRef = useRef(onReelAdvanced);
   onReelAdvancedRef.current = onReelAdvanced;
+  const onStripSettledRef = useRef(onStripSettled);
+  onStripSettledRef.current = onStripSettled;
   const onPrepareAdvanceRef = useRef(onPrepareAdvance);
   onPrepareAdvanceRef.current = onPrepareAdvance;
 
@@ -192,8 +198,11 @@ export function useReelStripEngine({
   );
 
   useEffect(() => {
-    canSwipeNext.value = activeIndex < maxActive;
-  }, [activeIndex, canSwipeNext, maxActive]);
+    const rs = roundsRef.current;
+    const last = rs.length - 1;
+    const lastWon = last >= 0 && rs[last]?.status === "won";
+    canSwipeNext.value = activeIndex < maxActive || (activeIndex === last && lastWon);
+  }, [activeIndex, canSwipeNext, maxActive, rounds]);
 
   useEffect(() => {
     busy.value = advanceBusy || isSpinning || stripSpringing;
@@ -233,6 +242,8 @@ export function useReelStripEngine({
     const last = roundCount - 1;
     if (last < 0) return;
     if (lastRoundStatus !== "won") return;
+    /** Boss wheel: player swipes into cycle 2 — do not auto-claim on a timer. */
+    if (activeIndexRef.current >= last) return;
     let cancelled = false;
     const id = setTimeout(() => {
       if (!cancelled && mountedRef.current) onClaimedRef.current(last);
@@ -283,7 +294,7 @@ export function useReelStripEngine({
     const i = activeIndexRef.current;
     const rs = roundsRef.current;
     const len = rs.length;
-    if (i >= len - 1) {
+    if (len === 0 || i < 0 || i > len - 1) {
       advanceBusyRef.current = false;
       busy.value = false;
       setStripSpringing(false);
@@ -301,7 +312,7 @@ export function useReelStripEngine({
     advanceBusyRef.current = true;
     busy.value = true;
 
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    runHapticNotification(Haptics.NotificationFeedbackType.Success);
 
     try {
       onPrepareAdvanceRef.current?.();
@@ -319,7 +330,8 @@ export function useReelStripEngine({
       if (!claimed) {
         return;
       }
-      const nextIndex = Math.min(i + 1, Math.max(0, len - 1));
+      const nextIndex = computeStripIndexAfterClaim(i, roundsRef.current);
+      if (nextIndex == null) return;
       activeIndexRef.current = nextIndex;
       setActiveIndex(nextIndex);
       onReelAdvancedRef.current?.();
@@ -342,6 +354,11 @@ export function useReelStripEngine({
         busy.value = false;
         setStripSpringing(false);
         setAdvanceBusy(false);
+        try {
+          onStripSettledRef.current?.();
+        } catch {
+          /* isolate failures */
+        }
       });
     });
   }, [busy, translateY]);
@@ -355,7 +372,7 @@ export function useReelStripEngine({
 
   const armStripSpringStart = useCallback(() => {
     if (!mountedRef.current) return;
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    runHapticImpact(Haptics.ImpactFeedbackStyle.Light);
     setStripSpringing(true);
     setAdvanceBusy(true);
   }, []);
