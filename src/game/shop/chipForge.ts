@@ -1,4 +1,4 @@
-import type { RunState } from "../../schemas";
+import type { IconFamily, RunState } from "../../schemas";
 import { getSpendableChips, spendChips } from "./chipEconomy";
 
 export type ChipForgeId =
@@ -14,6 +14,7 @@ export type ChipForgeDef = {
   name: string;
   line: string;
   icon: string;
+  iconFamily: IconFamily;
   baseCost: number;
   maxLevel: number;
 };
@@ -24,6 +25,7 @@ export const CHIP_FORGE_CATALOG: Record<ChipForgeId, ChipForgeDef> = {
     name: "Cash Boost",
     line: "+4% cash from +$ wedges (each level)",
     icon: "cash-plus",
+    iconFamily: "MaterialCommunityIcons",
     baseCost: 3,
     maxLevel: 99,
   },
@@ -32,6 +34,7 @@ export const CHIP_FORGE_CATALOG: Record<ChipForgeId, ChipForgeDef> = {
     name: "Loss Cushion",
     line: "−3% cash lost on −$ wedges (each level)",
     icon: "shield-half-full",
+    iconFamily: "MaterialCommunityIcons",
     baseCost: 4,
     maxLevel: 99,
   },
@@ -40,6 +43,7 @@ export const CHIP_FORGE_CATALOG: Record<ChipForgeId, ChipForgeDef> = {
     name: "Chip Bonus",
     line: "+6% shop chips earned per spin (each level)",
     icon: "poker-chip",
+    iconFamily: "MaterialCommunityIcons",
     baseCost: 3,
     maxLevel: 99,
   },
@@ -48,6 +52,7 @@ export const CHIP_FORGE_CATALOG: Record<ChipForgeId, ChipForgeDef> = {
     name: "Percent Boost",
     line: "+3% bank from +% wedges (each level)",
     icon: "percent",
+    iconFamily: "MaterialIcons",
     baseCost: 5,
     maxLevel: 99,
   },
@@ -55,7 +60,8 @@ export const CHIP_FORGE_CATALOG: Record<ChipForgeId, ChipForgeDef> = {
     id: "forge_barrier",
     name: "Shield Forge",
     line: "Every 2 levels: +1 hit shield",
-    icon: "shield-check",
+    icon: "shield-plus",
+    iconFamily: "MaterialCommunityIcons",
     baseCost: 7,
     maxLevel: 99,
   },
@@ -63,7 +69,8 @@ export const CHIP_FORGE_CATALOG: Record<ChipForgeId, ChipForgeDef> = {
     id: "forge_hot",
     name: "Hot Hand",
     line: "+2% win-streak cash bonus per level",
-    icon: "fire",
+    icon: "fire-circle",
+    iconFamily: "MaterialCommunityIcons",
     baseCost: 6,
     maxLevel: 99,
   },

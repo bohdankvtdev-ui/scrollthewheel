@@ -66,6 +66,69 @@ const PERK_CATALOG_RAW: Record<string, PerkDefinition> = {
     "final"
   ),
   clutch_cash: def("clutch_cash", "Clutch Cash", "cash-fast", "MaterialCommunityIcons", 1, "economy", "final"),
+  green_fever: def("green_fever", "Green Fever", "leaf", "MaterialCommunityIcons", 0, "wheel", "odds"),
+  chip_drip: def("chip_drip", "Chip Drip", "water", "MaterialCommunityIcons", 0, "meta", "shop"),
+  deep_pockets: def("deep_pockets", "Deep Pockets", "wallet", "MaterialCommunityIcons", 1, "meta", "shop"),
+  drain_ward: def("drain_ward", "Drain Ward", "shield-half-full", "MaterialCommunityIcons", 1, "defense", "defense"),
+  lucky_percent: def("lucky_percent", "Lucky Percent", "percent", "MaterialIcons", 0, "wheel", "odds"),
+  chaos_ward: def("chaos_ward", "Chaos Ward", "shield-alert", "MaterialCommunityIcons", 1, "defense", "defense"),
+  streak_spark: def("streak_spark", "Streak Spark", "lightning-bolt", "MaterialCommunityIcons", 2, "meta", "shop"),
+  jackpot_hunter: def(
+    "jackpot_hunter",
+    "Jackpot Hunter",
+    "treasure-chest",
+    "MaterialCommunityIcons",
+    2,
+    "wheel",
+    "odds"
+  ),
+  purify_touch: def(
+    "purify_touch",
+    "Purify Touch",
+    "water-outline",
+    "MaterialCommunityIcons",
+    1,
+    "defense",
+    "defense"
+  ),
+  hex_ward: def("hex_ward", "Hex Ward", "hexagon", "MaterialCommunityIcons", 1, "defense", "defense"),
+  ghost_repel: def(
+    "ghost_repel",
+    "Ghost Repel",
+    "ghost-off",
+    "MaterialCommunityIcons",
+    1,
+    "defense",
+    "defense"
+  ),
+  money_stream: def(
+    "money_stream",
+    "Money Stream",
+    "cash-fast",
+    "MaterialCommunityIcons",
+    1,
+    "wheel",
+    "odds"
+  ),
+  percent_focus: def("percent_focus", "Percent Focus", "percent", "MaterialIcons", 1, "wheel", "odds"),
+  curse_break: def(
+    "curse_break",
+    "Curse Break",
+    "broom",
+    "MaterialCommunityIcons",
+    3,
+    "defense",
+    "defense"
+  ),
+  cycle_momentum: def(
+    "cycle_momentum",
+    "Cycle Momentum",
+    "chart-line",
+    "MaterialCommunityIcons",
+    2,
+    "meta",
+    "shop"
+  ),
 };
 
 export const SLICE_PERK_IDS = ["extra_slice", "slice_expander"] as const;

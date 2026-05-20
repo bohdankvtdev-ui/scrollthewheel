@@ -57,6 +57,7 @@ export type SpinWheelStageProps = {
   hubMode?: "spin" | "claim" | "busy";
   onHubClaimPress?: () => void;
   sliceLabelMode?: "text" | "icons" | "both";
+  sliceIconScale?: number;
   hubAnimSubtle?: boolean;
   bulbRingPalette?: BulbRingPalette;
   onSlicePress?: (index: number) => void;
@@ -87,6 +88,7 @@ export function SpinWheelStage({
   hubMode = "spin",
   onHubClaimPress,
   sliceLabelMode = "text",
+  sliceIconScale = 1,
   hubAnimSubtle = false,
   bulbRingPalette,
   onSlicePress,
@@ -287,6 +289,7 @@ export function SpinWheelStage({
               hubMode={hubMode}
               onHubClaimPress={onHubClaimPress}
               sliceLabelMode={sliceLabelMode}
+              sliceIconScale={sliceIconScale}
               hubAnimSubtle={hubAnimSubtle}
               onSlicePress={onSlicePress}
               slicePressEnabled={slicePressEnabled}

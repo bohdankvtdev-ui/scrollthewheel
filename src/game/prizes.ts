@@ -1,6 +1,7 @@
 /** Prize pools — keyed by `slicePoolId` on each wheel in `loop.ts` WHEEL_ROTATION. */
 
 import type { SliceDefinition } from "../schemas";
+import { perkPrizeLabel } from "./perks/perkDisplay";
 
 
 
@@ -114,6 +115,12 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "r_perk_double", kind: "perk", label: "Double Down", icon: "exposure-plus-1", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "double_down" } },
 
+    { id: "r_green", kind: "perk", label: perkPrizeLabel("green_fever"), icon: "leaf", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "green_fever" } },
+
+    { id: "r_chip", kind: "perk", label: perkPrizeLabel("chip_drip"), icon: "water", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "chip_drip" } },
+
+    { id: "r_chaos", kind: "perk", label: perkPrizeLabel("chaos_ward"), icon: "shield-alert", iconFamily: "MaterialCommunityIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "chaos_ward" } },
+
   ],
 
   stabilizer: [
@@ -125,6 +132,8 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
     { id: "s_shield", kind: "perk", label: "Iron Reserve", icon: "shield", iconFamily: "MaterialCommunityIcons", baseWeight: 3, weightTags: ["positive", "rare"], payload: { perkId: "iron_reserve" } },
 
     { id: "s_perk_lucky", kind: "perk", label: "Lucky Clover", icon: "stars", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_streak" } },
+
+    { id: "s_drain_ward", kind: "perk", label: perkPrizeLabel("drain_ward"), icon: "shield-half-full", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "drain_ward" } },
 
     { id: "s_loss", kind: "money_loss", label: "-$50", icon: "remove-circle", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["negative"], payload: { moneyDelta: -50 } },
 
@@ -161,6 +170,8 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "j_high", kind: "perk", label: "High Roller", icon: "casino", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "high_roller" } },
 
+    { id: "j_deep", kind: "perk", label: perkPrizeLabel("deep_pockets"), icon: "wallet", iconFamily: "MaterialCommunityIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "deep_pockets" }, presentation: { rarity: "rare" } },
+
   ],
 
   power: [
@@ -182,6 +193,18 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
 
     { id: "pw_high", kind: "perk", label: "High Roller", icon: "casino", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "high_roller" } },
 
+    { id: "pw_green", kind: "perk", label: perkPrizeLabel("green_fever"), icon: "leaf", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "green_fever" } },
+
+    { id: "pw_chip", kind: "perk", label: perkPrizeLabel("chip_drip"), icon: "water", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "chip_drip" } },
+
+    { id: "pw_drain", kind: "perk", label: perkPrizeLabel("drain_ward"), icon: "shield-half-full", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "drain_ward" } },
+
+    { id: "pw_deep", kind: "perk", label: perkPrizeLabel("deep_pockets"), icon: "wallet", iconFamily: "MaterialCommunityIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "deep_pockets" }, presentation: { rarity: "rare" } },
+
+    { id: "pw_streak", kind: "perk", label: perkPrizeLabel("streak_spark"), icon: "lightning-bolt", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "streak_spark" } },
+
+    { id: "pw_jackpot", kind: "perk", label: perkPrizeLabel("jackpot_hunter"), icon: "treasure-chest", iconFamily: "MaterialCommunityIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "jackpot_hunter" }, presentation: { rarity: "rare" } },
+
   ],
 
   preparation: [
@@ -201,6 +224,14 @@ export const SLICE_POOLS: Record<SlicePoolId, SliceDefinition[]> = {
     { id: "p_gold", kind: "perk", label: "Gold Rush", icon: "trending-up", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "gold_rush" } },
 
     { id: "p_coupon", kind: "perk", label: "Coupon King", icon: "sell", iconFamily: "MaterialIcons", baseWeight: 1, weightTags: ["positive", "rare"], payload: { perkId: "coupon_king" } },
+
+    { id: "p_lucky_money", kind: "perk", label: perkPrizeLabel("lucky_money"), icon: "cash", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_money" } },
+
+    { id: "p_lucky_perk", kind: "perk", label: perkPrizeLabel("lucky_perk"), icon: "star-four-points", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_perk" } },
+
+    { id: "p_green", kind: "perk", label: perkPrizeLabel("green_fever"), icon: "leaf", iconFamily: "MaterialCommunityIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "green_fever" } },
+
+    { id: "p_lucky_pct", kind: "perk", label: perkPrizeLabel("lucky_percent"), icon: "percent", iconFamily: "MaterialIcons", baseWeight: 2, weightTags: ["positive", "rare"], payload: { perkId: "lucky_percent" } },
 
   ],
 

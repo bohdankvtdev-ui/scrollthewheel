@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -10,17 +10,15 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
+import { useRunChromeMetrics } from "../../../lib/layout/runChrome";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { isBankruptMoneyReveal, moneyRevealDurationMs } from "../../game/moneyReveal";
 import type { RunState } from "../../schemas";
 import { formatMoney } from "../../utils/formatMoney";
 
-/** Brief red flash on bank total after a loss (ms). */
 const LOSS_RED_HOLD_MS = 500;
 const BANKRUPT_RED_HOLD_MS = 180;
-
 const LOSS_MONEY = "#FF5C5C";
 
 type MoneyReveal = { before: number; delta: number };
@@ -31,7 +29,6 @@ type RunCasinoBarProps = {
   onMoneyRevealDone?: () => void;
   shopHighlighted?: boolean;
   onShop: () => void;
-  onYourWheel: () => void;
   onReset: () => void;
 };
 
@@ -41,11 +38,10 @@ export function RunCasinoBar({
   onMoneyRevealDone,
   shopHighlighted = false,
   onShop,
-  onYourWheel,
   onReset,
 }: RunCasinoBarProps) {
   const router = useRouter();
-  const runChips = run.chipsEarnedThisRun ?? 0;
+  const chrome = useRunChromeMetrics();
   const pulse = useSharedValue(1);
   const moneyPop = useSharedValue(1);
   const [shownMoney, setShownMoney] = useState(run.money);
@@ -64,7 +60,7 @@ export function RunCasinoBar({
       return;
     }
     pulse.value = withRepeat(
-      withSequence(withTiming(1.12, { duration: 520 }), withTiming(1, { duration: 520 })),
+      withSequence(withTiming(1.1, { duration: 520 }), withTiming(1, { duration: 520 })),
       -1,
       true
     );
@@ -86,7 +82,6 @@ export function RunCasinoBar({
     const before = Number(revealKey.slice(0, sep));
     const delta = Number(revealKey.slice(sep + 1));
     const end = Math.max(0, before + delta);
-    const isLoss = delta < 0;
     const isBankrupt = isBankruptMoneyReveal({ before, delta });
     const durationMs = moneyRevealDurationMs({ before, delta });
     let raf = 0;
@@ -96,7 +91,7 @@ export function RunCasinoBar({
     setLossTintActive(false);
 
     moneyPop.value = withSequence(
-      withTiming(1.1, { duration: isBankrupt ? 140 : 220 }),
+      withTiming(1.08, { duration: isBankrupt ? 140 : 220 }),
       withTiming(1, { duration: isBankrupt ? 160 : 280 })
     );
 
@@ -112,15 +107,12 @@ export function RunCasinoBar({
       if (finished) return;
       finished = true;
       setShownMoney(end);
-      if (isLoss) setLossTintActive(true);
+      if (delta < 0) setLossTintActive(true);
       onDoneRef.current?.();
     };
 
     raf = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(raf);
-    };
+    return () => cancelAnimationFrame(raf);
   }, [revealKey, moneyPop]);
 
   useEffect(() => {
@@ -138,20 +130,43 @@ export function RunCasinoBar({
   }));
 
   const moneyColor = lossTintActive ? LOSS_MONEY : Neo.neonYellow;
+  const actionSize = chrome.bar.actionSize;
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.chipBlock} accessibilityLabel={`${runChips} chips this run`}>
-        <MaterialCommunityIcons name="poker-chip" size={18} color={Neo.neonCyan} />
-        <Text style={[styles.chipVal, { fontFamily: FONT_BEBAS_NEUE }]}>{runChips}</Text>
-      </View>
+    <View
+      style={[
+        styles.wrap,
+        {
+          minHeight: chrome.bar.minHeight,
+          paddingHorizontal: chrome.bar.padH,
+        },
+      ]}
+    >
       <Animated.View style={[styles.moneyBlock, moneyAnimStyle]}>
-        <Text style={[styles.moneyPrefix, { fontFamily: FONT_BEBAS_NEUE, color: moneyColor }]}>
+        <Text
+          style={[
+            styles.moneyPrefix,
+            {
+              fontFamily: FONT_BEBAS_NEUE,
+              color: moneyColor,
+              fontSize: chrome.bar.moneyPrefixSize,
+            },
+          ]}
+        >
           $
         </Text>
         <Text
-          style={[styles.moneyVal, { fontFamily: FONT_BEBAS_NEUE, color: moneyColor }]}
+          style={[
+            styles.moneyVal,
+            {
+              fontFamily: FONT_BEBAS_NEUE,
+              color: moneyColor,
+              fontSize: chrome.bar.moneySize,
+            },
+          ]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
         >
           {formatMoney(moneyReveal != null ? shownMoney : run.money)}
         </Text>
@@ -160,8 +175,9 @@ export function RunCasinoBar({
             style={[
               styles.moneyDelta,
               isLossReveal ? styles.moneyDeltaLoss : styles.moneyDeltaGain,
-              { fontFamily: FONT_BEBAS_NEUE },
+              { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.narrow ? 13 : 14 },
             ]}
+            numberOfLines={1}
           >
             {isLossReveal ? "−" : "+"}
             {formatMoney(Math.abs(moneyReveal.delta))}
@@ -169,93 +185,79 @@ export function RunCasinoBar({
         ) : null}
       </Animated.View>
 
-      <Pressable
-        style={styles.yourWheelBtn}
-        onPress={onYourWheel}
-        accessibilityLabel="Your Wheel — view slices and odds"
-        hitSlop={6}
-      >
-        <MaterialIcons name="album" size={22} color={Neo.ink} />
-      </Pressable>
-
-      <View style={styles.shopWrap}>
-        <Animated.View pointerEvents="none" style={[styles.shopHighlightRing, shopRingStyle]} />
+      <View style={styles.actions}>
+        <View style={[styles.shopWrap, { width: actionSize, height: actionSize }]}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.shopHighlightRing,
+              shopRingStyle,
+              { width: actionSize + 4, height: actionSize + 4, borderRadius: 10 },
+            ]}
+          />
+          <Pressable
+            style={[
+              styles.actionBtn,
+              styles.shopBtn,
+              { width: actionSize, height: actionSize },
+              shopHighlighted && styles.shopBtnHighlighted,
+            ]}
+            onPress={onShop}
+            accessibilityLabel={shopHighlighted ? "Perk shop" : "Open shop"}
+            accessibilityState={{ selected: shopHighlighted }}
+            hitSlop={6}
+          >
+            <MaterialIcons name="storefront" size={chrome.bar.iconSize} color={Neo.ink} />
+          </Pressable>
+        </View>
         <Pressable
-          style={[styles.shopBtn, shopHighlighted && styles.shopBtnHighlighted]}
-          onPress={onShop}
-          accessibilityLabel={shopHighlighted ? "Perk shop — tap to buy or reroll" : "Open shop"}
-          accessibilityState={{ selected: shopHighlighted }}
+          style={[styles.actionBtn, { width: actionSize, height: actionSize }]}
+          onPress={() => router.push("/")}
+          accessibilityLabel="Menu"
           hitSlop={6}
         >
-          <MaterialIcons name="storefront" size={22} color={Neo.ink} />
+          <MaterialIcons name="home" size={chrome.bar.iconSize} color={Neo.textOnDark} />
+        </Pressable>
+        <Pressable
+          style={[styles.actionBtn, { width: actionSize, height: actionSize }]}
+          onPress={onReset}
+          accessibilityLabel="Reset run"
+          hitSlop={6}
+        >
+          <MaterialIcons name="logout" size={chrome.bar.iconSize - 2} color={Neo.textOnDark} />
         </Pressable>
       </View>
-
-      <Pressable style={styles.iconBtn} onPress={onReset} accessibilityLabel="Reset run" hitSlop={6}>
-        <MaterialIcons name="refresh" size={20} color={Neo.textOnDark} />
-      </Pressable>
-      <Pressable
-        style={styles.iconBtn}
-        onPress={() => router.push("/")}
-        accessibilityLabel="Menu"
-        hitSlop={6}
-      >
-        <MaterialIcons name="home" size={20} color={Neo.textOnDark} />
-      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    height: RUN_LAYOUT.bar,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
     gap: 10,
     backgroundColor: Neo.headerBg,
-    borderBottomWidth: Neo.borderBold,
-    borderBottomColor: Neo.ink,
-  },
-  chipBlock: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    height: 32,
-    backgroundColor: "rgba(34,211,238,0.15)",
-    borderRadius: 8,
-    borderWidth: Neo.borderThin,
-    borderColor: "rgba(34,211,238,0.4)",
-  },
-  chipVal: {
-    fontSize: 16,
-    color: Neo.neonCyan,
-    letterSpacing: 0.3,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
   },
   moneyBlock: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "baseline",
-    flex: 1,
     minWidth: 0,
     gap: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
   },
   moneyPrefix: {
-    fontSize: 20,
-    opacity: 0.85,
+    opacity: 0.88,
   },
   moneyVal: {
-    fontSize: 28,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
     flexShrink: 1,
   },
   moneyDelta: {
-    fontSize: 15,
-    marginLeft: 6,
-    letterSpacing: 0.3,
+    marginLeft: 4,
+    letterSpacing: 0.25,
+    flexShrink: 0,
   },
   moneyDeltaGain: {
     color: Neo.neonCyan,
@@ -263,53 +265,37 @@ const styles = StyleSheet.create({
   moneyDeltaLoss: {
     color: LOSS_MONEY,
   },
-  yourWheelBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#22D3EE",
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
+  actions: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
+    flexShrink: 0,
   },
   shopWrap: {
     position: "relative",
-    width: 40,
-    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
   shopHighlightRing: {
     position: "absolute",
-    width: 46,
-    height: 46,
-    borderRadius: 12,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: Neo.neonCyan,
-    backgroundColor: "rgba(34,211,238,0.15)",
+    backgroundColor: "rgba(34,211,238,0.12)",
   },
-  shopBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: Neo.neonYellow,
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
+  actionBtn: {
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  shopBtn: {
+    backgroundColor: Neo.neonYellow,
+    borderWidth: 1.5,
+    borderColor: Neo.ink,
   },
   shopBtnHighlighted: {
     backgroundColor: Neo.neonCyan,
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: Neo.borderThin,
-    borderColor: "rgba(255,255,255,0.15)",
   },
 });

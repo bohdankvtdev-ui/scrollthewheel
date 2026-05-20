@@ -1,4 +1,4 @@
-import type { RunState } from "../../schemas";
+import type { IconFamily, RunState } from "../../schemas";
 
 export type PitStopOptionId = "pit_laser" | "pit_cash" | "pit_chips";
 
@@ -7,6 +7,7 @@ export type PitStopOption = {
   title: string;
   line: string;
   icon: string;
+  iconFamily: IconFamily;
 };
 
 export const PIT_STOP_OPTIONS: PitStopOption[] = [
@@ -15,18 +16,21 @@ export const PIT_STOP_OPTIONS: PitStopOption[] = [
     title: "Wedge Laser",
     line: "+1 laser charge",
     icon: "ray-start",
+    iconFamily: "MaterialCommunityIcons",
   },
   {
     id: "pit_cash",
     title: "Cash infusion",
     line: "+$50 bank",
-    icon: "attach-money",
+    icon: "payments",
+    iconFamily: "MaterialIcons",
   },
   {
     id: "pit_chips",
     title: "Chip stash",
     line: "+10 shop chips",
-    icon: "poker-chip",
+    icon: "plus-circle-multiple-outline",
+    iconFamily: "MaterialCommunityIcons",
   },
 ];
 

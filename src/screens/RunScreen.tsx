@@ -4,8 +4,10 @@ import { Asset } from "expo-asset";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { RUN_PAGE_BACKGROUND } from "../game/runVisual";
+import { isBossCycleOverlay } from "../game/cycle/bossCycleFlow";
 import { RunCasinoBar } from "../components/run/RunCasinoBar";
-import { CycleClearOverlay } from "../components/run/CycleClearOverlay";
+import { RunWheelActionBar } from "../components/run/RunWheelActionBar";
+import { BossCycleStage } from "../components/run/BossCycleStage";
 import { RunEndModal } from "../components/run/RunEndModal";
 import { RunLoadoutDock } from "../components/run/RunLoadoutDock";
 import { RunLoadingShell } from "../components/run/RunLoadingShell";
@@ -16,7 +18,6 @@ import { RunPrizeFlash } from "../components/run/RunPrizeFlash";
 import { useTacticHud } from "../hooks/useTacticHud";
 import { ShopModal } from "../components/run/ShopModal";
 import { YourWheelSheet } from "../components/run/YourWheelSheet";
-import { RunWheelFeed } from "../components/wheel/RunWheelFeed";
 import { useRunLifecycle } from "../hooks/useRunLifecycle";
 import { ADVANCEMENT_CATALOG } from "../game/advancements";
 import { PERK_CATALOG } from "../data/perks";
@@ -25,6 +26,7 @@ import { ShopSystem } from "../systems/ShopSystem";
 import { useRunStore } from "../stores/runStore";
 import { runReelUiKey } from "../game/runState/runReelFeedKey";
 import { showRunInfoNotice, showRunNotice } from "../game/notices/runNotices";
+import { LAST_WHEEL_INDEX } from "../game/cycle/cycleTransition";
 
 const SPIN_HUB_ASSET = require("../../assets/images/middle.png");
 
@@ -45,12 +47,16 @@ export function RunScreen() {
   const lastWonDebuffId = useRunStore((s) => s.ui.lastWonDebuffId);
   const lastRewardKind = useRunStore((s) => s.ui.lastRewardKind);
   const startRun = useRunStore((s) => s.startRun);
-  const showCycleReward = useRunStore((s) => s.ui.showCycleReward);
-  const pendingBossCycleTransition = useRunStore((s) => s.ui.pendingBossCycleTransition);
+  const bossCyclePhase = useRunStore((s) => s.ui.bossCyclePhase);
+  const bossSliceEffect = useRunStore((s) => s.ui.bossSliceEffect);
   const lastResultLabel = useRunStore((s) => s.ui.lastResultLabel);
   const continueAfterCycleReward = useRunStore((s) => s.continueAfterCycleReward);
+  const continueInfiniteAfterAlpha = useRunStore((s) => s.continueInfiniteAfterAlpha);
+  const endRunAfterAlpha = useRunStore((s) => s.endRunAfterAlpha);
   const moneyReveal = useRunStore((s) => s.ui.moneyReveal);
+  const chipReveal = useRunStore((s) => s.ui.chipReveal);
   const commitMoneyReveal = useRunStore((s) => s.commitMoneyReveal);
+  const commitChipReveal = useRunStore((s) => s.commitChipReveal);
   const preSpinSnapshot = useRunStore((s) => s.preSpinSnapshot);
   const lastSliceId = useRunStore((s) => s.ui.lastSliceId);
   const gambleFlipActive = useRunStore((s) => s.ui.gambleFlipActive);
@@ -69,12 +75,14 @@ export function RunScreen() {
 
   const pageBg = RUN_PAGE_BACKGROUND;
 
-  const onFeedLayout = useCallback((h: number) => {
+  const onWheelStageLayout = useCallback((h: number) => {
     const rounded = Math.floor(h);
     if (rounded < 200 || Math.abs(feedHeightRef.current - rounded) < 2) return;
     feedHeightRef.current = rounded;
     setPageHeight(rounded);
   }, []);
+
+  const bossOverlay = isBossCycleOverlay(bossCyclePhase);
 
   useEffect(() => {
     void Asset.fromModule(SPIN_HUB_ASSET as number)
@@ -220,12 +228,11 @@ export function RunScreen() {
     );
   }
 
-  const cycleTransition = showCycleReward && run.phase === "won";
-  const hidePrizeBar =
-    cycleTransition || pendingBossCycleTransition || run.phase === "won";
+  const hidePrizeBar = bossOverlay || run.phase === "won" || run.phase === "alpha_won";
+  const isBossAwaitingClaim =
+    awaitingClaim && run.wheelIndex === LAST_WHEEL_INDEX && bossCyclePhase === "none";
   const reelUiKey = runReelUiKey({
     awaitingClaim,
-    pendingBossCycleTransition,
     isSpinning,
     gambleFlipActive,
     lastResultLabel,
@@ -240,7 +247,6 @@ export function RunScreen() {
         onMoneyRevealDone={commitMoneyReveal}
         shopHighlighted={shopPending && awaitingClaim}
         onShop={handleShopOpen}
-        onYourWheel={() => setYourWheelOpen(true)}
         onReset={handleReset}
       />
       <RunStageRail run={run} />
@@ -252,13 +258,25 @@ export function RunScreen() {
         />
         <RunNoticeHost />
       </View>
-      <View
-        style={styles.feed}
-        pointerEvents={hidePrizeBar ? "none" : "auto"}
-        onLayout={(e) => onFeedLayout(e.nativeEvent.layout.height)}
-      >
-        <RunWheelFeed run={run} pageHeight={pageHeight} reelUiKey={reelUiKey} />
-      </View>
+      <BossCycleStage
+        run={run}
+        pageHeight={pageHeight}
+        reelUiKey={reelUiKey}
+        bossCyclePhase={bossCyclePhase}
+        bossSliceEffect={bossSliceEffect}
+        onContinue={continueAfterCycleReward}
+        onContinueInfinite={continueInfiniteAfterAlpha}
+        onEndCampaign={endRunAfterAlpha}
+        onLayout={onWheelStageLayout}
+      />
+      {!hidePrizeBar ? (
+        <RunWheelActionBar
+          run={run}
+          chipReveal={chipReveal}
+          onChipRevealDone={commitChipReveal}
+          onYourWheel={() => setYourWheelOpen(true)}
+        />
+      ) : null}
       {!hidePrizeBar ? (
         showDesperationPick ? (
           <DesperationPickBar
@@ -275,6 +293,7 @@ export function RunScreen() {
             tacticPick={tacticHud.phase === "pick"}
             run={run}
             onDismissTactic={dismissTacticOffers}
+            bossEndCycleHint={isBossAwaitingClaim}
           />
         )
       ) : null}
@@ -290,14 +309,20 @@ export function RunScreen() {
         onReroll={handleReroll}
       />
       <YourWheelSheet visible={yourWheelOpen} run={run} onClose={() => setYourWheelOpen(false)} />
-      {cycleTransition ? (
-        <CycleClearOverlay run={run} onContinue={continueAfterCycleReward} />
-      ) : null}
-      {run.phase !== "active" &&
-      run.phase !== "won" &&
-      !showDesperationPick &&
-      (moneyReveal == null || run.phase === "lost_money") ? (
-        <RunEndModal phase={run.phase} floor={run.floor} onRestart={handleReset} />
+      {((run.phase === "alpha_won" && bossCyclePhase === "none") ||
+        (run.phase !== "active" &&
+          run.phase !== "won" &&
+          run.phase !== "alpha_won" &&
+          bossCyclePhase === "none" &&
+          !showDesperationPick &&
+          (moneyReveal == null || run.phase === "lost_money"))) ? (
+        <RunEndModal
+          phase={run.phase}
+          floor={run.floor}
+          money={run.money}
+          peakMoney={run.peakMoney}
+          onRestart={handleReset}
+        />
       ) : null}
     </SafeAreaView>
   );
@@ -310,5 +335,4 @@ const styles = StyleSheet.create({
     zIndex: 40,
     overflow: "visible",
   },
-  feed: { flex: 1, minHeight: 280, overflow: "hidden" },
 });

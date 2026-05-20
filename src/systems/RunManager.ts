@@ -62,6 +62,8 @@ import {
 import { applyChipForgeToModifiers } from "../game/shop/chipForge";
 
 import { getCycleRewardPackage } from "../game/cycle/cycleProgression";
+import { ALPHA_CAMPAIGN_CYCLES } from "../game/gdd";
+import { rollCurseResisted } from "../game/debuffs/curseRules";
 import {
   applyPostBuilderSliceFloor,
   sliceCapacityForNextCycle,
@@ -230,10 +232,13 @@ export class RunManager {
 
 
 
-    if (payload.debuffId != null && DEBUFF_CATALOG[payload.debuffId] != null && !next.debuffs.includes(payload.debuffId)) {
-
+    if (
+      payload.debuffId != null &&
+      DEBUFF_CATALOG[payload.debuffId] != null &&
+      !next.debuffs.includes(payload.debuffId) &&
+      !rollCurseResisted(next)
+    ) {
       next = { ...next, debuffs: [...next.debuffs, payload.debuffId] };
-
     }
 
 
@@ -377,11 +382,15 @@ export class RunManager {
       cycleEnd.chipsBonus + reward.chips
     ) as RunState;
 
+    const alphaMilestone = next.floor === ALPHA_CAMPAIGN_CYCLES;
+
     return {
       ...next,
       phase: "won",
       lastCycleReward: { cycle: reward.cycle, chips: reward.chips, money: reward.money },
-      runEffects: { ...next.runEffects, pitStopPending: true },
+      runEffects: alphaMilestone
+        ? { ...next.runEffects, pitStopPending: false, alphaMilestonePending: true }
+        : { ...next.runEffects, pitStopPending: true },
     };
 
   }

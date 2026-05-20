@@ -1,5 +1,7 @@
 import { DEBUFF_CATALOG } from "../../data/debuffs";
 import { PERK_CATALOG } from "../../data/perks";
+import { RELIC_CATALOG } from "../../data/relics";
+import { resolveEntityIcon } from "../content/resolveIcon";
 import { useRunToastStore, type RunToastType } from "../../stores/runToastStore";
 import type { CycleRewardPackage } from "../cycle/cycleProgression";
 import { MICRO_CHOICE_META, type MicroChoiceId } from "../tactics/microChoices";
@@ -71,6 +73,19 @@ export function showShieldPerkNotice(perkId: string): void {
     body: perk.name,
     icon: perk.icon,
     durationMs: noticeDurationMs("Shield perk", perk.name),
+  });
+}
+
+export function showRelicWonNotice(relicId: string): void {
+  const relic = RELIC_CATALOG[relicId];
+  const resolved = resolveEntityIcon("relic", relicId);
+  if (relic == null) return;
+  showRunNotice({
+    type: "success",
+    title: "Relic won",
+    body: `${relic.name} — ${relic.description}`,
+    icon: resolved.icon,
+    durationMs: noticeDurationMs("Relic won", relic.description),
   });
 }
 

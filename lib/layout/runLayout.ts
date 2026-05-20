@@ -1,7 +1,11 @@
-/** Run HUD chrome heights — wheel gets remaining flex space. */
+/**
+ * Run HUD chrome — prefer `useRunChromeMetrics()` for responsive min-heights.
+ * These are fallback estimates for layout math / loading shell.
+ */
 export const RUN_LAYOUT = {
-  bar: 52,
-  stageRail: 108,
+  bar: 44,
+  stageRail: 52,
+  wheelHud: 42,
   /** @deprecated Stakes banner removed — kept 0 so layout math stays stable */
   bossStrip: 0,
   loadout: 48,

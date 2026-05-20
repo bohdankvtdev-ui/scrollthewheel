@@ -5,7 +5,7 @@
 
 import type { WheelConfigEntry, WheelConfigId } from "./types";
 
-export const WHEEL_DATABASE_REVISION = 23;
+export const WHEEL_DATABASE_REVISION = 26;
 
 export const FLOOR_WHEEL_ORDER = [
   "wheel_1",

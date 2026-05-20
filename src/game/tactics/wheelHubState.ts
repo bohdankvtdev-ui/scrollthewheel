@@ -74,7 +74,7 @@ export function labelFromHistory(run: RunState, wheelIndex: number): string | nu
 
 export type RunUiTacticFields = {
   awaitingClaim: boolean;
-  pendingBossCycleTransition?: boolean;
+  bossCyclePhase?: "none" | "reward";
   gambleFlipActive: boolean;
   isSpinning: boolean;
   /** Wheel index when `isSpinning` was set — stale spins clear when this ≠ current wheel. */
@@ -114,7 +114,7 @@ export function reconcileRunUi(run: RunState, ui: RunUiTacticFields): RunUiTacti
     hasHistory &&
     !next.isSpinning &&
     !next.awaitingClaim &&
-    !next.pendingBossCycleTransition
+    (next.bossCyclePhase ?? "none") === "none"
   ) {
     next.awaitingClaim = true;
     if (next.lastResultLabel == null) {

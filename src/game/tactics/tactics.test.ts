@@ -107,8 +107,8 @@ describe("tactics", () => {
   it("gamble is a 2-slice wheel", () => {
     const slices = buildGambleSlices();
     expect(slices).toHaveLength(2);
-    expect(slices[0]?.label).toBe("+100%");
-    expect(slices[1]?.label).toBe("−100%");
+    expect(slices[0]?.label).toBe("×2");
+    expect(slices[1]?.label).toBe("LOSE");
   });
 
   it("tactics cost chips", () => {

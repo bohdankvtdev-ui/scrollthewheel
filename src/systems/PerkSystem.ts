@@ -15,6 +15,8 @@ import {
   remapWheelsAfterCapacityChange,
   syncRunWheels,
 } from "./WheelSystem";
+import { grantChipsInRun } from "../game/shop/chipEconomy";
+import { removeAllCurses, removeOldestCurse } from "../game/debuffs/curseRules";
 
 const MAX_SLICES = RUN_DEFAULTS.maxSliceCapacity;
 
@@ -70,6 +72,23 @@ export function applyPerkAcquisition(run: RunState, perkId: string): RunState {
       shieldPerks: appendShieldPerk(run, perkId),
       runEffects: { ...run.runEffects, safeHarborActive: true },
     };
+  }
+
+  if (perkId === "purify_touch") {
+    if (run.perks.includes(perkId)) return run;
+    if (isJokerSlotFull(run)) return run;
+    let next: RunState = { ...run, perks: [...run.perks, perkId] };
+    if (next.debuffs.length > 0) {
+      return removeOldestCurse(next);
+    }
+    return grantChipsInRun(next, 5);
+  }
+
+  if (perkId === "curse_break") {
+    if (run.perks.includes(perkId)) return run;
+    if (isJokerSlotFull(run)) return run;
+    const next: RunState = { ...run, perks: [...run.perks, perkId] };
+    return removeAllCurses(next);
   }
 
   const isSlice =

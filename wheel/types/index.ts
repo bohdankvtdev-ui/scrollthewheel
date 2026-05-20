@@ -63,6 +63,8 @@ export type SpinWheelProps = {
   onHubClaimPress?: () => void;
   /** `icons` hides wedge text and draws icon chips on slices. */
   sliceLabelMode?: "text" | "icons" | "both";
+  /** Scales wedge icons/captions (e.g. 1.45 on 2-slice gamble). */
+  sliceIconScale?: number;
   /** Softer hub pulse while spinning (less visual jump). */
   hubAnimSubtle?: boolean;
   /** When true, hub press only fires `onSpinPress` — parent must call `spinToIndex` via ref. */

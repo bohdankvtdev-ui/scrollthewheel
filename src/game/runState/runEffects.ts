@@ -58,15 +58,17 @@ export function applyRunEffect(run: RunState, slice: SliceDefinition, wheelIndex
     case "lock_drain":
       next = forceWheelArchetype(next, wheelIndex + 1, "drain");
       break;
-    case "boss_ghost":
+    case "boss_ghost": {
+      const ghostBias = next.perks.includes("ghost_repel") ? 0.1 : 0.2;
       next = {
         ...next,
         runEffects: {
           ...next.runEffects,
-          negativeBiasBonus: (next.runEffects?.negativeBiasBonus ?? 0) + 0.2,
+          negativeBiasBonus: (next.runEffects?.negativeBiasBonus ?? 0) + ghostBias,
         },
       };
       break;
+    }
     case "corruption_spread":
       if (!next.relics.includes("firewall")) {
         next = {

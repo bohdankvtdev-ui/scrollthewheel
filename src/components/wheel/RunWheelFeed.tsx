@@ -38,10 +38,7 @@ import { getArchetypeForConfigId } from "../../game/wheels/database";
 import { RunManager } from "../../systems/RunManager";
 import { syncRunWheels } from "../../systems/WheelSystem";
 import type { RunState } from "../../schemas";
-import {
-  LAST_WHEEL_INDEX,
-  previewNextCycleRun,
-} from "../../game/cycle/cycleTransition";
+import { isBossWheelClaim } from "../../game/cycle/cycleTransition";
 import { deriveHubMode, deriveSpinLocked } from "../../game/tactics/wheelHubState";
 import {
   buildGambleSlices,
@@ -135,6 +132,8 @@ const RunWheelSlot = memo(function RunWheelSlot({
     if (baseWheel == null || !gambleFlipActive || !isActiveWheel) return baseWheel;
     return overlayGambleWheel(baseWheel);
   }, [baseWheel, gambleFlipActive, isActiveWheel]);
+  const sliceIconScale =
+    gambleFlipActive && isActiveWheel && (wheel?.slices.length ?? 0) === 2 ? 1.48 : 1;
   const [previewSliceIndex, setPreviewSliceIndex] = useState<number | null>(null);
   const eraseArmed = sliceEraseMode && isActiveWheel && !spinLocked && !isSpinning;
 
@@ -229,6 +228,7 @@ const RunWheelSlot = memo(function RunWheelSlot({
             hubMode={hubMode}
             onHubClaimPress={onHubClaimPress}
             sliceLabelMode="icons"
+            sliceIconScale={sliceIconScale}
             hubAnimSubtle
             onExternalSpinPress={onExternalSpinPress}
             onBulbRingPhaseChange={onBulbRingPhaseChange}
@@ -263,8 +263,9 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     gambleFlipActive,
     sliceEraseMode,
     lastResultLabel,
-    pendingBossCycleTransition,
+    bossCyclePhase,
   } = useRunWheelUi();
+  const bossCycleUiActive = bossCyclePhase !== "none";
   const [spinArmEpoch, setSpinArmEpoch] = useState(0);
   const prevWheelIndexRef = useRef(run.wheelIndex);
   const dismissToast = useRunToastStore((s) => s.dismiss);
@@ -274,13 +275,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     []
   );
 
-  const rounds = useRunReelRounds(
-    run,
-    awaitingClaim,
-    lastResultLabel,
-    gambleFlipActive,
-    pendingBossCycleTransition
-  );
+  const rounds = useRunReelRounds(run, awaitingClaim, lastResultLabel, gambleFlipActive);
   const spinWheelRef = useRef<SpinWheelRef>(null);
   const pendingSliceRef = useRef<{
     wheelIndex: number;
@@ -318,11 +313,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({
   const reelEngineRef = useRef<ReturnType<typeof useReelStripEngine> | null>(null);
 
   const onStripSettled = useCallback(() => {
-    const store = useRunStore.getState();
-    if (store.ui.pendingBossCycleTransition) {
-      store.finishBossCycleTransition();
-    }
-    store.healRunUi();
+    useRunStore.getState().healRunUi();
   }, []);
 
   const onReelAdvanced = useCallback(() => {
@@ -355,12 +346,21 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     showRunInfoNotice(result.reason);
   }, []);
 
+  const shouldAdvanceStripAfterClaim = useCallback((roundIndex: number) => {
+    const store = useRunStore.getState();
+    if (store.ui.bossCyclePhase !== "none") return false;
+    const current = store.run;
+    if (current != null && isBossWheelClaim(current, roundIndex)) return false;
+    return true;
+  }, []);
+
   const reel = useReelStripEngine({
     pageHeight,
     rounds,
     initialActiveIndex: run.wheelIndex,
     bootRunId: `${run.runId}:${run.floor}`,
     onClaimed,
+    shouldAdvanceStripAfterClaim,
     onPrepareAdvance: () => useRunStore.getState().commitWheelLayout(),
     onReelAdvanced,
     onStripSettled,
@@ -370,8 +370,17 @@ export const RunWheelFeed = memo(function RunWheelFeed({
   reelEngineRef.current = reel;
 
   const handleHubClaim = useCallback(() => {
-    const { ui } = useRunStore.getState();
+    const store = useRunStore.getState();
+    const { ui, run: current } = store;
     if (ui.isSpinning || ui.gambleFlipActive) return;
+    if (
+      current != null &&
+      ui.awaitingClaim &&
+      isBossWheelClaim(current, current.wheelIndex)
+    ) {
+      store.claimAndAdvance();
+      return;
+    }
     reel.requestAdvance();
   }, [reel]);
 
@@ -488,39 +497,29 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     reel.onPrimaryBulbPhaseChange("idle");
   }, [reel, run.wheelIndex]);
 
+  const prevBossPhaseRef = useRef(bossCyclePhase);
   useEffect(() => {
+    const prev = prevBossPhaseRef.current;
+    prevBossPhaseRef.current = bossCyclePhase;
+    if (prev === "reward" && bossCyclePhase === "none") {
+      reel.snapToIndex(run.wheelIndex);
+      reel.setSpinningSafe(false);
+      reel.onPrimaryBulbPhaseChange("idle");
+      useRunStore.getState().clearSpinInteraction();
+      useRunStore.getState().healRunUi();
+    }
+  }, [bossCyclePhase, reel, run.wheelIndex]);
+
+  useEffect(() => {
+    if (bossCycleUiActive) return;
     if (reel.interactionLocked) return;
     const store = useRunStore.getState();
-    if (store.ui.pendingBossCycleTransition) {
-      if (reel.activeIndex === 0 && !reel.interactionLocked) {
-        store.finishBossCycleTransition();
-      }
-      return;
-    }
-    if (
-      run.phase === "won" &&
-      run.wheelIndex === 0 &&
-      reel.activeIndex === LAST_WHEEL_INDEX &&
-      !store.ui.showCycleReward
-    ) {
-      reel.snapToIndex(0);
-      reel.setSpinningSafe(false);
-      store.clearSpinInteraction();
-      reel.onPrimaryBulbPhaseChange("idle");
-      return;
-    }
     if (reel.activeIndex === run.wheelIndex) return;
     reel.snapToIndex(run.wheelIndex);
     reel.setSpinningSafe(false);
     store.clearSpinInteraction();
     reel.onPrimaryBulbPhaseChange("idle");
-  }, [reel, run.wheelIndex, run.phase, reel.activeIndex]);
-
-  useEffect(() => {
-    if (!pendingBossCycleTransition) return;
-    if (reel.activeIndex !== 0 || reel.interactionLocked) return;
-    useRunStore.getState().finishBossCycleTransition();
-  }, [pendingBossCycleTransition, reel.activeIndex, reel.interactionLocked]);
+  }, [bossCycleUiActive, reel, run.wheelIndex]);
 
   useEffect(() => {
     if (reel.activeIndex !== run.wheelIndex) return;
@@ -549,19 +548,10 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     wasSpinningRef.current = isSpinning;
   }, [dismissToast, isSpinning]);
 
-  const cycleWrapReveal =
-    reel.activeIndex === LAST_WHEEL_INDEX &&
-    rounds[LAST_WHEEL_INDEX]?.status === "won" &&
-    (awaitingClaim || pendingBossCycleTransition);
-  const stripNextIndex = cycleWrapReveal ? 0 : reel.nextIndex;
+  const stripNextIndex = reel.nextIndex;
 
   const mountNextStripSlot =
     stripNextIndex != null && (scrolling || revealNextSlot || reel.stripSpringing);
-
-  const previewRun = useMemo(
-    () => (cycleWrapReveal && run != null ? previewNextCycleRun(run) : run),
-    [cycleWrapReveal, run]
-  );
 
   const renderStripBuffer = useCallback(
     (buffer: "a" | "b") => {
@@ -570,11 +560,8 @@ export const RunWheelFeed = memo(function RunWheelFeed({
         return <View style={[styles.slotRow, { height: pageHeight }]} />;
       }
       const ri = roundIndex as number;
-      const slotRun = buffer === "b" && cycleWrapReveal && previewRun != null ? previewRun : run;
-      const round =
-        buffer === "b" && cycleWrapReveal
-          ? ({ status: "ready" as const, prize: null })
-          : rounds[ri];
+      const slotRun = run;
+      const round = rounds[ri];
 
       const isActive = ri === reel.activeIndex;
       const hubMode = deriveHubMode({
@@ -617,7 +604,6 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     },
     [
       awaitingClaim,
-      cycleWrapReveal,
       gambleFlipActive,
       spinArmEpoch,
       handleBanishSlice,
@@ -626,7 +612,6 @@ export const RunWheelFeed = memo(function RunWheelFeed({
       handleSpinComplete,
       isSpinning,
       pageHeight,
-      previewRun,
       reel.stripSpringing,
       reel.activeIndex,
       reel.onPrimaryBulbPhaseChange,

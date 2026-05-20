@@ -42,6 +42,8 @@ export type UseReelStripEngineArgs = {
   bootRunId?: string;
   /** Return false to cancel reel advance (store did not commit the claim). */
   onClaimed: (roundIndex: number) => boolean;
+  /** When false after a successful claim, strip index stays put (boss cycle dismiss). */
+  shouldAdvanceStripAfterClaim?: (roundIndex: number) => boolean;
   /** Commit pending wheel layout before swipe spring (avoids slice-count pop mid-transition). */
   onPrepareAdvance?: () => void;
   growToMinLength?: (minLength: number) => void;
@@ -106,6 +108,7 @@ export function useReelStripEngine({
   initialActiveIndex = 0,
   bootRunId,
   onClaimed,
+  shouldAdvanceStripAfterClaim,
   onPrepareAdvance,
   growToMinLength,
   onReelAdvanced,
@@ -119,6 +122,8 @@ export function useReelStripEngine({
   roundsRef.current = rounds;
   const onClaimedRef = useRef(onClaimed);
   onClaimedRef.current = onClaimed;
+  const shouldAdvanceStripRef = useRef(shouldAdvanceStripAfterClaim);
+  shouldAdvanceStripRef.current = shouldAdvanceStripAfterClaim;
   const onReelAdvancedRef = useRef(onReelAdvanced);
   onReelAdvancedRef.current = onReelAdvanced;
   const onStripSettledRef = useRef(onStripSettled);
@@ -330,11 +335,14 @@ export function useReelStripEngine({
       if (!claimed) {
         return;
       }
-      const nextIndex = computeStripIndexAfterClaim(i, roundsRef.current);
-      if (nextIndex == null) return;
-      activeIndexRef.current = nextIndex;
-      setActiveIndex(nextIndex);
-      onReelAdvancedRef.current?.();
+      const advanceStrip = shouldAdvanceStripRef.current?.(i) !== false;
+      if (advanceStrip) {
+        const nextIndex = computeStripIndexAfterClaim(i, roundsRef.current);
+        if (nextIndex == null) return;
+        activeIndexRef.current = nextIndex;
+        setActiveIndex(nextIndex);
+        onReelAdvancedRef.current?.();
+      }
     });
 
     if (!claimed) {

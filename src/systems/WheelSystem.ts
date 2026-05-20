@@ -13,6 +13,7 @@ import type { ResolvedWheel, RunState, SliceCount, SliceDefinition, WheelDefinit
 import { clampSliceCount } from "../schemas/wheel.schema";
 
 import { getSliceVisualTheme } from "../game/content/sliceVisualTheme";
+import { resolveSliceIcon } from "../game/content/resolveIcon";
 
 import { getArchetypeForConfigId } from "../game/wheels/database";
 
@@ -59,7 +60,32 @@ function pickSlices(
 
 }
 
-
+function buildSpinItemFromSlice(
+  s: SliceDefinition,
+  sliceIndex: number,
+  sliceCount: SliceCount,
+  wheelArchetype?: ReturnType<typeof getArchetypeForConfigId>
+) {
+  const caption = sliceWheelCaption(s);
+  const visual = getSliceVisualTheme(s.kind, s.weightTags, {
+    sliceIndex,
+    sliceCount,
+    wheelArchetype,
+  });
+  const resolved = resolveSliceIcon(s);
+  return {
+    id: s.id,
+    label: s.label,
+    shortLabel: caption,
+    icon: resolved.icon,
+    iconFamily: resolved.iconFamily,
+    iconTint: visual.chipBg,
+    iconChipBg: visual.chipBg,
+    iconColor: visual.iconColor,
+    captionColor: visual.captionColor,
+    iconTone: visual.tone,
+  };
+}
 
 export function buildWheel(
 
@@ -155,41 +181,9 @@ export function buildWheel(
 
   });
 
-  const spinItems = slices.map((s, sliceIndex) => {
-
-    const caption = sliceWheelCaption(s);
-
-    const visual = getSliceVisualTheme(s.kind, s.weightTags, {
-      sliceIndex,
-      sliceCount,
-      wheelArchetype,
-    });
-
-    return {
-
-      id: s.id,
-
-      label: s.label,
-
-      shortLabel: caption,
-
-      icon: s.icon,
-
-      iconFamily: s.iconFamily,
-
-      iconTint: visual.chipBg,
-
-      iconChipBg: visual.chipBg,
-
-      iconColor: visual.iconColor,
-
-      captionColor: visual.captionColor,
-
-      iconTone: visual.tone,
-
-    };
-
-  });
+  const spinItems = slices.map((s, sliceIndex) =>
+    buildSpinItemFromSlice(s, sliceIndex, sliceCount, wheelArchetype)
+  );
 
   return {
 
@@ -233,26 +227,9 @@ export function patchResolvedWheelSlices(
     };
   });
 
-  const spinItems = remapped.map((s, sliceIndex) => {
-    const caption = sliceWheelCaption(s);
-    const visual = getSliceVisualTheme(s.kind, s.weightTags, {
-      sliceIndex,
-      sliceCount,
-      wheelArchetype,
-    });
-    return {
-      id: s.id,
-      label: s.label,
-      shortLabel: caption,
-      icon: s.icon,
-      iconFamily: s.iconFamily,
-      iconTint: visual.chipBg,
-      iconChipBg: visual.chipBg,
-      iconColor: visual.iconColor,
-      captionColor: visual.captionColor,
-      iconTone: visual.tone,
-    };
-  });
+  const spinItems = remapped.map((s, sliceIndex) =>
+    buildSpinItemFromSlice(s, sliceIndex, sliceCount, wheelArchetype)
+  );
 
   return {
     definition: { ...wheel.definition, sliceCount },

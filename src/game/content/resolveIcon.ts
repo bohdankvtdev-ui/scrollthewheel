@@ -3,7 +3,12 @@ import { PERK_CATALOG } from "../../data/perks";
 import { RELIC_CATALOG } from "../../data/relics";
 import { CARD_CATALOG } from "../../data/cards";
 import type { IconFamily, SliceDefinition } from "../../schemas";
+import {
+  MONEY_WHEEL_CASH_ICON,
+  MONEY_WHEEL_LOSS_ICON,
+} from "./prizeIcons";
 import { getRegistryIcon, type IconSpec } from "./iconRegistry";
+import { isMoneyWheelInstanceId } from "./wheelInstanceId";
 
 export type ResolvedIcon = IconSpec & { source: "registry" | "catalog" | "slice" };
 
@@ -46,6 +51,15 @@ export function resolveEntityIcon(
 export function resolveSliceIcon(slice: SliceDefinition): ResolvedIcon {
   const byId = getRegistryIcon("slice", slice.id);
   if (byId != null) return { ...byId, source: "registry" };
+
+  if (isMoneyWheelInstanceId(slice.id)) {
+    if (slice.kind === "money") {
+      return { ...MONEY_WHEEL_CASH_ICON, source: "registry" };
+    }
+    if (slice.kind === "money_loss") {
+      return { ...MONEY_WHEEL_LOSS_ICON, source: "registry" };
+    }
+  }
 
   const { payload } = slice;
   if (payload.perkId != null) {

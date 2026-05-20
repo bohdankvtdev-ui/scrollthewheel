@@ -47,6 +47,25 @@ export function applyPerkSpinEffects(
     }
   }
 
+  if (archetype === "percent") {
+    let pctMult = 1;
+    for (const e of listPerkEffects(perkIds)) {
+      if (e.kind === "land_weight" && e.scope === "percent_wheel") {
+        pctMult *= e.value;
+      }
+    }
+    if (pctMult > 1) {
+      next = { ...next, positiveWeightMult: next.positiveWeightMult * pctMult };
+    }
+  }
+
+  if (archetype === "lucky" && perkIds.includes("jackpot_hunter")) {
+    next = {
+      ...next,
+      tagMults: { ...next.tagMults, rare: (next.tagMults.rare ?? 1) * 1.08 },
+    };
+  }
+
   if (perkIds.includes("hot_table")) {
     next = {
       ...next,
@@ -94,6 +113,12 @@ export function applyPerkLossMult(
   archetype: WheelArchetype | null
 ): number {
   if (rawDelta >= 0) return rawDelta;
+  if (archetype === "drain" && perkIds.includes("drain_ward")) {
+    return Math.floor(rawDelta * 0.9);
+  }
+  if (archetype === "chaos" && perkIds.includes("chaos_ward")) {
+    return Math.floor(rawDelta * 0.88);
+  }
   if (archetype !== "risk" && archetype !== "chaos" && archetype !== "drain") return rawDelta;
   const harbor = listPerkEffects(perkIds).find((e) => e.perkId === "safe_harbor");
   if (harbor != null) return Math.floor(rawDelta * harbor.value);

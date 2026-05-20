@@ -6,7 +6,14 @@ import type { WheelConfigId, WheelPrizeSlot } from "./types";
 import { applyCycleEconomyToPayload, formatPrizeLabel } from "./cycleEconomy";
 import { getAdvancementPoolCycleBonus } from "../../advancements";
 import { getCycleAdvancement } from "../../effects/cycleAdvancement";
-import { distributeLandChances, mulberry32, pickWeighted, wheelLayoutSeed } from "./prizeRng";
+import {
+  distributeLandChances,
+  mulberry32,
+  pickWeighted,
+  shuffleInPlace,
+  wheelLayoutSeed,
+} from "./prizeRng";
+import { NOTHING_PRIZE_ID } from "./wheelNothing";
 import { FINAL_LAND_SHAPE, getBossPoolAdjustments } from "../../boss/bossWheel";
 import {
   BUILDER_WEDGE_PRIZES,
@@ -18,9 +25,31 @@ import {
   LUCKY_POOL,
   MONEY_TIER_PRIZES,
   PERK_WHEEL_POOL,
-  RISK_POOL,
+  RISK_BAD_POOL,
+  RISK_GOOD_POOL,
   type PoolPick,
 } from "./wheelPrizePools";
+import { layoutWithNothing } from "./wheelNothing";
+
+const LATE_PERK_PRIZES = new Set<PrizeCatalogId>([
+  "perk_compounder",
+  "perk_coupon_king",
+  "perk_final_tax_shield",
+  "perk_hex_ward",
+  "perk_money_stream",
+]);
+
+const EARLY_PERK_BOOST = new Set<PrizeCatalogId>([
+  "perk_lucky_money",
+  "perk_lucky_percent",
+  "perk_lucky_streak",
+  "perk_lucky_perk",
+  "perk_green_fever",
+  "perk_gold_rush",
+  "perk_iron_reserve",
+  "perk_ante_insurance",
+  "perk_chip_drip",
+]);
 
 export type BuildWheelPrizeOptions = {
   runId: string;
@@ -101,12 +130,18 @@ function buildMoneyWheel(
 ): WheelPrizeSlot[] {
   const n = sliceCount;
   const pool: PoolPick[] = [
-    ...MONEY_TIER_PRIZES.map((t) => ({ prize: t.prize, weight: 10 })),
-    { prize: "money_loss_40", weight: 8 },
-    { prize: "money_loss_60", weight: 6, minCycle: 2 },
+    ...MONEY_TIER_PRIZES.map((t) => ({ prize: t.prize, weight: cycle <= 1 ? 14 : 10 })),
+    { prize: "money_loss_40", weight: 6, minCycle: 2 },
+    { prize: "money_loss_60", weight: 5, minCycle: 3 },
   ];
   const rng = mulberry32(wheelLayoutSeed("money", cycle, "wheel_1"));
-  const picked = pickUniqueFromPool(rng, filterPool(pool, cycle, banished), n);
+  const picked = layoutWithNothing(
+    pickUniqueFromPool(rng, filterPool(pool, cycle, banished), n),
+    "wheel_1",
+    cycle,
+    n,
+    rng
+  );
   return slotsFromPrizes(picked, landShapeForSliceCount(n, false));
 }
 
@@ -140,7 +175,13 @@ function buildPercentWheel(
   const allowed = percentWheelPrizePool(cycle).filter((id) => !banished.includes(id));
   const rng = mulberry32(wheelLayoutSeed("pct", cycle, "wheel_2"));
   const pool: PoolPick[] = allowed.map((prize) => ({ prize, weight: 10 }));
-  const picked = pickUniqueFromPool(rng, pool, n);
+  const picked = layoutWithNothing(
+    pickUniqueFromPool(rng, pool, n),
+    "wheel_2",
+    cycle,
+    n,
+    rng
+  );
   return slotsFromPrizes(picked, landShapeForSliceCount(n, false));
 }
 
@@ -160,16 +201,94 @@ function buildPerkWheel(
 ): WheelPrizeSlot[] {
   const n = sliceCount;
   const pool = PERK_WHEEL_POOL.filter((id) => {
+    if (cycle < 3 && LATE_PERK_PRIZES.has(id)) return false;
     const pid = catalogPerkId(id);
     return (pid == null || !ownedPerks.includes(pid)) && !banished.includes(id);
   });
   const tierBias: PoolPick[] = (pool.length > 0 ? pool : PERK_WHEEL_POOL).map((id) => {
-    const tier = id.includes("compounder") || id.includes("coupon") ? 2 : 0;
-    const weight = tier >= 2 && cycle < 2 ? 2 : tier === 0 ? 10 : 6;
+    let weight = 8;
+    if (EARLY_PERK_BOOST.has(id) && cycle <= 2) weight = 14;
+    if (id.includes("compounder") || id.includes("coupon")) weight = cycle < 3 ? 3 : 7;
     return { prize: id, weight };
   });
-  const picked = pickUniqueFromPool(rng, tierBias, n);
+  const picked = layoutWithNothing(
+    pickUniqueFromPool(rng, tierBias, n),
+    "wheel_4",
+    cycle,
+    n,
+    rng
+  );
   return slotsFromPrizes(picked, landShapeForSliceCount(n, false));
+}
+
+function isRiskGoodPrize(prizeId: PrizeCatalogId): boolean {
+  if (prizeId === NOTHING_PRIZE_ID) return false;
+  const def = PRIZE_CATALOG[prizeId];
+  if (def == null) return false;
+  if (def.kind === "money") return true;
+  if (def.kind === "bank_cut") {
+    const pct = def.payload?.bankPercent;
+    return typeof pct === "number" && pct > 0;
+  }
+  return false;
+}
+
+function landChancesForHalf(count: number, targetSum: number): number[] {
+  if (count <= 0) return [];
+  const shape = landShapeForSliceCount(count, false).slice(0, count);
+  const base = distributeLandChances(shape.length === count ? shape : [...shape, ...Array(count - shape.length).fill(10)]);
+  const sum = base.reduce((a, b) => a + b, 0);
+  const scaled = base.map((w) => Math.max(1, Math.round((w / sum) * targetSum)));
+  let delta = targetSum - scaled.reduce((a, b) => a + b, 0);
+  let i = 0;
+  while (delta !== 0 && i < 200) {
+    const idx = i % scaled.length;
+    if (delta > 0) {
+      scaled[idx] = (scaled[idx] ?? 1) + 1;
+      delta -= 1;
+    } else if ((scaled[idx] ?? 1) > 1) {
+      scaled[idx] = (scaled[idx] ?? 1) - 1;
+      delta += 1;
+    }
+    i += 1;
+  }
+  return scaled;
+}
+
+function slotsFromRiskHalves(prizes: PrizeCatalogId[]): WheelPrizeSlot[] {
+  const good: PrizeCatalogId[] = [];
+  const bad: PrizeCatalogId[] = [];
+  for (const id of prizes) {
+    if (isRiskGoodPrize(id)) good.push(id);
+    else bad.push(id);
+  }
+  const goodChances = landChancesForHalf(good.length, 50);
+  const badChances = landChancesForHalf(bad.length, 50);
+  const chanceByPrize = new Map<string, number>();
+  good.forEach((id, i) => chanceByPrize.set(id, goodChances[i]!));
+  bad.forEach((id, i) => chanceByPrize.set(id, badChances[i]!));
+  return prizes.map((prize) => ({
+    prize,
+    chance: chanceByPrize.get(prize) ?? Math.floor(100 / prizes.length),
+  }));
+}
+
+function buildRiskWheel(
+  cycle: number,
+  rng: () => number,
+  sliceCount: number,
+  banished: string[],
+  configId: FloorWheelOrderId
+): WheelPrizeSlot[] {
+  const goodPool = filterPool(RISK_GOOD_POOL, cycle, banished);
+  const badPool = filterPool(RISK_BAD_POOL, cycle, banished);
+  const half = Math.floor(sliceCount / 2);
+
+  const good = pickUniqueFromPool(rng, goodPool, half);
+  const bad = pickUniqueFromPool(rng, badPool, sliceCount - half);
+  const withNothing = layoutWithNothing([...good, ...bad], configId, cycle, sliceCount, rng);
+  const slots = slotsFromRiskHalves(withNothing);
+  return shuffleInPlace(rng, slots);
 }
 
 function buildPoolWheel(
@@ -178,10 +297,17 @@ function buildPoolWheel(
   rng: () => number,
   sliceCount: number,
   harshFirst: boolean,
-  banished: string[]
+  banished: string[],
+  configId: FloorWheelOrderId
 ): WheelPrizeSlot[] {
   const filtered = filterPool(pool, cycle, banished);
-  const picked = pickUniqueFromPool(rng, filtered, sliceCount);
+  const picked = layoutWithNothing(
+    pickUniqueFromPool(rng, filtered, sliceCount),
+    configId,
+    cycle,
+    sliceCount,
+    rng
+  );
   return slotsFromPrizes(picked, landShapeForSliceCount(sliceCount, harshFirst));
 }
 
@@ -229,7 +355,14 @@ function buildFinalWheel(
       picked.push(id);
     }
   }
-  return slotsFromPrizes(picked.slice(0, sliceCount), landShapeForFinalWheel(sliceCount));
+  const withNothing = layoutWithNothing(
+    picked.slice(0, sliceCount),
+    "wheel_9",
+    poolCycle,
+    sliceCount,
+    rng
+  );
+  return slotsFromPrizes(withNothing, landShapeForFinalWheel(sliceCount));
 }
 
 export function buildPrizeSlotsForWheel(
@@ -261,23 +394,24 @@ export function buildPrizeSlotsForWheel(
     case "wheel_2":
       return buildPercentWheel(cycle, advancements, banished, n);
     case "wheel_3":
-      return buildPoolWheel(RISK_POOL, poolCycle, rng, n, true, banished);
+      return buildRiskWheel(poolCycle, rng, n, banished, "wheel_3");
     case "wheel_4":
       return buildPerkWheel(poolCycle, ownedPerks, advancements, banished, rng, n);
     case "wheel_5":
-      return buildPoolWheel(DRAIN_POOL, poolCycle, rng, n, true, banished);
+      return buildPoolWheel(DRAIN_POOL, poolCycle, rng, n, true, banished, "wheel_5");
     case "wheel_6":
-      return buildPoolWheel(LUCKY_POOL, poolCycle, rng, n, false, banished);
+      return buildPoolWheel(LUCKY_POOL, poolCycle, rng, n, false, banished, "wheel_6");
     case "wheel_7": {
       const base = [...BUILDER_WEDGE_PRIZES] as PrizeCatalogId[];
       const prizes = [...base];
       while (prizes.length < n) {
         prizes.push(base[Math.floor(rng() * base.length)]!);
       }
-      return slotsFromPrizes(prizes, landShapeForSliceCount(prizes.length, false));
+      const withNothing = layoutWithNothing(prizes, "wheel_7", cycle, n, rng);
+      return slotsFromPrizes(withNothing, landShapeForSliceCount(withNothing.length, false));
     }
     case "wheel_8":
-      return buildPoolWheel(CHAOS_POOL, poolCycle, rng, n, true, banished);
+      return buildPoolWheel(CHAOS_POOL, poolCycle, rng, n, true, banished, "wheel_8");
     case "wheel_9":
       return buildFinalWheel(poolCycle, ownedPerks, banished, rng, n);
     default:

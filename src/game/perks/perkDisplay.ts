@@ -1,226 +1,204 @@
 import type { PerkCategory } from "../../data/perks";
-
 import { getPerkEffect } from "../effects/perkEffects";
 
 function perkLine(perkId: string): string {
   return getPerkEffect(perkId)?.line ?? "";
 }
 
-
-
 /** Player-facing category labels (not internal enum names). */
-
 export const PERK_CATEGORY_LABELS: Record<PerkCategory, string> = {
-
   economy: "Money",
-
   defense: "Defense",
-
   wheel: "Wheel",
-
   meta: "Shop & cycles",
-
 };
-
-
 
 export const PERK_CATEGORY_COLORS: Record<PerkCategory, { bg: string; accent: string }> = {
-
   economy: { bg: "#FEF9C3", accent: "#A16207" },
-
   defense: { bg: "#DBEAFE", accent: "#1D4ED8" },
-
   wheel: { bg: "#EDE9FE", accent: "#6D28D9" },
-
   meta: { bg: "#CFFAFE", accent: "#0E7490" },
-
 };
-
-
 
 export type PerkDisplayCopy = {
-
   tagline: string;
-
-  /** One sentence on the shop card */
-
   shopLine: string;
-
-  /** 2–4 short bullets in the detail sheet */
-
   bullets: string[];
-
 };
 
-
-
-/** Plain-language copy keyed by perk id — keep in sync with PerkSystem / jokerEngine / useWheelModifiers. */
-
-export const PERK_DISPLAY: Record<string, PerkDisplayCopy> = {
-
-  lucky_money: {
-    tagline: "Money wheel luck",
-    shopLine: perkLine("lucky_money"),
-    bullets: [perkLine("lucky_money"), "Only affects the Money wheel (wheel 1)"],
-  },
-
-  lucky_perk: {
-    tagline: "Perk wheel luck",
-    shopLine: perkLine("lucky_perk"),
-    bullets: [perkLine("lucky_perk"), "Only affects the Perk wheel (wheel 4)"],
-  },
-
-  lucky_streak: {
-    tagline: "All-around luck",
-    shopLine: perkLine("lucky_streak"),
-    bullets: [perkLine("lucky_streak"), "+2 shop chips on cash wins (meta)"],
-  },
-
-  iron_reserve: {
-
-    tagline: "Block one hit",
-
-    shopLine: "+1 shield when acquired",
-
-    bullets: [
-
-      "Grants one shield immediately when you get this perk",
-
-      "A shield blocks one flat $ loss, % bank cut, or wipe",
-
-      "The shield is consumed when it blocks — not permanent",
-
-      "Pairs with Safe Harbor for two shields total",
-
-    ],
-
-  },
-
-  ante_insurance: {
-    tagline: "Cycle chip bonus",
-    shopLine: perkLine("ante_insurance"),
-    bullets: [
-      perkLine("ante_insurance"),
-      "Stacks when you clear wheel 9 and start the next cycle",
-    ],
-  },
-
-  high_roller: {
-    tagline: "Money wheel odds",
-    shopLine: perkLine("high_roller"),
-    bullets: [perkLine("high_roller"), "Stacks with Lucky Money"],
-  },
-
-  gold_rush: {
-    tagline: "Cash payout",
-    shopLine: perkLine("gold_rush"),
-    bullets: [perkLine("gold_rush"), "+1 shop chip when a money wedge pays"],
-  },
-
-  safe_harbor: {
-
-    tagline: "Extra shield",
-
-    shopLine: "+1 shield when acquired (stacks with Iron Shield)",
-
-    bullets: [
-
-      "Adds one shield immediately when bought or won on a wedge",
-
-      "Each shield blocks one bank hit, then is used up",
-
-      "Two shields can absorb two bad outcomes in a row",
-
-    ],
-
-  },
-
-  coupon_king: {
-
-    tagline: "Cheaper shop",
-
-    shopLine: "Perk shop prices −15% (shop chips, not bank $)",
-
-    bullets: [
-
-      "Buy, sell refund, and reroll all cost fewer shop chips",
-
-      "Applies for the rest of the run",
-
-      "Does not change wedge payouts or bank money",
-
-    ],
-
-  },
-
-  hot_table: {
-    tagline: "Rare slices",
-    shopLine: perkLine("hot_table"),
-    bullets: [perkLine("hot_table"), "Jackpots, perks, relic offers"],
-  },
-
-  vip_roller: {
-    tagline: "Percent gains",
-    shopLine: perkLine("vip_roller"),
-    bullets: [perkLine("vip_roller"), "Only when a % wedge adds to your bank"],
-  },
-
-  double_down: {
-    tagline: "One double payday",
-    shopLine: perkLine("double_down"),
-
-    bullets: [
-
-      "Doubles the next wedge that adds flat $ only",
-
-      "Consumed after it triggers once",
-
-      "Save it for a big +$ wedge on Lucky or Boss",
-
-    ],
-
-  },
-
-  compounder: {
-    tagline: "Scale with cycles",
-    shopLine: perkLine("compounder"),
-    bullets: [perkLine("compounder"), "Bonus shop chips each cycle end"],
-  },
-
-  final_guard: {
-    tagline: "Survive Final",
-    shopLine: perkLine("final_guard"),
-    bullets: [perkLine("final_guard"), "Stacks with Safe Harbor on Risk/Chaos"],
-  },
-
-  final_tax_shield: {
-    tagline: "Beat Perk Tax",
-    shopLine: perkLine("final_tax_shield"),
-    bullets: [perkLine("final_tax_shield"), "Only affects Perk Tax on wheel 9"],
-  },
-
-  clutch_cash: {
-    tagline: "Final payday",
-    shopLine: perkLine("clutch_cash"),
-    bullets: [perkLine("clutch_cash"), "Once per cycle when you reach wheel 9"],
-  },
-
-};
-
-
-
-export function getPerkDisplay(perkId: string): PerkDisplayCopy | null {
-
-  return PERK_DISPLAY[perkId] ?? null;
-
+/** Short lines for shop + detail — max 2 shown in UI. */
+export function getPerkDetailLines(perkId: string): string[] {
+  const d = PERK_DISPLAY[perkId];
+  if (d == null) return [];
+  const primary = d.shopLine.trim();
+  const extra = d.bullets.find((b) => b.trim() !== primary);
+  if (extra != null && extra.trim().length > 0) return [primary, extra.trim()];
+  return primary.length > 0 ? [primary] : [];
 }
 
+export const PERK_DISPLAY: Record<string, PerkDisplayCopy> = {
+  lucky_money: {
+    tagline: "W1 luck",
+    shopLine: "+12% +$ on Money wheel",
+    bullets: ["Money wheel only"],
+  },
+  lucky_perk: {
+    tagline: "W4 luck",
+    shopLine: "+12% perks on Perk wheel",
+    bullets: ["Perk wheel only"],
+  },
+  lucky_streak: {
+    tagline: "Lucky runs",
+    shopLine: "+8% green wedges",
+    bullets: ["+2 chips on cash wins"],
+  },
+  lucky_percent: {
+    tagline: "W2 luck",
+    shopLine: "+10% +% on Percent wheel",
+    bullets: ["Stacks VIP Roller"],
+  },
+  iron_reserve: {
+    tagline: "Block 1 hit",
+    shopLine: "+1 shield",
+    bullets: ["Uses on next loss"],
+  },
+  ante_insurance: {
+    tagline: "Cycle chips",
+    shopLine: "+4 chips per cycle clear",
+    bullets: ["Stacks each cycle"],
+  },
+  high_roller: {
+    tagline: "W1 boost",
+    shopLine: "+10% +$ on Money wheel",
+    bullets: ["Stacks Lucky Money"],
+  },
+  gold_rush: {
+    tagline: "Cash boost",
+    shopLine: "+20% from +$ wedges",
+    bullets: ["+1 chip on cash wins"],
+  },
+  safe_harbor: {
+    tagline: "Softer hits",
+    shopLine: "−20% Risk & Chaos losses",
+    bullets: ["+1 shield on buy"],
+  },
+  coupon_king: {
+    tagline: "Shop sale",
+    shopLine: "Shop prices −15%",
+    bullets: ["Chips only"],
+  },
+  hot_table: {
+    tagline: "Rare hunt",
+    shopLine: "+10% rare wedges",
+    bullets: ["Jackpots & perks"],
+  },
+  vip_roller: {
+    tagline: "% boost",
+    shopLine: "+15% from +% wedges",
+    bullets: ["Percent wheel"],
+  },
+  double_down: {
+    tagline: "One double",
+    shopLine: "Next +$ wedge ×2",
+    bullets: ["Once per run"],
+  },
+  compounder: {
+    tagline: "Scale up",
+    shopLine: "+5% cash per cycle cleared",
+    bullets: ["Stacks forever"],
+  },
+  final_guard: {
+    tagline: "Final armor",
+    shopLine: "−15% on Final wheel",
+    bullets: ["Wheel 9"],
+  },
+  final_tax_shield: {
+    tagline: "Tax cap",
+    shopLine: "Perk tax capped at 15% bank",
+    bullets: ["Final wheel only"],
+  },
+  clutch_cash: {
+    tagline: "Final payday",
+    shopLine: "+$50 entering Final wheel",
+    bullets: ["Once per cycle"],
+  },
+  green_fever: {
+    tagline: "Green bias",
+    shopLine: "+5% all green wedges",
+    bullets: ["Every wheel"],
+  },
+  chip_drip: {
+    tagline: "Chip drip",
+    shopLine: "+1 chip on cash wins",
+    bullets: ["Stacks with Gold Rush"],
+  },
+  deep_pockets: {
+    tagline: "Deep run",
+    shopLine: "+4 chips on cycle clear",
+    bullets: ["+1 more per cycle #"],
+  },
+  drain_ward: {
+    tagline: "Drain ward",
+    shopLine: "−10% Drain wheel (W5)",
+    bullets: ["Losses only"],
+  },
+  chaos_ward: {
+    tagline: "Chaos guard",
+    shopLine: "−12% Chaos wheel (W8)",
+    bullets: ["Stacks Safe Harbor"],
+  },
+  streak_spark: {
+    tagline: "Hot streak",
+    shopLine: "+1 chip on cash wins",
+    bullets: ["Needs win streak 2+"],
+  },
+  jackpot_hunter: {
+    tagline: "W6 hunt",
+    shopLine: "+8% rare on Lucky wheel",
+    bullets: ["Jackpots & perks"],
+  },
+  purify_touch: {
+    tagline: "Cleanse",
+    shopLine: "Remove oldest curse",
+    bullets: ["+5 chips if you have none"],
+  },
+  hex_ward: {
+    tagline: "Curse resist",
+    shopLine: "30% resist new curses",
+    bullets: ["Stacks with shields"],
+  },
+  ghost_repel: {
+    tagline: "Boss Ghost",
+    shopLine: "Boss Ghost half strength",
+    bullets: ["Less red wedges this cycle"],
+  },
+  money_stream: {
+    tagline: "W1 stream",
+    shopLine: "+6% +$ on Money wheel",
+    bullets: ["Stacks Lucky Money"],
+  },
+  percent_focus: {
+    tagline: "W2 focus",
+    shopLine: "+6% +% on Percent wheel",
+    bullets: ["Stacks Lucky Percent"],
+  },
+  curse_break: {
+    tagline: "Full cleanse",
+    shopLine: "Remove all curses",
+    bullets: ["One-time on buy"],
+  },
+  cycle_momentum: {
+    tagline: "Long run",
+    shopLine: "+2 chips every 5 cycles",
+    bullets: ["Cycle 5, 10, 15…"],
+  },
+};
 
-
-/** Wheel wedge label for a perk prize — matches `PERK_CATALOG` display names. */
+export function getPerkDisplay(perkId: string): PerkDisplayCopy | null {
+  return PERK_DISPLAY[perkId] ?? null;
+}
 
 export function perkPrizeLabel(perkId: string): string {
-
   const names: Record<string, string> = {
     lucky_money: "Lucky Money",
     lucky_perk: "Lucky Perk",
@@ -231,21 +209,28 @@ export function perkPrizeLabel(perkId: string): string {
     high_roller: "Loaded Money",
     hot_table: "Hot Table",
     vip_roller: "Percent Plus",
-
     double_down: "Double Down",
-
     ante_insurance: "Cycle Cushion",
-
     compounder: "Compounder",
-
     coupon_king: "Coupon King",
     final_guard: "Final Guard",
     final_tax_shield: "Tax Shield",
     clutch_cash: "Clutch Cash",
-
+    green_fever: "Green Fever",
+    chip_drip: "Chip Drip",
+    deep_pockets: "Deep Pockets",
+    drain_ward: "Drain Ward",
+    lucky_percent: "Lucky Percent",
+    chaos_ward: "Chaos Ward",
+    streak_spark: "Streak Spark",
+    jackpot_hunter: "Jackpot Hunter",
+    purify_touch: "Purify Touch",
+    hex_ward: "Hex Ward",
+    ghost_repel: "Ghost Repel",
+    money_stream: "Money Stream",
+    percent_focus: "Percent Focus",
+    curse_break: "Curse Break",
+    cycle_momentum: "Cycle Momentum",
   };
-
   return names[perkId] ?? perkId;
-
 }
-

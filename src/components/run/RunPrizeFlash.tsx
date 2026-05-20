@@ -26,6 +26,8 @@ type RunPrizeFlashProps = {
   tacticPick?: boolean;
   run?: RunState | null;
   onDismissTactic?: () => void;
+  /** Wheel 9 — swipe up ends the cycle (no reel wrap). */
+  bossEndCycleHint?: boolean;
 };
 
 export function RunPrizeFlash({
@@ -36,6 +38,7 @@ export function RunPrizeFlash({
   tacticPick = false,
   run = null,
   onDismissTactic,
+  bossEndCycleHint = false,
 }: RunPrizeFlashProps) {
   if (tacticPick && run != null && onDismissTactic != null) {
     return (
@@ -58,7 +61,11 @@ export function RunPrizeFlash({
     accent = "rgba(34,211,238,0.1)";
   } else if (showResult) {
     line = effect.shortLabel;
-    sub = isPerkWin ? "New perk — swipe up" : "Swipe up for next wheel";
+    sub = bossEndCycleHint
+      ? "Swipe up — cycle rewards"
+      : isPerkWin
+        ? "New perk — swipe up"
+        : "Swipe up for next wheel";
     accent = isPerkWin ? "#EDE9FE" : effect.accent;
   } else if (effect != null) {
     line = effect.shortLabel;

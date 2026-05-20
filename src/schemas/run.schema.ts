@@ -4,6 +4,7 @@ import type { SliceCount } from "./wheel.schema";
 export type RunPhase =
   | "active"
   | "won"
+  | "alpha_won"
   | "lost_money"
   | "lost_blind"
   | "lost_boss";
@@ -61,6 +62,8 @@ export type RunEffectsPersisted = {
   tacticWheelIndices?: number[];
   /** Show pick-1 pit stop before cycle reward overlay. */
   pitStopPending?: boolean;
+  /** Cleared cycle 100 — player chooses infinite mode or end run. */
+  alphaMilestonePending?: boolean;
   /** Clutch Cash perk paid out this cycle. */
   clutchCashPaidCycle?: number;
   /** Early-run chip grants after W1 / W2 (before Risk wheel). */

@@ -104,6 +104,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
     hubMode = "spin",
     onHubClaimPress,
     sliceLabelMode = "text",
+    sliceIconScale = 1,
     hubAnimSubtle = false,
     externalSpinControl = false,
     hubLoadEpoch = 0,
@@ -483,7 +484,12 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
             </G>
           </Svg>
           {showSliceIcons ? (
-            <SliceIconLayer size={size} data={data} placements={iconPlacements} />
+            <SliceIconLayer
+              size={size}
+              data={data}
+              placements={iconPlacements}
+              iconScale={sliceIconScale}
+            />
           ) : null}
           <SliceTouchLayer
             size={size}

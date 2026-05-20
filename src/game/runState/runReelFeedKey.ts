@@ -3,14 +3,12 @@ import type { RunState } from "../../schemas";
 /** UI flags that affect reel rounds / swipe — must bust `RunWheelFeed` memo when they change. */
 export function runReelUiKey(input: {
   awaitingClaim: boolean;
-  pendingBossCycleTransition: boolean;
   isSpinning: boolean;
   gambleFlipActive: boolean;
   lastResultLabel: string | null;
 }): string {
   return [
     input.awaitingClaim ? 1 : 0,
-    input.pendingBossCycleTransition ? 1 : 0,
     input.isSpinning ? 1 : 0,
     input.gambleFlipActive ? 1 : 0,
     input.lastResultLabel ?? "",

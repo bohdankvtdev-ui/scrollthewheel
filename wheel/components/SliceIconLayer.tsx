@@ -1,15 +1,15 @@
 import { memo } from "react";
-import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { VectorIcon } from "../../lib/ui/VectorIcon";
 import { StyleSheet, Text, View } from "react-native";
 import { FONT_BEBAS_NEUE } from "../../theme/fonts";
 import type { SpinWheelIconFamily, SpinWheelItem } from "../types";
 
-function iconSizeForWheel(wheelSize: number): number {
-  return Math.round(Math.min(46, Math.max(34, wheelSize * 0.108)));
+function iconSizeForWheel(wheelSize: number, scale = 1): number {
+  return Math.round(Math.min(58, Math.max(34, wheelSize * 0.108)) * scale);
 }
 
-function captionSizeForWheel(wheelSize: number): number {
-  return Math.round(Math.min(16, Math.max(12, wheelSize * 0.044)));
+function captionSizeForWheel(wheelSize: number, scale = 1): number {
+  return Math.round(Math.min(20, Math.max(12, wheelSize * 0.044)) * scale);
 }
 
 export type SliceIconPlacement = {
@@ -17,45 +17,22 @@ export type SliceIconPlacement = {
   y: number;
 };
 
-function Glyph({
-  family,
-  name,
-  color,
-  size,
-}: {
-  family: SpinWheelIconFamily;
-  name: string;
-  color: string;
-  size: number;
-}) {
-  if (family === "MaterialCommunityIcons") {
-    return (
-      <MaterialCommunityIcons
-        name={name as keyof typeof MaterialCommunityIcons.glyphMap}
-        size={size}
-        color={color}
-      />
-    );
-  }
-  if (family === "Ionicons") {
-    return <Ionicons name={name as keyof typeof Ionicons.glyphMap} size={size} color={color} />;
-  }
-  return <MaterialIcons name={name as keyof typeof MaterialIcons.glyphMap} size={size} color={color} />;
-}
-
 /** Wedge icons + captions — complementary colors, no glow. */
 export const SliceIconLayer = memo(function SliceIconLayer({
   size,
   data,
   placements,
+  iconScale = 1,
 }: {
   size: number;
   data: SpinWheelItem[];
   placements: SliceIconPlacement[];
+  /** e.g. 1.45 for 2-slice gamble wheel */
+  iconScale?: number;
 }) {
-  const iconPx = iconSizeForWheel(size);
-  const captionPx = captionSizeForWheel(size);
-  const markerW = Math.round(iconPx * 2.2);
+  const iconPx = iconSizeForWheel(size, iconScale);
+  const captionPx = captionSizeForWheel(size, iconScale);
+  const markerW = Math.round(iconPx * 2.35);
 
   return (
     <View style={[styles.layer, { width: size, height: size }]} pointerEvents="none">
@@ -80,7 +57,7 @@ export const SliceIconLayer = memo(function SliceIconLayer({
               },
             ]}
           >
-            <Glyph family={family} name={item.icon} color={iconColor} size={iconPx} />
+            <VectorIcon family={family} name={item.icon} color={iconColor} size={iconPx} />
             {caption ? (
               <Text
                 style={[styles.caption, { fontSize: captionPx, maxWidth: markerW + 6, color: captionColor }]}

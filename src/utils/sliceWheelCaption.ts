@@ -104,7 +104,12 @@ export function sliceWheelCaption(slice: SliceDefinition): string {
 
   if (kind === "deck_upgrade") return DECK_UPGRADE_WHEEL_CAPTION;
 
-  if (kind === "neutral") return "—";
+  if (kind === "neutral") {
+    if (slice.label.toLowerCase().includes("nothing") || slice.id.includes("nothing")) {
+      return "NONE";
+    }
+    return "—";
+  }
 
   return slice.label.slice(0, 6);
 

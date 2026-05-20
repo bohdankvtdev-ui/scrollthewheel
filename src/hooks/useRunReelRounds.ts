@@ -3,14 +3,12 @@ import type { ScrollWheelRound } from "../../features/cash-spin/reelStripModel";
 import type { RunState } from "../schemas";
 import type { SpinWheelItem } from "../../types/spin";
 import { labelFromHistory } from "../game/tactics/wheelHubState";
-import { LAST_WHEEL_INDEX } from "../game/cycle/cycleTransition";
 
 export function buildRunReelRounds(
   run: RunState,
   awaitingClaim: boolean,
   lastResultLabel: string | null,
-  gambleFlipActive: boolean,
-  pendingBossCycleTransition = false
+  gambleFlipActive: boolean
 ): ScrollWheelRound[] {
   const lastHistByWheel = new Map<number, (typeof run.history)[number]>();
   for (const h of run.history) {
@@ -31,18 +29,6 @@ export function buildRunReelRounds(
         return { status: "claimed" as const, prize: prizeFromHist };
       }
       if (i === run.wheelIndex) {
-        if (
-          pendingBossCycleTransition &&
-          i === LAST_WHEEL_INDEX &&
-          (hist != null || awaitingClaim)
-        ) {
-          const label =
-            lastResultLabel ?? labelFromHistory(run, i) ?? prizeFromHist?.label ?? "Result";
-          return {
-            status: "won" as const,
-            prize: { id: "last", label },
-          };
-        }
         if (gambleFlipActive) {
           return { status: "ready" as const, prize: prizeFromHist };
         }
@@ -67,22 +53,14 @@ export function useRunReelRounds(
   run: RunState | null,
   awaitingClaim: boolean,
   lastResultLabel: string | null,
-  gambleFlipActive: boolean,
-  pendingBossCycleTransition = false
+  gambleFlipActive: boolean
 ): ScrollWheelRound[] {
   return useMemo(() => {
     if (run == null) return [];
-    return buildRunReelRounds(
-      run,
-      awaitingClaim,
-      lastResultLabel,
-      gambleFlipActive,
-      pendingBossCycleTransition
-    );
+    return buildRunReelRounds(run, awaitingClaim, lastResultLabel, gambleFlipActive);
   }, [
     awaitingClaim,
     gambleFlipActive,
-    pendingBossCycleTransition,
     lastResultLabel,
     run?.wheelIndex,
     run?.floor,

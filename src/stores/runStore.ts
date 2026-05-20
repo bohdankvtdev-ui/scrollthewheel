@@ -28,6 +28,11 @@ import {
   type RunUiTacticFields,
 } from "../game/tactics/wheelHubState";
 import {
+  canDismissBossOverlay,
+  cancelBossCycleRewardApply,
+  scheduleBossCycleRewardApply,
+} from "../game/cycle/bossCycleFlow";
+import {
   isBossWheelClaim,
   transitionRunAfterBossClear,
 } from "../game/cycle/cycleTransition";
@@ -43,6 +48,7 @@ import { useMetaStore } from "./metaStore";
 import {
   showDebuffWonNotice,
   showPerkWonNotice,
+  showRelicWonNotice,
   showRunNotice,
   showShieldPerkNotice,
 } from "../game/notices/runNotices";
@@ -89,13 +95,16 @@ const emptyUi = {
   sliceEraseMode: false,
   showCycleReward: false,
   moneyReveal: null as { before: number; delta: number } | null,
+  chipReveal: null as { before: number; delta: number } | null,
   gambleFlipActive: false,
   spinWheelIndex: null as number | null,
   showDesperationPick: false,
   desperationOffers: [] as DesperationId[],
   runEndFinalized: false,
-  /** Boss wheel claimed; reel must land on cycle-2 wheel 1 before `finishBossCycleTransition`. */
-  pendingBossCycleTransition: false,
+  /** Boss wheel → scroll away wheel, cycle reward panel, then wheel 1. */
+  bossCyclePhase: "none" as "none" | "reward",
+  /** Boss slice result shown on the cycle reward panel. */
+  bossSliceEffect: null as RunUiEffect | null,
 };
 
 type RunUiState = typeof emptyUi;
@@ -184,7 +193,8 @@ type RunStore = {
   applySpinResult: (wheelIndex: number, sliceId: string) => void;
   applyGambleFlipResult: (wheelIndex: number, sliceId: string) => void;
   claimAndAdvance: () => boolean;
-  finishBossCycleTransition: () => void;
+  /** After wheel scroll-off: apply cycle rewards and show reward panel. */
+  commitBossCycleReward: () => void;
   clearShopPending: () => void;
   clearLastWonPerk: () => void;
   clearLastWonDebuff: () => void;
@@ -197,10 +207,13 @@ type RunStore = {
     wheelIndex: number,
     sliceIndex: number
   ) => { ok: true } | { ok: false; reason: string };
-  continueAfterCycleReward: () => void;
+  continueAfterCycleReward: (pitId?: PitStopOptionId) => void;
+  continueInfiniteAfterAlpha: () => void;
+  endRunAfterAlpha: () => void;
   revealCycleClearOverlay: () => void;
   dismissCycleReward: () => void;
   commitMoneyReveal: () => void;
+  commitChipReveal: () => void;
   useMicroChoice: (id: MicroChoiceId) => { ok: true } | { ok: false; reason: string };
   useDesperationChoice: (id: DesperationId) => { ok: true } | { ok: false; reason: string };
   dismissDesperationPick: () => void;
@@ -327,6 +340,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         ? commitPendingWheelRebuild(resolved.run)
         : resolved.run;
     const debuffId = slice.payload.debuffId;
+    const relicId = slice.payload.relicId;
     const perkWasNew =
       perkId != null && !run.perks.includes(perkId) && next.perks.includes(perkId);
     const shieldPerkWasNew =
@@ -335,6 +349,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
       (next.shieldPerks ?? []).includes(perkId);
     const debuffWasNew =
       debuffId != null && !run.debuffs.includes(debuffId) && next.debuffs.includes(debuffId);
+    const relicWasNew =
+      relicId != null && !run.relics.includes(relicId) && next.relics.includes(relicId);
     const display = toSliceDisplay(slice);
     const sliceIndex = wheel?.slices.findIndex((s) => s.id === sliceId) ?? 0;
     const visual = getSliceVisualTheme(slice.kind, slice.weightTags, { sliceIndex });
@@ -348,6 +364,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       tone: visual.tone,
     };
     const moneyReveal = resolved.moneyReveal ?? null;
+    const chipsBeforeSpin = run.chipsEarnedThisRun ?? 0;
 
     let runWithOffers = next;
     const earlyChip = grantEarlyRunChipBonusOnSpinComplete(next, wheelIndex);
@@ -405,11 +422,17 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
     if (debuffWasNew && debuffId != null) {
       showDebuffWonNotice(debuffId);
+    } else if (relicWasNew && relicId != null) {
+      showRelicWonNotice(relicId);
     } else if (perkWasNew && perkId != null) {
       showPerkWonNotice(perkId);
     } else if (shieldPerkWasNew && perkId != null) {
       showShieldPerkNotice(perkId);
     }
+
+    const chipsAfterSpin = runWithOffers.chipsEarnedThisRun ?? 0;
+    const chipDelta = chipsAfterSpin - chipsBeforeSpin;
+    const chipReveal = chipDelta > 0 ? { before: chipsBeforeSpin, delta: chipDelta } : null;
 
     const { ui: uiNow, preSpinSnapshot: snap } = get();
     const offers = runWithOffers.runEffects?.microChoiceOffers;
@@ -438,6 +461,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         lastWonDebuffId: debuffWasNew ? debuffId! : null,
         lastRewardKind: slice.kind,
         moneyReveal,
+        chipReveal,
         showCycleReward: false,
       }),
     });
@@ -464,8 +488,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
   claimAndAdvance: () => {
     const { run, ui } = get();
     if (run == null || !ui.awaitingClaim || run.phase !== "active") return false;
-    if (ui.pendingBossCycleTransition) return true;
+    if (ui.bossCyclePhase !== "none") return true;
+    const chipsBeforeClaim = run.chipsEarnedThisRun ?? 0;
     const afterMoney = applyPendingMoneyReveal(run, ui.moneyReveal);
+    const claimChipDelta = (afterMoney.chipsEarnedThisRun ?? 0) - chipsBeforeClaim;
+    const claimChipReveal =
+      claimChipDelta > 0 ? { before: chipsBeforeClaim, delta: claimChipDelta } : ui.chipReveal;
     if (afterMoney.phase !== "active") {
       if (afterMoney.phase === "lost_money") {
         applyLossOrDesperation(afterMoney);
@@ -476,6 +504,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
             ...get().ui,
             awaitingClaim: false,
             moneyReveal: null,
+            chipReveal: null,
           },
         });
         saveRunCheckpoint(afterMoney);
@@ -487,13 +516,16 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const bossClear = isBossWheelClaim(committed, committed.wheelIndex);
     if (bossClear) {
       const cleared = clearTacticOffersOnRun(committed);
+      const bossSliceEffect = ui.lastEffect;
+      const wi = cleared.wheelIndex;
       set({
         run: cleared,
         preSpinSnapshot: null,
         ui: mergeUi(cleared, ui, {
-          pendingBossCycleTransition: true,
-          activeWheelIndex: cleared.wheelIndex,
-          scrollTarget: cleared.wheelIndex,
+          bossCyclePhase: "reward",
+          bossSliceEffect,
+          activeWheelIndex: wi,
+          scrollTarget: wi,
           awaitingClaim: false,
           isSpinning: false,
           spinWheelIndex: null,
@@ -506,11 +538,25 @@ export const useRunStore = create<RunStore>((set, get) => ({
           shopPending: false,
           sliceEraseMode: false,
           moneyReveal: null,
+          chipReveal: null,
           gambleFlipActive: false,
           showCycleReward: false,
         }),
       });
       saveRunCheckpoint(cleared);
+      scheduleBossCycleRewardApply(() => {
+        const st = get();
+        if (st.run == null || st.ui.bossCyclePhase !== "reward") return;
+        const next = transitionRunAfterBossClear(commitPendingWheelRebuild(st.run));
+        set({
+          run: next,
+          ui: mergeUi(next, st.ui, {
+            activeWheelIndex: 0,
+            scrollTarget: 0,
+          }),
+        });
+        saveRunCheckpoint(next);
+      });
       return true;
     }
     const next = clearTacticOffersOnRun(normalizeRunState(RunManager.advanceWheel(committed)));
@@ -535,6 +581,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         shopPending: false,
         sliceEraseMode: false,
         moneyReveal: null,
+        chipReveal: claimChipReveal,
         gambleFlipActive: false,
         showCycleReward: false,
       }),
@@ -545,17 +592,17 @@ export const useRunStore = create<RunStore>((set, get) => ({
     return true;
   },
 
-  finishBossCycleTransition: () => {
+  commitBossCycleReward: () => {
     const { run, ui } = get();
-    if (run == null || !ui.pendingBossCycleTransition) return;
+    if (run == null || ui.bossCyclePhase !== "reward" || run.phase === "active") return;
     const next = transitionRunAfterBossClear(commitPendingWheelRebuild(run));
     set({
       run: next,
       preSpinSnapshot: null,
       ui: mergeUi(next, ui, {
-        pendingBossCycleTransition: false,
-        activeWheelIndex: next.wheelIndex,
-        scrollTarget: next.wheelIndex,
+        bossCyclePhase: "reward",
+        activeWheelIndex: 0,
+        scrollTarget: 0,
         awaitingClaim: false,
         isSpinning: false,
         spinWheelIndex: null,
@@ -568,18 +615,18 @@ export const useRunStore = create<RunStore>((set, get) => ({
         shopPending: false,
         sliceEraseMode: false,
         moneyReveal: null,
+        chipReveal: null,
         gambleFlipActive: false,
         showCycleReward: false,
       }),
     });
     saveRunCheckpoint(next);
     flushRunCheckpoint();
-    get().revealCycleClearOverlay();
   },
 
   revealCycleClearOverlay: () => {
     const { run, ui } = get();
-    if (run == null || run.phase !== "won" || ui.showCycleReward) return;
+    if (run == null || (run.phase !== "won" && run.phase !== "alpha_won") || ui.showCycleReward) return;
     set((s) => ({ ui: { ...s.ui, showCycleReward: true } }));
   },
 
@@ -878,26 +925,102 @@ export const useRunStore = create<RunStore>((set, get) => ({
     return { ok: true };
   },
 
-  continueAfterCycleReward: () => {
-    const { run } = get();
-    if (run == null || run.phase !== "won") return;
+  continueAfterCycleReward: (pitId) => {
+    cancelBossCycleRewardApply();
+    const { run, ui } = get();
+    if (!canDismissBossOverlay(run, ui.bossCyclePhase)) return;
+    if (run!.runEffects?.alphaMilestonePending === true) return;
+    if (run!.runEffects?.pitStopPending === true && pitId == null) return;
+
+    let cleared = run!;
+    if (pitId != null) {
+      cleared = applyPitStopChoice(cleared, pitId);
+    }
+
     const next = withTacticWheelIndices(
       normalizeRunState({
-        ...run,
+        ...cleared,
         phase: "active",
-        runEffects: { ...run.runEffects, pitStopPending: false },
+        runEffects: { ...cleared.runEffects, pitStopPending: false },
       })
     );
     set({
       run: next,
-      ui: {
-        ...emptyUi,
+      preSpinSnapshot: null,
+      ui: mergeUi(next, ui, {
+        bossCyclePhase: "none",
+        bossSliceEffect: null,
+        activeWheelIndex: next.wheelIndex,
+        scrollTarget: next.wheelIndex,
+        awaitingClaim: false,
+        isSpinning: false,
+        spinWheelIndex: null,
+        showCycleReward: false,
+        shopPending: false,
+        sliceEraseMode: false,
+        gambleFlipActive: false,
+        moneyReveal: null,
+        chipReveal: null,
+        showDesperationPick: false,
+        desperationOffers: [],
+      }),
+    });
+    saveRunCheckpoint(next);
+    flushRunCheckpoint();
+  },
+
+  continueInfiniteAfterAlpha: () => {
+    const { run, ui } = get();
+    if (run == null || run.runEffects?.alphaMilestonePending !== true) return;
+    const advanced = RunManager.enterInfiniteFloor({
+      ...run,
+      runEffects: {
+        ...run.runEffects,
+        alphaMilestonePending: false,
+        pitStopPending: false,
+      },
+    });
+    const next = withTacticWheelIndices(
+      normalizeRunState({
+        ...advanced,
+        phase: "active",
+      })
+    );
+    set({
+      run: next,
+      ui: mergeUi(next, ui, {
         activeWheelIndex: next.wheelIndex,
         scrollTarget: next.wheelIndex,
         showCycleReward: false,
-      },
+        bossCyclePhase: "none",
+        bossSliceEffect: null,
+        awaitingClaim: false,
+        isSpinning: false,
+        spinWheelIndex: null,
+        shopPending: false,
+      }),
     });
     saveRunCheckpoint(next);
+    flushRunCheckpoint();
+  },
+
+  endRunAfterAlpha: () => {
+    const { run, ui } = get();
+    if (run == null || run.runEffects?.alphaMilestonePending !== true) return;
+    const next: RunState = {
+      ...run,
+      phase: "alpha_won",
+      runEffects: {
+        ...run.runEffects,
+        alphaMilestonePending: false,
+        pitStopPending: false,
+      },
+    };
+    set({
+      run: next,
+      ui: { ...ui, showCycleReward: false, bossCyclePhase: "none", bossSliceEffect: null },
+    });
+    flushRunCheckpoint();
   },
 
   dismissCycleReward: () => {
@@ -917,5 +1040,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
       ui: { ...ui, moneyReveal: null },
     });
     saveRunCheckpoint(next);
+  },
+
+  commitChipReveal: () => {
+    const { ui } = get();
+    if (ui.chipReveal == null) return;
+    set({ ui: { ...ui, chipReveal: null } });
   },
 }));

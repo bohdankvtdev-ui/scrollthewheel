@@ -18,6 +18,14 @@ const TRIGGER_BY_ID: Record<string, JokerTrigger> = {
   final_guard: "passive",
   final_tax_shield: "passive",
   clutch_cash: "onFloorEnd",
+  green_fever: "passive",
+  chip_drip: "onGainMoney",
+  deep_pockets: "onFloorEnd",
+  drain_ward: "onLoseMoney",
+  lucky_percent: "passive",
+  chaos_ward: "onLoseMoney",
+  streak_spark: "onGainMoney",
+  jackpot_hunter: "passive",
 };
 
 const STACK: JokerDefinition["stackRule"] = "unique";

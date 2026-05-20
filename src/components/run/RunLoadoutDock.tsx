@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
+import { Neo } from "../../../theme/neoBrutal";
 import { useRunStore } from "../../stores/runStore";
 import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
 import { PERK_CATALOG } from "../../data/perks";
+import { resolveEntityIcon } from "../../game/content/resolveIcon";
 import { DEBUFF_CATALOG } from "../../data/debuffs";
 import type { RunState } from "../../schemas";
 import { PerkIconChip } from "./PerkIconChip";
+import { ShieldLoadoutChip } from "./ShieldLoadoutChip";
 import { PerkDetailSheet } from "./PerkDetailSheet";
 import { DebuffDetailSheet } from "./DebuffDetailSheet";
 import { getLoadoutPerkIds } from "../../game/shields/shieldRules";
@@ -31,7 +35,8 @@ export function RunLoadoutDock({
 
   const loadoutPerks = getLoadoutPerkIds(run);
   const debuffs = run.debuffs;
-  const hasItems = loadoutPerks.length > 0 || debuffs.length > 0;
+  const shields = run.shields ?? 0;
+  const hasItems = loadoutPerks.length > 0 || debuffs.length > 0 || shields > 0;
 
   useEffect(() => {
     if (highlightPerkId == null && highlightDebuffId == null) return;
@@ -50,14 +55,16 @@ export function RunLoadoutDock({
         contentContainerStyle={styles.row}
         scrollEnabled={hasItems}
       >
+        {shields > 0 ? <ShieldLoadoutChip count={shields} /> : null}
         {loadoutPerks.map((id) => {
           const p = PERK_CATALOG[id];
           if (p == null) return null;
+          const resolved = resolveEntityIcon("perk", id);
           return (
             <PerkIconChip
               key={`perk-${id}`}
-              icon={p.icon}
-              iconFamily={p.iconFamily}
+              icon={resolved.icon}
+              iconFamily={resolved.iconFamily}
               variant="good"
               tier={p.tier}
               highlighted={id === highlightPerkId}

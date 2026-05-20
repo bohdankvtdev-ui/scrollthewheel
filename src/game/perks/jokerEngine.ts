@@ -32,6 +32,12 @@ export function applyJokerEvent(run: RunState, event: JokerEvent): JokerEngineRe
     if (owns("gold_rush")) {
       chipsBonus += 1;
     }
+    if (owns("chip_drip")) {
+      chipsBonus += 1;
+    }
+    if (owns("streak_spark") && (next.winStreak ?? 0) >= 2) {
+      chipsBonus += 1;
+    }
   }
 
   if (event.type === "onLoseMoney" && event.amount < 0) {
@@ -51,6 +57,12 @@ export function applyJokerEvent(run: RunState, event: JokerEvent): JokerEngineRe
     }
     if (owns("ante_insurance")) {
       chipsBonus += 4;
+    }
+    if (owns("deep_pockets")) {
+      chipsBonus += 4 + Math.max(0, event.floor);
+    }
+    if (owns("cycle_momentum") && event.floor > 0 && event.floor % 5 === 0) {
+      chipsBonus += 2;
     }
   }
 

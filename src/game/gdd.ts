@@ -14,6 +14,9 @@ export const GDD_PACING = {
   cyclesPerSkilledRun: 5,
 } as const;
 
+/** Alpha campaign — clearing this cycle count ends the run in victory. */
+export const ALPHA_CAMPAIGN_CYCLES = 100;
+
 export type RunEffectId =
   | "debt_bomb"
   | "lock_drain"
@@ -29,7 +32,7 @@ export type RunEffectId =
 export const RUN_EFFECT_LABELS: Record<RunEffectId, string> = {
   debt_bomb: "Debt Bomb — lose 30% bank + curse",
   lock_drain: "Locked — next spin is Drain wheel",
-  boss_ghost: "Boss Ghost — more bad slices this cycle",
+  boss_ghost: "Boss Ghost (boss curse) — more red wedges this cycle",
   corruption_spread: "Corruption — 3 wheels get extra losses",
   doom_spiral: "Doom Spiral — next wheels are Chaos",
   boss_perk_tax: "Perk Tax — lose 5% bank per perk you own",
@@ -47,7 +50,7 @@ export const PRIZE_TAXONOMY = {
   bank_wipe: "Lose all bank $ (shield blocks once)",
   perk: "Free perk for your loadout",
   debuff: "Bad effect until cleared",
-  relic_offer: "Passive relic — always on",
+  relic_offer: "Relic — passive bonus for the whole run (stacks on wheel odds / cash)",
   deck_add: "Passive chip in your row",
   deck_remove: "Remove last chip",
   deck_upgrade: "Upgrade your best chip",
@@ -100,7 +103,7 @@ export function getWheelDifficultyBias(wheelIndex: number, cycleLevel: number): 
 export const GDD_LOOP_SUMMARY = {
   hook: "Start at $0. Spin 9 wheels per cycle; buy perks and forge upgrades with chips.",
   lose: "Bank hits $0 — run over.",
-  win: "Clear wheel 9 → next cycle hits harder.",
+  win: `Clear ${ALPHA_CAMPAIGN_CYCLES} cycles, then choose to push further or bank your run.`,
   chipsNote:
     "Chips = shop currency per run. Bank $ = wedge payouts. Win streaks earn bonus chips and cash.",
 } as const;

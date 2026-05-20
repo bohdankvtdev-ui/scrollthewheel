@@ -1,8 +1,9 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { PERK_CATALOG } from "../../data/perks";
+import { resolveEntityIcon } from "../../game/content/resolveIcon";
 import { PERK_TIER_LABELS } from "../../game/gdd";
-import { getPerkDisplay } from "../../game/perks/perkDisplay";
+import { getPerkDetailLines, getPerkDisplay } from "../../game/perks/perkDisplay";
 import { PERK_FAMILY_COLORS, PERK_FAMILY_LABELS } from "../../game/perks/perkFamilies";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
@@ -48,14 +49,19 @@ export function PerkDetailSheet({ perkId, visible, onClose }: PerkDetailSheetPro
 
   const colors = PERK_FAMILY_COLORS[perk.family];
   const categoryLabel = PERK_FAMILY_LABELS[perk.family];
-  const bullets = display?.bullets ?? [perk.description];
+  const lines = perkId != null ? getPerkDetailLines(perkId) : [perk.description];
+  const resolved = perkId != null ? resolveEntityIcon("perk", perkId) : null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
           <View style={[styles.iconBox, { backgroundColor: colors.bg }]}>
-            <Glyph family={perk.iconFamily} name={perk.icon} color={colors.accent} />
+            <Glyph
+              family={resolved?.iconFamily ?? perk.iconFamily}
+              name={resolved?.icon ?? perk.icon}
+              color={colors.accent}
+            />
           </View>
 
           <Text style={[styles.name, { fontFamily: FONT_BEBAS_NEUE }]}>{perk.name}</Text>
@@ -72,15 +78,15 @@ export function PerkDetailSheet({ perkId, visible, onClose }: PerkDetailSheetPro
             </Text>
           </View>
 
-          <View style={styles.bulletBox}>
-            <Text style={[styles.bulletHeading, { fontFamily: FONT_BEBAS_NEUE }]}>How it works</Text>
-            {bullets.map((line) => (
-              <View key={line} style={styles.bulletRow}>
-                <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>{line}</Text>
-              </View>
-            ))}
-          </View>
+          {lines.length > 0 ? (
+            <View style={styles.bulletBox}>
+              {lines.map((line) => (
+                <Text key={line} style={styles.effectLine}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          ) : null}
 
           <Pressable style={styles.closeBtn} onPress={onClose}>
             <Text style={[styles.closeLbl, { fontFamily: FONT_BEBAS_NEUE }]}>Got it</Text>
@@ -173,21 +179,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 2,
   },
-  bulletRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-  },
-  bulletDot: {
-    fontSize: 14,
-    lineHeight: 20,
+  effectLine: {
+    fontSize: 15,
+    lineHeight: 21,
     color: Neo.ink,
-  },
-  bulletText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    color: Neo.ink,
+    textAlign: "center",
   },
   closeBtn: {
     marginTop: 10,

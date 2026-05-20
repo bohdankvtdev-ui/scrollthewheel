@@ -26,6 +26,13 @@ export function previewNextCycleRun(run: RunState): RunState {
 /** Apply cycle rewards, pit-stop flag, and cycle-2 wheel 1 — overlay shown separately. */
 export function transitionRunAfterBossClear(run: RunState): RunState {
   const cleared = RunManager.completeCycle(run);
+  if (cleared.runEffects?.alphaMilestonePending === true) {
+    return {
+      ...cleared,
+      phase: "won",
+      lastCycleReward: cleared.lastCycleReward,
+    };
+  }
   const cycle2 = RunManager.enterInfiniteFloor(cleared);
   return {
     ...cycle2,
@@ -36,4 +43,8 @@ export function transitionRunAfterBossClear(run: RunState): RunState {
       pitStopPending: cleared.runEffects?.pitStopPending ?? true,
     },
   };
+}
+
+export function isAlphaMilestoneChoice(run: Pick<RunState, "runEffects">): boolean {
+  return run.runEffects?.alphaMilestonePending === true;
 }

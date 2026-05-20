@@ -1,4 +1,5 @@
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
+import { VectorIcon } from "../../../lib/ui/VectorIcon";
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
@@ -14,25 +15,7 @@ const TYPE_STYLE: Record<RunToastType, { bg: string; accent: string; icon: strin
 
 function ToastIcon({ name, type }: { name?: string; type: RunToastType }) {
   const iconName = name ?? TYPE_STYLE[type].icon;
-  if (iconName in MaterialCommunityIcons.glyphMap) {
-    return (
-      <MaterialCommunityIcons
-        name={iconName as keyof typeof MaterialCommunityIcons.glyphMap}
-        size={14}
-        color={Neo.ink}
-      />
-    );
-  }
-  if (iconName in MaterialIcons.glyphMap) {
-    return (
-      <MaterialIcons
-        name={iconName as keyof typeof MaterialIcons.glyphMap}
-        size={14}
-        color={Neo.ink}
-      />
-    );
-  }
-  return <MaterialIcons name="info-outline" size={14} color={Neo.ink} />;
+  return <VectorIcon name={iconName} size={14} color={Neo.ink} />;
 }
 
 /** Compact notice directly under the perk loadout (in `loadoutStack`). */

@@ -10,7 +10,7 @@ import { CARD_CATALOG } from "../data/cards";
 
 import { RUN_EFFECT_LABELS, type RunEffectId } from "../game/gdd";
 
-import { getPerkDisplay } from "../game/perks/perkDisplay";
+import { getPerkDetailLines, getPerkDisplay } from "../game/perks/perkDisplay";
 
 import { resolveSliceIcon } from "../game/content/resolveIcon";
 
@@ -224,7 +224,7 @@ export function getSliceTapDetail(slice: SliceDefinition): SliceTapDetail {
 
     const perk = PERK_CATALOG[payload.perkId];
 
-    const display = getPerkDisplay(payload.perkId);
+    const detailLines = getPerkDetailLines(payload.perkId);
 
     return {
 
@@ -232,7 +232,7 @@ export function getSliceTapDetail(slice: SliceDefinition): SliceTapDetail {
 
       effectLine: perk != null ? `Win: ${perk.name}` : "New perk",
 
-      bullets: display?.bullets.slice(0, 3) ?? [perk?.description ?? "Adds to your perk row for the rest of the run"],
+      bullets: detailLines.length > 0 ? detailLines : [perk?.description ?? "Adds to loadout"],
 
     };
 
@@ -357,17 +357,15 @@ export function getSliceTapDetail(slice: SliceDefinition): SliceTapDetail {
 
 
   if (kind === "neutral") {
-
+    const isNothing =
+      slice.label.toLowerCase().includes("nothing") || slice.id.includes("nothing");
     return {
-
-      category: "Neutral",
-
-      effectLine: "No change",
-
-      bullets: ["Breathing room — bank and loadout stay the same"],
-
+      category: isNothing ? "Nothing" : "Neutral",
+      effectLine: isNothing ? "Nothing" : "No change",
+      bullets: isNothing
+        ? ["No cash, perks, or curses — spin again on the next wheel"]
+        : ["Breathing room — bank and loadout stay the same"],
     };
-
   }
 
 

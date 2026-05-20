@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
+import { VectorIcon } from "../../../lib/ui/VectorIcon";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { PIT_STOP_OPTIONS, type PitStopOptionId } from "../../game/tactics/cyclePitStop";
+import { ALPHA_CAMPAIGN_CYCLES } from "../../game/gdd";
 import { getPermanentWedgeBonus, STARTING_WEDGE_COUNT } from "../../game/wheels/sliceCapacityBonus";
+import { formatMoney } from "../../utils/formatMoney";
 import type { RunState } from "../../schemas";
 import { useRunStore } from "../../stores/runStore";
 
@@ -18,17 +21,25 @@ const PIT_SHORT: Record<PitStopOptionId, { label: string; value: string }> = {
 type CycleClearOverlayProps = {
   run: RunState;
   onContinue: () => void;
+  onContinueInfinite: () => void;
+  onEndCampaign: () => void;
 };
 
-export function CycleClearOverlay({ run, onContinue }: CycleClearOverlayProps) {
+export function CycleClearOverlay({
+  run,
+  onContinue,
+  onContinueInfinite,
+  onEndCampaign,
+}: CycleClearOverlayProps) {
   const applyPitStop = useRunStore((s) => s.applyPitStop);
   const pitPending = run.runEffects?.pitStopPending === true;
+  const alphaChoice = run.runEffects?.alphaMilestonePending === true;
   const reward = run.lastCycleReward;
   const [pickedPitId, setPickedPitId] = useState<PitStopOptionId | null>(null);
 
   useEffect(() => {
     setPickedPitId(null);
-  }, [pitPending, reward?.cycle]);
+  }, [pitPending, reward?.cycle, alphaChoice]);
 
   const nextCycle = run.floor + 1;
   const nextSlices = STARTING_WEDGE_COUNT + getPermanentWedgeBonus(run);
@@ -54,17 +65,19 @@ export function CycleClearOverlay({ run, onContinue }: CycleClearOverlayProps) {
         </View>
 
         <Text style={[styles.headline, { fontFamily: FONT_BEBAS_NEUE }]}>
-          Cycle {reward.cycle}
+          {alphaChoice ? `${ALPHA_CAMPAIGN_CYCLES} cycles cleared` : `Cycle ${reward.cycle}`}
         </Text>
 
         <Text style={[styles.rewardsLine, { fontFamily: FONT_BEBAS_NEUE }]}>
           +${reward.money} · +{reward.chips} chips
         </Text>
         <Text style={[styles.nextLine, { fontFamily: FONT_BEBAS_NEUE }]}>
-          Cycle {nextCycle} · {nextSlices} wedges
+          {alphaChoice
+            ? `Bank ${formatMoney(run.money)} — keep climbing or end your run`
+            : `Cycle ${nextCycle} · ${nextSlices} wedges`}
         </Text>
 
-        {pitPending ? (
+        {pitPending && !alphaChoice ? (
           <View style={styles.pitRow}>
             {PIT_STOP_OPTIONS.map((opt) => {
               const short = PIT_SHORT[opt.id];
@@ -79,8 +92,9 @@ export function CycleClearOverlay({ run, onContinue }: CycleClearOverlayProps) {
                   accessibilityRole="button"
                   accessibilityLabel={`${short.label} ${short.value}`}
                 >
-                  <MaterialCommunityIcons
-                    name={opt.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                  <VectorIcon
+                    name={opt.icon}
+                    family={opt.iconFamily}
                     size={22}
                     color={isPicked ? Neo.neonYellow : Neo.neonCyan}
                   />
@@ -92,16 +106,37 @@ export function CycleClearOverlay({ run, onContinue }: CycleClearOverlayProps) {
           </View>
         ) : null}
 
-        <Pressable
-          style={[styles.btn, !canContinue && styles.btnDisabled]}
-          onPress={onContinue}
-          disabled={!canContinue}
-          accessibilityRole="button"
-          accessibilityLabel="Continue"
-          accessibilityState={{ disabled: !canContinue }}
-        >
-          <Text style={[styles.btnText, { fontFamily: FONT_BEBAS_NEUE }]}>Continue</Text>
-        </Pressable>
+        {alphaChoice ? (
+          <View style={styles.choiceRow}>
+            <Pressable
+              style={[styles.btn, styles.btnInfinite]}
+              onPress={onContinueInfinite}
+              accessibilityRole="button"
+              accessibilityLabel="Continue infinite run"
+            >
+              <Text style={[styles.btnText, { fontFamily: FONT_BEBAS_NEUE }]}>Keep playing</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.btn, styles.btnEnd]}
+              onPress={onEndCampaign}
+              accessibilityRole="button"
+              accessibilityLabel="End run"
+            >
+              <Text style={[styles.btnTextEnd, { fontFamily: FONT_BEBAS_NEUE }]}>End run</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            style={[styles.btn, !canContinue && styles.btnDisabled]}
+            onPress={onContinue}
+            disabled={!canContinue}
+            accessibilityRole="button"
+            accessibilityLabel="Continue"
+            accessibilityState={{ disabled: !canContinue }}
+          >
+            <Text style={[styles.btnText, { fontFamily: FONT_BEBAS_NEUE }]}>Continue</Text>
+          </Pressable>
+        )}
       </Animated.View>
     </View>
   );
@@ -117,49 +152,47 @@ const styles = StyleSheet.create({
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.82)",
+    backgroundColor: "rgba(0,0,0,0.78)",
   },
   card: {
     width: "100%",
-    maxWidth: 340,
-    backgroundColor: Neo.ink,
+    maxWidth: 400,
+    backgroundColor: "#1A1228",
+    borderRadius: 16,
     borderWidth: Neo.borderBold,
-    borderColor: Neo.neonYellow,
-    borderRadius: 14,
+    borderColor: Neo.ink,
     padding: 20,
-    alignItems: "center",
-    gap: 10,
-    zIndex: 1,
+    gap: 12,
   },
   badge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    alignSelf: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     backgroundColor: Neo.neonYellow,
-    borderWidth: Neo.borderBold,
+    borderWidth: Neo.borderThin,
     borderColor: Neo.ink,
     alignItems: "center",
     justifyContent: "center",
   },
   headline: {
-    fontSize: 32,
+    fontSize: 28,
     color: Neo.neonYellow,
-    letterSpacing: 0.5,
+    textAlign: "center",
   },
   rewardsLine: {
-    fontSize: 20,
-    color: Neo.textOnDark,
+    fontSize: 18,
+    color: Neo.neonCyan,
     textAlign: "center",
   },
   nextLine: {
     fontSize: 14,
-    color: "rgba(250,250,250,0.55)",
+    color: "rgba(250,250,250,0.72)",
     textAlign: "center",
-    marginBottom: 4,
+    lineHeight: 18,
   },
   pitRow: {
     flexDirection: "row",
-    width: "100%",
     gap: 8,
     marginTop: 4,
   },
@@ -172,38 +205,51 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: Neo.borderThin,
-    borderColor: "rgba(34,211,238,0.4)",
+    borderColor: "rgba(34,211,238,0.35)",
   },
   pitChipPicked: {
     borderColor: Neo.neonYellow,
-    backgroundColor: "rgba(253,224,71,0.14)",
+    backgroundColor: "rgba(255,233,77,0.12)",
   },
   pitChipDim: {
-    opacity: 0.4,
+    opacity: 0.45,
   },
   pitLabel: {
-    fontSize: 15,
+    fontSize: 13,
     color: Neo.textOnDark,
   },
   pitValue: {
-    fontSize: 13,
-    color: "rgba(250,250,250,0.65)",
+    fontSize: 12,
+    color: Neo.neonCyan,
+  },
+  choiceRow: {
+    gap: 10,
+    marginTop: 4,
   },
   btn: {
-    marginTop: 6,
-    width: "100%",
-    paddingVertical: 13,
-    backgroundColor: Neo.neonCyan,
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
-    borderRadius: 10,
     alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: Neo.borderThin,
+    borderColor: Neo.ink,
+  },
+  btnInfinite: {
+    backgroundColor: Neo.neonCyan,
+  },
+  btnEnd: {
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   btnDisabled: {
-    opacity: 0.38,
+    opacity: 0.45,
   },
   btnText: {
-    fontSize: 19,
+    fontSize: 18,
     color: Neo.ink,
+    letterSpacing: 0.3,
+  },
+  btnTextEnd: {
+    fontSize: 18,
+    color: Neo.textOnDark,
+    letterSpacing: 0.3,
   },
 });

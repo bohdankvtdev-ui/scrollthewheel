@@ -17,7 +17,9 @@ describe("wheelDatabase", () => {
       const slices = getConfiguredWheelSlices(id, id);
       expect(slices).toHaveLength(SLICES_PER_WHEEL);
       const labels = new Set(slices.map((s) => s.label));
-      expect(labels.size).toBe(SLICES_PER_WHEEL);
+      if (!slices.some((s) => s.label === "Nothing")) {
+        expect(labels.size).toBe(SLICES_PER_WHEEL);
+      }
     }
   });
 
@@ -98,8 +100,30 @@ describe("wheelDatabase", () => {
     expect(rareLucky).toBeLessThan(rareBase);
   });
 
-  it("wheel_1 is money-themed with same cash icon", () => {
-    const slices = getConfiguredWheelSlices("wheel_1", "wheel_1");
+  it("risk wheel cycle 1 splits ~50% land on good vs bad wedges", () => {
+    const slices = getConfiguredWheelSlices("wheel_3", "wheel_3", 1);
+    expect(slices).toHaveLength(6);
+    const goodLand = slices
+      .filter((s) => s.weightTags?.includes("positive"))
+      .reduce((sum, s) => sum + s.baseWeight, 0);
+    const badLand = slices
+      .filter((s) => !s.weightTags?.includes("positive"))
+      .reduce((sum, s) => sum + s.baseWeight, 0);
+    expect(goodLand).toBeGreaterThanOrEqual(48);
+    expect(goodLand).toBeLessThanOrEqual(52);
+    expect(badLand).toBeGreaterThanOrEqual(48);
+    expect(badLand).toBeLessThanOrEqual(52);
+    expect(slices.some((s) => s.label.includes("%"))).toBe(true);
+  });
+
+  it("cycle 1 money wheel has no losses or nothing", () => {
+    const slices = getConfiguredWheelSlices("wheel_1", "wheel_1", 1);
+    expect(slices.every((s) => s.kind === "money")).toBe(true);
+    expect(slices.some((s) => s.label === "Nothing")).toBe(false);
+  });
+
+  it("wheel_1 is money-themed with same cash icon on +$ wedges", () => {
+    const slices = getConfiguredWheelSlices("wheel_1", "wheel_1", 2);
     expect(slices).toHaveLength(6);
     expect(slices.every((s) => s.kind === "money" || s.kind === "money_loss")).toBe(true);
     expect(slices.filter((s) => s.kind === "money").every((s) => s.icon === "attach-money")).toBe(

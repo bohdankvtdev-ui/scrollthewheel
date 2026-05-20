@@ -1,4 +1,5 @@
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
+import { VectorIcon } from "../../../lib/ui/VectorIcon";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
@@ -29,8 +30,9 @@ export function CyclePitStopOverlay({ onPicked }: CyclePitStopOverlayProps) {
                 onPicked();
               }}
             >
-              <MaterialCommunityIcons
-                name={opt.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+              <VectorIcon
+                name={opt.icon}
+                family={opt.iconFamily}
                 size={28}
                 color={Neo.neonCyan}
               />

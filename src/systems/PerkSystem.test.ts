@@ -7,7 +7,7 @@ describe("PerkSystem money math", () => {
     let run = RunManager.createInitialRun();
     run = { ...run, money: 0, perks: ["gold_rush"] };
     const next = applyMoneyDelta(run, 100);
-    expect(next.money).toBe(125);
+    expect(next.money).toBe(120);
   });
 
   it("vip_roller boosts percent wheel gains via applyBankPercent", () => {

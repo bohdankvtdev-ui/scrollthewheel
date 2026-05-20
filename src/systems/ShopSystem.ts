@@ -1,4 +1,6 @@
 import { PERK_CATALOG } from "../data/perks";
+import { resolveEntityIcon } from "../game/content/resolveIcon";
+import { getPerkDetailLines, getPerkDisplay } from "../game/perks/perkDisplay";
 import {
   ADVANCEMENT_CATALOG,
   advancementShopCost,
@@ -24,7 +26,10 @@ import {
   CONSUMABLE_CATALOG,
   type ConsumableId,
 } from "../game/shop/consumables";
+import { buildShopPerkCatalog, perkShopLockReason, type ShopPerkCatalogEntry } from "../game/shop/perkCatalog";
 import { pickShopOfferIds, sellRefundAmount, shopRerollCost } from "../game/shop/offers";
+
+export type { ShopPerkCatalogEntry };
 import type { RunState } from "../schemas";
 import { applyPerkAcquisition } from "./PerkSystem";
 import { rebuildWheelsFromDatabase } from "./WheelSystem";
@@ -170,6 +175,7 @@ export class ShopSystem {
         name: def.name,
         description: def.line,
         icon: def.icon,
+        iconFamily: def.iconFamily,
         level,
         maxed,
         cost,
@@ -240,12 +246,14 @@ export class ShopSystem {
         const node = SHOP_PERK_TREE.find((n) => n.perkId === perkId);
         const catalog = PERK_CATALOG[perkId];
         const base = node?.cost ?? 4;
+        const resolved = resolveEntityIcon("perk", perkId);
+        const detailLines = getPerkDetailLines(perkId);
         return {
           perkId,
           name: catalog?.name ?? perkId,
-          description: catalog?.description ?? "",
-          icon: catalog?.icon ?? "stars",
-          iconFamily: catalog?.iconFamily ?? "MaterialIcons",
+          description: detailLines[0] ?? catalog?.description ?? "",
+          icon: resolved.icon,
+          iconFamily: resolved.iconFamily,
           sellValue: sellRefundAmount(shopChipCost(run, base)),
         };
       });
@@ -269,23 +277,31 @@ export class ShopSystem {
     const catalog = PERK_CATALOG[node.perkId];
     const cost = shopChipCost(run, node.cost);
     const slotsFull = isJokerSlotFull(run) && !owned;
+    const resolved = resolveEntityIcon("perk", node.perkId);
+    const detailLines = getPerkDetailLines(node.perkId);
+    const lockReason = owned ? null : perkShopLockReason(run, node);
 
     return {
       ...node,
       cost,
       owned,
       locked: locked || slotsFull,
+      lockReason,
       canAfford: getSpendableChips(run) >= cost,
       name: catalog?.name ?? node.perkId,
-      tagline: catalog?.tagline ?? "",
-      description: catalog?.description ?? "",
-      icon: catalog?.icon ?? "stars",
-      iconFamily: catalog?.iconFamily ?? "MaterialIcons",
+      tagline: catalog?.tagline || getPerkDisplay(node.perkId)?.tagline || "",
+      description: detailLines[0] ?? catalog?.description ?? "",
+      icon: resolved.icon,
+      iconFamily: resolved.iconFamily,
     };
   }
 
   static listNodes(run: RunState) {
     return ShopSystem.listOfferNodes(run, ShopSystem.pickOffers(run));
+  }
+
+  static listPerkCatalog(run: RunState, offerIds: readonly string[]): ShopPerkCatalogEntry[] {
+    return buildShopPerkCatalog(run, offerIds);
   }
 }
 

@@ -3,6 +3,7 @@ import { MIN_SLICE_COUNT, MAX_SLICE_COUNT } from "../../../schemas/wheel.schema"
 import { getSliceCountForWheel } from "../../advancements/sliceCount";
 import { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
 import type { PrizeDef, WheelConfigEntry, WheelConfigId, WheelPrizeSlot } from "./types";
+import { resolvePrizeIcon } from "../../content/prizeIcons";
 import {
   buildPrizeSlotsForWheel,
   finalizeSlicePayload,
@@ -61,12 +62,13 @@ export function buildSliceFromPrizeSlot(
     template.label,
     cycle
   );
+  const { icon, iconFamily } = resolvePrizeIcon(slot.prize, template, { wheelId });
   return {
     id: `${wheelId}_${slot.prize}_${index}`,
     kind: template.kind,
     label,
-    icon: template.icon,
-    iconFamily: template.iconFamily,
+    icon,
+    iconFamily,
     baseWeight: slot.chance,
     weightTags: template.weightTags ? [...template.weightTags] : undefined,
     payload: payload as PrizeDef["payload"],

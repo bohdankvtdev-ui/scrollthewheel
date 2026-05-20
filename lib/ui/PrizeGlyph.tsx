@@ -1,7 +1,7 @@
-import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import type { SliceVisualTone } from "../../src/game/content/sliceVisualTheme";
 import { Neo } from "../../theme/neoBrutal";
+import { VectorIcon } from "./VectorIcon";
 
 export type PrizeGlyphFamily = "MaterialIcons" | "MaterialCommunityIcons" | "Ionicons";
 
@@ -32,32 +32,6 @@ const TONE_CHIP: Record<SliceVisualTone, { bg: string; fg: string }> = {
   curse: { bg: "#E7E5E4", fg: "#44403C" },
   neutral: { bg: "#F3F4F6", fg: "#374151" },
 };
-
-function Glyph({
-  family,
-  name,
-  size,
-  color,
-}: {
-  family: PrizeGlyphFamily;
-  name: string;
-  size: number;
-  color: string;
-}) {
-  if (family === "MaterialCommunityIcons") {
-    return (
-      <MaterialCommunityIcons
-        name={name as keyof typeof MaterialCommunityIcons.glyphMap}
-        size={size}
-        color={color}
-      />
-    );
-  }
-  if (family === "Ionicons") {
-    return <Ionicons name={name as keyof typeof Ionicons.glyphMap} size={size} color={color} />;
-  }
-  return <MaterialIcons name={name as keyof typeof MaterialIcons.glyphMap} size={size} color={color} />;
-}
 
 /** Flat neo-brutal icon chip — rounded square, no circle pills. */
 export function PrizeGlyph({
@@ -92,7 +66,7 @@ export function PrizeGlyph({
         style,
       ]}
     >
-      <Glyph family={iconFamily} name={icon} size={dim.glyph} color={fg} />
+      <VectorIcon family={iconFamily} name={icon} size={dim.glyph} color={fg} />
     </View>
   );
 }
