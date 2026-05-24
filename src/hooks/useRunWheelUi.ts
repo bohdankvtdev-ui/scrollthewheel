@@ -11,6 +11,9 @@ export function useRunWheelUi() {
       sliceEraseMode: s.ui.sliceEraseMode,
       lastResultLabel: s.ui.lastResultLabel,
       bossCyclePhase: s.ui.bossCyclePhase,
+      spinFeedbackTier: s.ui.spinFeedbackTier,
+      washFlashEpoch: s.ui.washFlashEpoch,
+      washFlashTier: s.ui.washFlashTier,
     }))
   );
 }

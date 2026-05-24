@@ -4,15 +4,19 @@ import { DEBUFF_CATALOG } from "../data/debuffs";
 import { PERK_CATALOG } from "../data/perks";
 import { RELIC_CATALOG } from "../data/relics";
 import { GDD_LOOP_SUMMARY, GDD_PACING, PRIZE_TAXONOMY } from "./gdd";
+import { INFINITE_SCALING, getScalingParams } from "./infiniteScalingConfig";
 import {
-  getScalingParams,
-  INFINITE_SCALING,
   RUN_DEFAULTS,
   RUN_LOOP,
   SHOP_PERK_TREE,
   WHEEL_COUNT,
   WHEEL_ROTATION,
 } from "./loop";
+import {
+  buildProgressionTable,
+  PROGRESSION_PREVIEW_CYCLES,
+  type ProgressionRow,
+} from "./cycle/cycleProgression";
 import { SLICE_POOLS, SLICE_POOL_IDS } from "./prizes";
 
 export type GameContentSnapshot = {
@@ -21,7 +25,9 @@ export type GameContentSnapshot = {
   loop: typeof RUN_LOOP;
   runDefaults: typeof RUN_DEFAULTS;
   infiniteScaling: typeof INFINITE_SCALING;
+  /** @deprecated use progressionTable */
   scalingPreview: ReturnType<typeof getScalingParams>[];
+  progressionTable: ProgressionRow[];
   wheelRotation: typeof WHEEL_ROTATION;
   shopTree: typeof SHOP_PERK_TREE;
   slicePoolIds: readonly string[];
@@ -38,12 +44,13 @@ export function buildGameContentSnapshot(): GameContentSnapshot {
     SLICE_POOL_IDS.map((id) => [id, SLICE_POOLS[id]?.length ?? 0])
   );
   return {
-    meta: { version: 3, generatedAt: new Date().toISOString() },
+    meta: { version: 4, generatedAt: new Date().toISOString() },
     gdd: { pacing: GDD_PACING, loop: GDD_LOOP_SUMMARY, prizes: PRIZE_TAXONOMY },
     loop: RUN_LOOP,
     runDefaults: RUN_DEFAULTS,
     infiniteScaling: INFINITE_SCALING,
-    scalingPreview: [1, 2, 3, 5, 10].map(getScalingParams),
+    scalingPreview: [...PROGRESSION_PREVIEW_CYCLES].map(getScalingParams),
+    progressionTable: buildProgressionTable(),
     wheelRotation: WHEEL_ROTATION,
     shopTree: SHOP_PERK_TREE,
     slicePoolIds: SLICE_POOL_IDS,

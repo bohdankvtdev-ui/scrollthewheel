@@ -52,6 +52,7 @@
     },
     "extra": {
       "router": {},
+      "leaderboardApiUrl": "https://spinwheel-leaderboard.bohdankvtdev.workers.dev",
       "eas": {
         "projectId": "42bd8603-7601-466c-892b-37e68017f607"
       }

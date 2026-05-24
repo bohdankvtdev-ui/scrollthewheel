@@ -21,6 +21,8 @@ export type EffectKind =
   | "loss_mult"
   | "quota_mult"
   | "shield"
+  | "chip_grant"
+  | "curse_resist"
   | "next_payout_double"
   | "cycle_money_growth";
 

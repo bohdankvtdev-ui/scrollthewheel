@@ -2,7 +2,7 @@ import { shopChipCost, spendChips } from "../shop/chipEconomy";
 import type { RunState } from "../../schemas";
 import { WHEEL_COUNT } from "../loop";
 import { canInsureNextWheel } from "./applyInsureWheel";
-import { isTacticDecisionWheel } from "./tacticWheels";
+import { isTacticWheelEligible } from "./tacticWheels";
 
 export type MicroChoiceId = "reroll" | "insure" | "gamble";
 
@@ -37,11 +37,11 @@ export const MICRO_CHOICE_META: Record<
     chosen: "Worst negative stripped. Swipe up.",
   },
   gamble: {
-    label: "Gamble",
-    icon: "dice-multiple",
-    hint: "+100% or −100% bank",
-    pickerHint: "2× your bank or wipe it",
-    chosen: "Tap Spin — double bank or wipe.",
+    label: "All In",
+    icon: "arrow-up-down-bold",
+    hint: "WIN ALL or LOSE ALL",
+    pickerHint: "Green = double bank · Red = wipe bank",
+    chosen: "Spin — green doubles bank, red wipes it.",
   },
 };
 
@@ -79,7 +79,7 @@ export function listEligibleMicroChoices(
   wheelIndex: number,
   opts: { hasPreSpinSnapshot: boolean }
 ): MicroChoiceId[] {
-  if (!isTacticDecisionWheel(run, wheelIndex)) return [];
+  if (!isTacticWheelEligible(run, wheelIndex)) return [];
   const isLast = wheelIndex >= WHEEL_COUNT - 1;
   return OFFER_POOL.filter((id) => {
     if (id === "insure" && isLast) return false;
@@ -115,7 +115,7 @@ export function getMicroChoiceOffers(
   wheelIndex: number,
   opts: { hasPreSpinSnapshot: boolean }
 ): MicroChoiceId[] {
-  if (!isTacticDecisionWheel(run, wheelIndex)) return [];
+  if (!isTacticWheelEligible(run, wheelIndex)) return [];
   const fx = run.runEffects;
   if (
     fx?.microChoiceOffersWheel === wheelIndex &&

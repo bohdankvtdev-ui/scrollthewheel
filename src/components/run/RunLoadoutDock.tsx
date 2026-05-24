@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
+import { useEffect, useRef, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Neo } from "../../../theme/neoBrutal";
 import { useRunStore } from "../../stores/runStore";
-import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
+import { useRunChromeMetrics } from "../../../lib/layout/runChrome";
 import { PERK_CATALOG } from "../../data/perks";
+import { PERK_FAMILY_COLORS } from "../../game/perks/perkFamilies";
 import { resolveEntityIcon } from "../../game/content/resolveIcon";
 import { DEBUFF_CATALOG } from "../../data/debuffs";
 import type { RunState } from "../../schemas";
@@ -12,7 +12,7 @@ import { PerkIconChip } from "./PerkIconChip";
 import { ShieldLoadoutChip } from "./ShieldLoadoutChip";
 import { PerkDetailSheet } from "./PerkDetailSheet";
 import { DebuffDetailSheet } from "./DebuffDetailSheet";
-import { getLoadoutPerkIds } from "../../game/shields/shieldRules";
+import { getLoadoutStacks } from "../../game/perks/perkStacks";
 
 type RunLoadoutDockProps = {
   run: RunState;
@@ -22,21 +22,23 @@ type RunLoadoutDockProps = {
 
 const HIGHLIGHT_MS = 1600;
 
-/** Perks (green) and curses (red) under the header — fixed height to avoid layout shift. */
+/** Oldest left → newest right (new perks slide in from the right). */
 export function RunLoadoutDock({
   run,
   highlightPerkId,
   highlightDebuffId,
 }: RunLoadoutDockProps) {
+  const chrome = useRunChromeMetrics();
+  const chipSize = chrome.layout.chipSlot;
+  const loadoutHeight = chrome.layout.loadout;
   const [perkDetailId, setPerkDetailId] = useState<string | null>(null);
   const [debuffDetailId, setDebuffDetailId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const clearLastWonPerk = useRunStore((s) => s.clearLastWonPerk);
   const clearLastWonDebuff = useRunStore((s) => s.clearLastWonDebuff);
 
-  const loadoutPerks = getLoadoutPerkIds(run);
-  const debuffs = run.debuffs;
-  const shields = run.shields ?? 0;
-  const hasItems = loadoutPerks.length > 0 || debuffs.length > 0 || shields > 0;
+  const stacks = getLoadoutStacks(run);
+  const hasItems = stacks.length > 0;
 
   useEffect(() => {
     if (highlightPerkId == null && highlightDebuffId == null) return;
@@ -47,46 +49,66 @@ export function RunLoadoutDock({
     return () => clearTimeout(t);
   }, [highlightPerkId, highlightDebuffId, clearLastWonPerk, clearLastWonDebuff]);
 
+  useEffect(() => {
+    if (highlightPerkId != null || highlightDebuffId != null) {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [highlightPerkId, highlightDebuffId, stacks.length]);
+
   return (
-    <View style={styles.wrap} pointerEvents={hasItems ? "auto" : "none"}>
+    <View
+      style={[styles.wrap, { height: loadoutHeight }]}
+      pointerEvents={hasItems ? "auto" : "none"}
+    >
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
+        contentContainerStyle={[styles.row, { height: loadoutHeight }]}
         scrollEnabled={hasItems}
       >
-        {shields > 0 ? <ShieldLoadoutChip count={shields} /> : null}
-        {loadoutPerks.map((id) => {
-          const p = PERK_CATALOG[id];
-          if (p == null) return null;
-          const resolved = resolveEntityIcon("perk", id);
-          return (
-            <PerkIconChip
-              key={`perk-${id}`}
-              icon={resolved.icon}
-              iconFamily={resolved.iconFamily}
-              variant="good"
-              tier={p.tier}
-              highlighted={id === highlightPerkId}
-              animateEnter={id === highlightPerkId}
-              onPress={() => setPerkDetailId(id)}
-              accessibilityLabel={`Perk: ${p.name}`}
-            />
-          );
-        })}
-        {debuffs.map((id) => {
-          const d = DEBUFF_CATALOG[id];
+        {stacks.map((stack) => {
+          if (stack.kind === "shield") {
+            return <ShieldLoadoutChip key="__shields__" count={stack.count} size={chipSize} />;
+          }
+          if (stack.kind === "perk") {
+            const p = PERK_CATALOG[stack.id];
+            if (p == null) return null;
+            const resolved = resolveEntityIcon("perk", stack.id);
+            const familyColors = PERK_FAMILY_COLORS[p.family];
+            return (
+              <PerkIconChip
+                key={`perk-${stack.id}`}
+                size={chipSize}
+                icon={resolved.icon}
+                iconFamily={resolved.iconFamily}
+                variant="good"
+                familyTint={familyColors.bg}
+                familyIconColor={familyColors.accent}
+                familyHighlight={familyColors.border}
+                tier={p.tier}
+                stackCount={stack.count}
+                highlighted={stack.id === highlightPerkId}
+                animateEnter={stack.id === highlightPerkId}
+                onPress={() => setPerkDetailId(stack.id)}
+                accessibilityLabel={`Perk: ${p.name}${stack.count > 1 ? ` ×${stack.count}` : ""}`}
+              />
+            );
+          }
+          const d = DEBUFF_CATALOG[stack.id];
           if (d == null) return null;
           return (
             <PerkIconChip
-              key={`debuff-${id}`}
+              key={`debuff-${stack.id}`}
+              size={chipSize}
               icon={d.icon}
               iconFamily={d.iconFamily}
               variant="bad"
-              highlighted={id === highlightDebuffId}
-              animateEnter={id === highlightDebuffId}
-              onPress={() => setDebuffDetailId(id)}
-              accessibilityLabel={`Curse: ${d.name}`}
+              stackCount={stack.count}
+              highlighted={stack.id === highlightDebuffId}
+              animateEnter={stack.id === highlightDebuffId}
+              onPress={() => setDebuffDetailId(stack.id)}
+              accessibilityLabel={`Curse: ${d.name}${stack.count > 1 ? ` ×${stack.count}` : ""}`}
             />
           );
         })}
@@ -108,7 +130,6 @@ export function RunLoadoutDock({
 
 const styles = StyleSheet.create({
   wrap: {
-    height: RUN_LAYOUT.loadout,
     justifyContent: "center",
     overflow: "hidden",
   },
@@ -118,6 +139,5 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingRight: 18,
-    height: RUN_LAYOUT.loadout,
   },
 });

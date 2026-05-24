@@ -6,7 +6,11 @@
 import { NeoWheel } from "../../theme/neoBrutal";
 
 const MIN_WHEEL = 200;
-const MAX_WHEEL = 400;
+/** Default cap for phone / home previews. */
+export const WHEEL_INNER_MAX_PHONE = 400;
+/** Run screen on tablet, iPad, and desktop web. */
+export const WHEEL_INNER_MAX_LARGE = 720;
+
 const MIN_BULBS = 6;
 const MAX_BULBS = 32;
 
@@ -28,9 +32,12 @@ function roundEven(n: number): number {
   return r % 2 === 0 ? r : r + 1;
 }
 
-/** Canonical wheel size for layout + `SpinWheel` (even, clamped) — keeps disc and bulb ring concentric. */
-export function normalizeWheelInnerSize(raw: number): number {
-  return roundEven(clamp(Math.round(raw), MIN_WHEEL, MAX_WHEEL));
+/** Canonical wheel size for layout + `SpinWheel` (even, clamped). */
+export function normalizeWheelInnerSize(
+  raw: number,
+  maxWheel = WHEEL_INNER_MAX_PHONE
+): number {
+  return roundEven(clamp(Math.round(raw), MIN_WHEEL, maxWheel));
 }
 
 export type BulbRingLayout = {
@@ -61,13 +68,16 @@ export type BulbRingLayoutInput = {
   ringInnerStrokeMaxPx?: number;
   /** Radial gap from effective bulb outer edge to the inner stroke (px). Default 1. */
   bulbToStrokeGapPx?: number;
+  /** Upper clamp for `wheelInnerSize` normalization (tablet / web run screen). */
+  maxWheelInnerSize?: number;
 };
 
 /**
  * Geometry only: bulb orbit, outer square size, and bulb positions (top-left for each bulb View).
  */
 export function computeBulbRingLayout(input: BulbRingLayoutInput): BulbRingLayout {
-  const wheel = normalizeWheelInnerSize(input.wheelInnerSize);
+  const maxWheel = input.maxWheelInnerSize ?? WHEEL_INNER_MAX_PHONE;
+  const wheel = normalizeWheelInnerSize(input.wheelInnerSize, maxWheel);
   const bulbCount = Math.round(clamp(input.bulbCount, MIN_BULBS, MAX_BULBS));
   const bulbDiameter = roundEven(
     clamp(
@@ -152,21 +162,22 @@ export function computeBulbRingLayout(input: BulbRingLayoutInput): BulbRingLayou
 
 /** Vertical offset so the ring center matches the wheel SVG center. */
 export function computeBulbRingTopOffset(wheelInnerSize: number, outerDiameter: number): number {
-  const w = normalizeWheelInnerSize(wheelInnerSize);
+  const w = normalizeWheelInnerSize(wheelInnerSize, WHEEL_INNER_MAX_LARGE);
   const o = outerDiameter;
   return w / 2 - o / 2;
 }
 
 export function computeStageMinWidth(
   wheelInnerSize: number,
-  outerDiameter: number
+  outerDiameter: number,
+  maxWheel = WHEEL_INNER_MAX_LARGE
 ): number {
-  return Math.max(outerDiameter, 50, normalizeWheelInnerSize(wheelInnerSize));
+  return Math.max(outerDiameter, 50, normalizeWheelInnerSize(wheelInnerSize, maxWheel));
 }
 
 export function computeWheelInnerSize(windowMin: number): number {
   const s = Math.round(Math.max(272, Math.min(windowMin * 0.82, 372)));
-  return roundEven(clamp(s, MIN_WHEEL, MAX_WHEEL));
+  return roundEven(clamp(s, MIN_WHEEL, WHEEL_INNER_MAX_PHONE));
 }
 
 export function computeSpinWheelTextSize(wheelInnerSize: number): number {

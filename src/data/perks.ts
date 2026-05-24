@@ -47,7 +47,7 @@ const PERK_CATALOG_RAW: Record<string, PerkDefinition> = {
   lucky_streak: def("lucky_streak", "Lucky Charm", "clover", "MaterialCommunityIcons", 0, "wheel", "odds"),
   iron_reserve: def("iron_reserve", "Iron Shield", "shield-check", "MaterialCommunityIcons", 0, "defense", "defense"),
   ante_insurance: def("ante_insurance", "Cycle Cushion", "umbrella", "MaterialCommunityIcons", 0, "meta", "shop"),
-  high_roller: def("high_roller", "Loaded Money", "dice-multiple", "MaterialCommunityIcons", 1, "wheel", "odds"),
+  high_roller: def("high_roller", "Loaded Money", "cash-plus", "MaterialCommunityIcons", 1, "wheel", "odds"),
   gold_rush: def("gold_rush", "Gold Rush", "cash-multiple", "MaterialCommunityIcons", 1, "economy", "bank"),
   safe_harbor: def("safe_harbor", "Safe Harbor", "anchor", "MaterialCommunityIcons", 1, "defense", "defense"),
   coupon_king: def("coupon_king", "Coupon King", "ticket-percent", "MaterialCommunityIcons", 2, "meta", "shop"),
@@ -114,7 +114,7 @@ const PERK_CATALOG_RAW: Record<string, PerkDefinition> = {
   curse_break: def(
     "curse_break",
     "Curse Break",
-    "broom",
+    "delete-sweep",
     "MaterialCommunityIcons",
     3,
     "defense",
@@ -129,6 +129,14 @@ const PERK_CATALOG_RAW: Record<string, PerkDefinition> = {
     "meta",
     "shop"
   ),
+  rush_hour: def("rush_hour", "Rush Hour", "clock-fast", "MaterialCommunityIcons", 1, "wheel", "odds"),
+  perk_magnet: def("perk_magnet", "Perk Magnet", "magnet", "MaterialCommunityIcons", 2, "wheel", "odds"),
+  green_chain: def("green_chain", "Green Chain", "link-variant", "MaterialCommunityIcons", 1, "wheel", "odds"),
+  bank_bloom: def("bank_bloom", "Bank Bloom", "flower", "MaterialCommunityIcons", 2, "economy", "bank"),
+  chip_hoarder: def("chip_hoarder", "Chip Hoarder", "treasure-chest", "MaterialCommunityIcons", 2, "meta", "shop"),
+  tax_cut: def("tax_cut", "Tax Cut", "scissors-cutting", "MaterialCommunityIcons", 2, "defense", "defense"),
+  bleed_slow: def("bleed_slow", "Bleed Slow", "bandage", "MaterialCommunityIcons", 1, "defense", "defense"),
+  cycle_tithe: def("cycle_tithe", "Cycle Tithe", "hand-coin", "MaterialCommunityIcons", 1, "meta", "shop"),
 };
 
 export const SLICE_PERK_IDS = ["extra_slice", "slice_expander"] as const;

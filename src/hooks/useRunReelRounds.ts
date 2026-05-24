@@ -32,12 +32,18 @@ export function buildRunReelRounds(
         if (gambleFlipActive) {
           return { status: "ready" as const, prize: prizeFromHist };
         }
-        if (awaitingClaim) {
+        const hasUnclaimed =
+          awaitingClaim ||
+          (run.phase === "active" &&
+            prizeFromHist != null &&
+            hist != null &&
+            hist.wheelIndex === run.wheelIndex);
+        if (hasUnclaimed) {
           const label =
             lastResultLabel ?? labelFromHistory(run, i) ?? prizeFromHist?.label ?? "Result";
           return {
             status: "won" as const,
-            prize: { id: "last", label },
+            prize: { id: hist?.sliceId ?? "last", label },
           };
         }
         if (run.phase === "active") {

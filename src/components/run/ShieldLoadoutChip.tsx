@@ -12,10 +12,11 @@ import { PerkIconChip } from "./PerkIconChip";
 
 type ShieldLoadoutChipProps = {
   count: number;
+  size?: number;
 };
 
 /** Shield stack in loadout — fades out when a shield is consumed. */
-export function ShieldLoadoutChip({ count }: ShieldLoadoutChipProps) {
+export function ShieldLoadoutChip({ count, size }: ShieldLoadoutChipProps) {
   const [displayCount, setDisplayCount] = useState(count);
   const fade = useSharedValue(1);
   const scale = useSharedValue(1);
@@ -58,6 +59,7 @@ export function ShieldLoadoutChip({ count }: ShieldLoadoutChipProps) {
         icon="shield-check"
         iconFamily="MaterialCommunityIcons"
         variant="good"
+        size={size}
         onPress={() => {}}
         accessibilityLabel={`${displayCount} shields`}
       />

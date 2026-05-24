@@ -110,10 +110,8 @@ export function useSpinWheel(
   }, [angle]);
 
   useEffect(() => {
-    if (spinInFlightRef.current) {
-      onInterruptedRef.current?.();
-    }
-    spinInFlightRef.current = false;
+    // Do not abort a spin when wedge rebuild changes slice count (e.g. builder wheel).
+    if (spinInFlightRef.current) return;
     angle.stopAnimation();
     angle.setValue(0);
     setWinnerIndex(null);
@@ -121,8 +119,13 @@ export function useSpinWheel(
     setEnabled(true);
   }, [dataLength, angle]);
 
-  const spinToIndex = (targetIndex: number, onEnd?: (index: number) => void) => {
-    if (!enabled) return;
+  const spinToIndex = (
+    targetIndex: number,
+    onEnd?: (index: number) => void,
+    /** Parent `ref.spinToIndex` — recover from a cancelled spin leaving `enabled` false. */
+    force = false
+  ) => {
+    if (!enabled && !force) return;
     const randomIndex = Math.max(0, Math.min(dataLength - 1, targetIndex));
     const slicePointerT = randomSlicePointerT();
     const targetAngle =

@@ -17,3 +17,8 @@ export function removeAllCurses(run: RunState): RunState {
   if (run.debuffs.length === 0) return run;
   return { ...run, debuffs: [] };
 }
+
+/** Clears every debuff / curse on the run (shop, Curse Break, debug). */
+export function clearAllPlayerDebuffs(run: RunState): RunState {
+  return removeAllCurses(run);
+}

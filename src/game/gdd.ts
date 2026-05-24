@@ -83,11 +83,11 @@ export function getCycleParams(cycleLevel: number): CycleParams {
   const c = Math.max(1, cycleLevel);
   return {
     cycleLevel: c,
-    negativeSliceInject: c >= 2 ? 2 : c === 1 ? 1 : 0,
-    shopPriceMult: 1 + (c - 1) * 0.1 + (c >= 3 ? (c - 2) * 0.03 : 0),
-    luckyWeightMult: c >= 2 ? Math.max(0.72, 1 - (c - 1) * 0.055) : 1,
+    negativeSliceInject: c >= 2 ? 3 : 2,
+    shopPriceMult: 1 + (c - 1) * 0.12 + (c >= 3 ? (c - 2) * 0.04 : 0),
+    luckyWeightMult: c >= 2 ? Math.max(0.68, 1 - (c - 1) * 0.065) : 1,
     globalNegativeBias:
-      (c === 1 ? 0.05 : 0) + (c - 1) * 0.045 + (c >= 2 ? 0.06 : 0),
+      (c === 1 ? 0.08 : 0) + (c - 1) * 0.055 + (c >= 2 ? 0.08 : 0),
     riskWheelIndices: c >= 3 ? [1, 5] : c === 2 ? [1] : [],
     doubleBossWheel: c >= 3,
   };
@@ -97,7 +97,7 @@ export function getCycleParams(cycleLevel: number): CycleParams {
 export function getWheelDifficultyBias(wheelIndex: number, cycleLevel: number): number {
   const idx = Math.max(0, wheelIndex);
   const f = Math.max(1, cycleLevel);
-  return idx * 0.035 * (1 + (f - 1) * 0.12);
+  return idx * 0.042 * (1 + (f - 1) * 0.15);
 }
 
 export const GDD_LOOP_SUMMARY = {

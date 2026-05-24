@@ -3,12 +3,13 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Platform,
   StyleSheet,
   Text as RNText,
-  TouchableOpacity,
   View,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Pressable } from "react-native-gesture-handler";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { runHapticImpact } from "../../src/utils/haptics";
 import { Image } from "expo-image";
@@ -23,6 +24,10 @@ import { SliceTouchLayer } from "./SliceTouchLayer";
 
 const windowWidth = Dimensions.get("window").width;
 const ONE_TURN = 360;
+const HUB_ICON_COLOR = "#FFFFFF";
+/** Web focus rings on hub/slice pressables read as a harsh square around the wheel. */
+const WEB_PRESSABLE_RESET =
+  Platform.OS === "web" ? ({ outlineWidth: 0 } as const) : null;
 
 /** Counter-rotate labels/images so copy stays screen-upright once the wheel has stopped. */
 function prizeUprightTransform(
@@ -113,6 +118,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
     onSlicePress,
     slicePressEnabled = true,
     onSpinInterrupted,
+    stripPanGesture,
   },
   ref
 ) {
@@ -128,11 +134,14 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   const wheelDegForLabels = lastRestAngleDeg ?? 0;
 
   const hubLabelScale = useRef(new Animated.Value(1)).current;
-  const hubLabelPulse = enabled || hubMode === "claim";
+  const hubScrollY = useRef(new Animated.Value(0)).current;
+  const showPlayIcon = hubMode === "spin" && enabled;
+  const showPauseIcon = !enabled;
+  const showScrollIcon = hubMode === "claim";
 
   useEffect(() => {
     if (!showSpinButton || !centerSpinButton) return;
-    if (!hubLabelPulse) {
+    if (!showPlayIcon) {
       hubLabelScale.stopAnimation();
       hubLabelScale.setValue(1);
       return;
@@ -140,14 +149,14 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(hubLabelScale, {
-          toValue: 1.06,
-          duration: 1300,
+          toValue: 1.08,
+          duration: 1200,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(hubLabelScale, {
           toValue: 1,
-          duration: 1300,
+          duration: 1200,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -158,7 +167,38 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
       anim.stop();
       hubLabelScale.setValue(1);
     };
-  }, [centerSpinButton, hubLabelPulse, hubLabelScale, showSpinButton]);
+  }, [centerSpinButton, hubLabelScale, showPlayIcon, showSpinButton]);
+
+  useEffect(() => {
+    if (!showSpinButton || !centerSpinButton) return;
+    if (!showScrollIcon) {
+      hubScrollY.stopAnimation();
+      hubScrollY.setValue(0);
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hubScrollY, {
+          toValue: 9,
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(hubScrollY, {
+          toValue: 0,
+          duration: 520,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(280),
+      ])
+    );
+    anim.start();
+    return () => {
+      anim.stop();
+      hubScrollY.setValue(0);
+    };
+  }, [centerSpinButton, hubScrollY, showScrollIcon, showSpinButton]);
 
   const segmentSpan = useRef(new Animated.Value(angleBySegment)).current;
   useEffect(() => {
@@ -267,6 +307,9 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   const innerRadius = Math.max(32, Math.round(size * 0.118));
   /** Hub image: full inner opening plus slight overlap so it reads larger than the hole. */
   const hubDiameter = Math.round(innerRadius * 2 + 22);
+  const hubPlayIconSize = Math.max(18, Math.round(hubDiameter * 0.38));
+  const hubScrollIconSize = Math.max(22, Math.round(hubDiameter * 0.34));
+  const hubPauseIconSize = Math.max(18, Math.round(hubDiameter * 0.34));
   const cornerR = segmentCornerRadius;
 
   const knobW = 36;
@@ -331,7 +374,10 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
     runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
     onSpinPress?.();
     if (externalSpinControl) return;
-    spin((i) => onSpinEnd?.(data[i], i));
+    spin((i) => {
+      const item = data[i] ?? { id: String(i), label: "" };
+      onSpinEnd?.(item, i);
+    });
   };
 
   const handleHubPress = () => {
@@ -346,20 +392,21 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
   const hubPressable = hubMode === "claim" ? !spinLocked : enabled && !spinLocked;
   const hubOpacity = hubMode === "claim" ? 1 : spinLocked ? 0.45 : enabled ? 1 : 0.55;
 
-  const handleSpinToIndex = (index: number) => {
-    if (spinLocked) return;
-    if (!enabled) return;
-    runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
-    // Parent already ran `onSpinPress` when `externalSpinControl` — avoid infinite loop.
-    if (!externalSpinControl) {
-      onSpinPress?.();
-    }
-    spinToIndex(index, (i) => onSpinEnd?.(data[i], i));
+  const driveSpinToIndex = (index: number) => {
+    spinToIndex(
+      index,
+      (i) => {
+        const item = data[i] ?? { id: String(i), label: "" };
+        onSpinEnd?.(item, i);
+      },
+      true
+    );
   };
 
   useImperativeHandle(ref, () => ({
     spin: handleSpin,
-    spinToIndex: handleSpinToIndex,
+    // Parent-driven spins must not check `spinLocked` (UI may already show isSpinning).
+    spinToIndex: driveSpinToIndex,
   }));
 
   useEffect(() => {
@@ -389,17 +436,9 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
             top: 0,
             width: size,
             height: size,
+            borderRadius: size / 2,
             transform: [{ rotate: spinRotate }, { scale: spinDiscScale }],
-            opacity: enabled ? 1 : 0.93,
-            ...(enabled
-              ? {}
-              : {
-                  shadowColor: Neo.accent,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.22,
-                  shadowRadius: 14,
-                  elevation: 8,
-                }),
+            opacity: enabled ? 1 : 0.96,
           }}
         >
           <Svg width={size} height={size}>
@@ -530,7 +569,7 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
               }}
               pointerEvents="box-none"
             >
-              <TouchableOpacity
+              <Pressable
               accessibilityRole="button"
               accessibilityLabel={
                 hubMode === "claim"
@@ -545,9 +584,11 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
                 busy: hubMode === "busy",
                 disabled: !hubPressable,
               }}
+              simultaneousWithExternalGesture={stripPanGesture}
               style={[
                 StyleSheet.absoluteFillObject,
                 styles.centerSpinBase,
+                WEB_PRESSABLE_RESET,
                 hubSoftShadow ? styles.centerSpinSoftShadow : null,
                 hubInkRing
                   ? {
@@ -563,7 +604,6 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
               ]}
               onPress={handleHubPress}
               disabled={!hubPressable}
-              activeOpacity={0.88}
             >
               <Image
                 key={`spin-hub-${hubLoadEpoch}`}
@@ -587,33 +627,37 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
                   style={[
                     styles.centerSpinLabelWrap,
                     {
-                      transform: [{ scale: hubLabelScale }],
-                      opacity: hubMode === "busy" ? 0.35 : 1,
+                      transform: [
+                        { scale: showPlayIcon ? hubLabelScale : 1 },
+                        { translateY: showScrollIcon ? hubScrollY : 0 },
+                      ],
+                      opacity: showPauseIcon ? 0.92 : showPlayIcon || showScrollIcon ? 1 : 0,
                     },
                   ]}
                 >
-                  {hubMode === "claim" ? (
-                    <View style={styles.hubClaimIcons}>
-                      <MaterialIcons name="keyboard-double-arrow-down" size={30} color={hubLabelColor} />
-                    </View>
-                  ) : hubMode === "spin" && enabled ? (
-                    <RNText
-                      style={[
-                        styles.centerSpinTextOnImage,
-                        {
-                          ...(hubLabelFontFamily != null ? { fontFamily: hubLabelFontFamily } : {}),
-                          color: hubLabelColor,
-                          fontWeight: hubLabelFontFamily != null ? "400" : "900",
-                          letterSpacing: hubLabelFontFamily != null ? 0.9 : 0.45,
-                        },
-                      ]}
-                    >
-                      Spin
-                    </RNText>
+                  {showScrollIcon ? (
+                    <MaterialCommunityIcons
+                      name="chevron-down"
+                      size={hubScrollIconSize}
+                      color={HUB_ICON_COLOR}
+                    />
+                  ) : showPauseIcon ? (
+                    <MaterialCommunityIcons
+                      name="pause"
+                      size={hubPauseIconSize}
+                      color={HUB_ICON_COLOR}
+                    />
+                  ) : showPlayIcon ? (
+                    <MaterialCommunityIcons
+                      name="play"
+                      size={hubPlayIconSize}
+                      color={HUB_ICON_COLOR}
+                      style={styles.hubPlayIcon}
+                    />
                   ) : null}
                 </Animated.View>
               </View>
-            </TouchableOpacity>
+            </Pressable>
             </Animated.View>
           </View>
         ) : null}
@@ -637,13 +681,14 @@ const SpinWheel = forwardRef<SpinWheelRef, SpinWheelProps>(function SpinWheel(
       </View>
 
       {showSpinButton && !centerSpinButton ? (
-        <TouchableOpacity
+        <Pressable
           style={[styles.buttonBelow, (!enabled || spinLocked) && { opacity: 0.5 }]}
           onPress={handleSpin}
           disabled={!enabled || spinLocked}
+          simultaneousWithExternalGesture={stripPanGesture}
         >
           <RNText style={styles.buttonText}>Spin</RNText>
-        </TouchableOpacity>
+        </Pressable>
       ) : null}
 
       {showResultText ? (
@@ -675,13 +720,8 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 3,
   },
-  centerSpinTextOnImage: {
-    fontSize: 30,
-    textAlign: "center",
-  },
-  hubClaimIcons: {
-    alignItems: "center",
-    justifyContent: "center",
+  hubPlayIcon: {
+    marginLeft: 2,
   },
   centerSpinLabelSlot: {
     justifyContent: "center",

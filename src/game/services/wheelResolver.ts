@@ -18,6 +18,8 @@ import {
   adjustSliceForRun,
   computeSliceMoneyDelta,
 } from "../../utils/sliceMoneyDisplay";
+import { CHIP_GRANTS, chipsFromCashWin } from "../shop/chipGrants";
+import { canAddPerkCopy } from "../perks/perkStacks";
 
 export type WheelResolveResult = {
   run: RunState;
@@ -51,12 +53,12 @@ export function buildWheelOutcome(
   }
 
   if (payload.perkId != null && PERK_CATALOG[payload.perkId] != null) {
-    if (!run.perks.includes(payload.perkId)) {
+    if (canAddPerkCopy(run, payload.perkId)) {
       perkOffers.push(payload.perkId);
     }
   }
 
-  if (payload.debuffId != null && !run.debuffs.includes(payload.debuffId)) {
+  if (payload.debuffId != null) {
     debuffApplied = payload.debuffId;
   }
 
@@ -66,22 +68,23 @@ export function buildWheelOutcome(
 
   const archetype = getArchetypeForWheelIndex(wheelIndex);
   if (deltaMoney > 0) {
-    deltaChips += Math.max(1, Math.floor(deltaMoney / 80));
+    deltaChips += chipsFromCashWin(deltaMoney);
   }
   if (archetype === "joker_offer" && perkOffers.length > 0) {
-    deltaChips += 4;
+    deltaChips += CHIP_GRANTS.perkWheelOffer;
   }
-  if (archetype === "lucky" && deltaMoney > 200) {
-    deltaChips += 6;
-  }
-  if (archetype === "boss" && deltaMoney > 0) {
-    deltaChips += 1;
-  }
-  if (archetype === "chaos") {
-    deltaChips += 2;
+  if (
+    archetype === "lucky" &&
+    deltaMoney >= CHIP_GRANTS.luckyJackpotMinDelta
+  ) {
+    deltaChips += CHIP_GRANTS.luckyJackpotBonus;
   }
   if (archetype === "money" && deltaMoney > 0) {
-    deltaChips += 1;
+    deltaChips += CHIP_GRANTS.moneyWheelCashBonus;
+  }
+
+  if (deltaChips > 0) {
+    deltaChips = Math.max(CHIP_GRANTS.wheelPrizeChipMin, deltaChips);
   }
 
   return {
@@ -156,7 +159,10 @@ export function resolveAndApplyWheel(
   }
 
   const streakBonus = winStreakChipBonus(next.winStreak ?? 0);
-  const chipTotal = outcome.deltaChips + joker.chipsBonus + streakBonus;
+  let chipTotal = outcome.deltaChips + joker.chipsBonus + streakBonus;
+  if ((run.floor ?? 1) === 1 && wheelIndex < 2 && chipTotal > 0) {
+    chipTotal = CHIP_GRANTS.wheelPrizeChipMin;
+  }
   next = applyChipGain(next, chipTotal);
 
   const result: WheelResolveResult = {

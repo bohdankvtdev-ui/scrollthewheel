@@ -13,6 +13,7 @@ export default function PrivacyRoute() {
         title={PRIVACY_POLICY_TITLE}
         meta={PRIVACY_POLICY_META}
         sections={PRIVACY_POLICY_SECTIONS}
+        legalHubExcludeId="privacy"
       />
     </GestureHandlerRootView>
   );

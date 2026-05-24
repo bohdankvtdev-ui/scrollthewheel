@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
-import { GestureDetector } from "react-native-gesture-handler";
+import { GestureDetector, type GestureType } from "react-native-gesture-handler";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { SpinWheelStage } from "../../../features/cash-spin/components/SpinWheelStage";
 import {
@@ -20,11 +20,9 @@ import {
 } from "../../../features/cash-spin/cashStripPerformance";
 import { useReelStripEngine } from "../../../features/cash-spin/hooks/useReelStripEngine";
 import { REEL_STRIP } from "../../../features/cash-spin/reelStripConstants";
-import { RUN_PAGE_BACKGROUND } from "../../game/runVisual";
-import {
-  computeSpinWheelTextSize,
-  computeWheelInnerSize,
-} from "../../../lib/layout/wheelFrame";
+import { useSpinFeedbackWash } from "../../hooks/useSpinFeedbackWash";
+import { computeRunWheelStageDimensions } from "../../../lib/layout/runStageLayout";
+import { useRunChromeMetrics } from "../../../lib/layout/runChrome";
 import { CASH_SPIN_WHEEL_PROFILE } from "../../../lib/wheel/profiles";
 import { spinSafetyTimeoutMs } from "../../../lib/wheel";
 import { resolveWheelPhysics } from "../../../lib/wheel/resolveWheelPhysics";
@@ -36,21 +34,20 @@ import { resolveSlice } from "../../systems/ProbabilityResolver";
 import { getBulbRingPalette, getWheelSegmentColors } from "../../game/content/sliceVisualTheme";
 import { getArchetypeForConfigId } from "../../game/wheels/database";
 import { RunManager } from "../../systems/RunManager";
-import { syncRunWheels } from "../../systems/WheelSystem";
-import type { RunState } from "../../schemas";
+import type { RunState, SliceDefinition } from "../../schemas";
 import { isBossWheelClaim } from "../../game/cycle/cycleTransition";
-import { deriveHubMode, deriveSpinLocked } from "../../game/tactics/wheelHubState";
 import {
-  buildGambleSlices,
-  getGambleSliceById,
-  overlayGambleWheel,
-} from "../../game/tactics/gambleWheel";
-import { runReelFeedKey } from "../../game/runState/runReelFeedKey";
+  blocksReelAdvanceForTactics,
+  deriveHubMode,
+  deriveSpinLocked,
+} from "../../game/tactics/wheelHubState";
+import { buildGambleSlices, overlayGambleWheel } from "../../game/tactics/gambleWheel";
+import { isWheelAtLaserMinimum, LASER_MIN_SLICE_COUNT } from "../../game/runState/laserSlice";
 import { useRunWheelUi } from "../../hooks/useRunWheelUi";
 import { useRunStore } from "../../stores/runStore";
 import {
   shouldDismissNoticeOnScroll,
-  showRunInfoNotice,
+  showLaserBlockedNotice,
   showRunNotice,
 } from "../../game/notices/runNotices";
 import { useRunToastStore } from "../../stores/runToastStore";
@@ -58,6 +55,15 @@ import { sliceWheelCaptionForRun } from "../../utils/sliceMoneyDisplay";
 import { runHapticImpact, runHapticNotification } from "../../utils/haptics";
 import * as Haptics from "expo-haptics";
 import type { SpinWheelItem } from "../../../wheel/types";
+import type { BulbRingPhase } from "../../../features/cash-spin/bulbRingPhase";
+import {
+  bulbPhaseForFeedback,
+  washFlashIntensity,
+  isGainTier,
+  isLossTier,
+  type SpinFeedbackTier,
+} from "../../game/spinFeedback";
+import { spinTrace } from "../../dev/spinTrace";
 
 type RunWheelFeedProps = {
   run: RunState;
@@ -85,16 +91,23 @@ const RunWheelSlot = memo(function RunWheelSlot({
   pageHeight,
   run,
   wheelInnerSize,
+  wheelInnerMax,
+  stageWidth,
+  stageHeight,
   textSize,
   textColor,
+  wheelPadH,
   spinWheelRef,
   onSpinComplete,
+  onSpinSettled,
   onExternalSpinPress,
   onHubClaimPress,
   hubMode,
   spinLocked,
   ringPhaseResetKey,
   onBulbRingPhaseChange,
+  bulbRingPhase,
+  spinFeedbackTier = null,
   scrollGrainOverlay,
   sliceEraseMode,
   isActiveWheel,
@@ -103,21 +116,30 @@ const RunWheelSlot = memo(function RunWheelSlot({
   onBanishSlice,
   isSpinning,
   clearSpinInteraction,
+  onSpinInterrupted,
+  stripPanGesture,
 }: {
   roundIndex: number;
   pageHeight: number;
   run: RunState;
   wheelInnerSize: number;
+  wheelInnerMax: number;
+  stageWidth: number;
+  stageHeight: number;
   textSize: number;
   textColor: string;
+  wheelPadH: number;
   spinWheelRef: React.RefObject<SpinWheelRef | null>;
   onSpinComplete: (roundIndex: number, item: { id: string; label?: string }) => void;
+  onSpinSettled?: () => void;
   onExternalSpinPress: () => void;
   onHubClaimPress: () => void;
   hubMode: "spin" | "claim" | "busy";
   spinLocked: boolean;
   ringPhaseResetKey: number;
-  onBulbRingPhaseChange?: (phase: "idle" | "spinning" | "victory") => void;
+  onBulbRingPhaseChange?: (phase: BulbRingPhase) => void;
+  bulbRingPhase?: BulbRingPhase;
+  spinFeedbackTier?: SpinFeedbackTier | null;
   scrollGrainOverlay?: React.ReactNode;
   sliceEraseMode: boolean;
   isActiveWheel: boolean;
@@ -126,6 +148,8 @@ const RunWheelSlot = memo(function RunWheelSlot({
   onBanishSlice: (sliceIndex: number) => void;
   isSpinning: boolean;
   clearSpinInteraction: () => void;
+  onSpinInterrupted?: () => void;
+  stripPanGesture?: GestureType;
 }) {
   const baseWheel = run.wheels[roundIndex];
   const wheel = useMemo(() => {
@@ -136,20 +160,11 @@ const RunWheelSlot = memo(function RunWheelSlot({
     gambleFlipActive && isActiveWheel && (wheel?.slices.length ?? 0) === 2 ? 1.48 : 1;
   const [previewSliceIndex, setPreviewSliceIndex] = useState<number | null>(null);
   const eraseArmed = sliceEraseMode && isActiveWheel && !spinLocked && !isSpinning;
+  const atLaserMinimum = wheel != null && isWheelAtLaserMinimum(wheel.slices.length);
 
   useEffect(() => {
     if (isSpinning) setPreviewSliceIndex(null);
   }, [isSpinning]);
-
-  useEffect(() => {
-    if (!isActiveWheel) return;
-    return () => {
-      const st = useRunStore.getState();
-      if (st.ui.isSpinning && st.ui.spinWheelIndex === roundIndex) {
-        st.clearSpinInteraction();
-      }
-    };
-  }, [isActiveWheel, roundIndex]);
 
   const wheelPhysics = useMemo(
     () => physicsForProfile(wheel?.definition.physicsProfileId ?? "default"),
@@ -204,22 +219,43 @@ const RunWheelSlot = memo(function RunWheelSlot({
         resolveContext={resolveContext}
       />
       {eraseArmed ? (
-        <View style={styles.eraseBanner} pointerEvents="none">
-          <MaterialCommunityIcons name="eraser" size={18} color={Neo.ink} />
+        <View style={[styles.eraseBanner, atLaserMinimum && styles.eraseBannerBlocked]} pointerEvents="none">
+          <MaterialCommunityIcons
+            name={atLaserMinimum ? "ray-start-end" : "eraser"}
+            size={18}
+            color={Neo.ink}
+          />
           <Text style={[styles.eraseBannerText, { fontFamily: FONT_BEBAS_NEUE }]}>
-            Tap a wedge to laser
+            {atLaserMinimum
+              ? `Min ${LASER_MIN_SLICE_COUNT} wedges — cannot remove`
+              : "Tap a wedge to laser"}
           </Text>
         </View>
       ) : null}
-      <View style={[styles.wheelSlotShell, eraseArmed && styles.wheelSlotErase]}>
-        <View style={[styles.wheelPad, eraseArmed && styles.wheelPadErase]}>
+      <View
+        style={[
+          styles.wheelSlotShell,
+          { minHeight: stageHeight },
+          eraseArmed && styles.wheelSlotErase,
+        ]}
+      >
+        <View
+          style={[
+            styles.wheelPad,
+            { width: stageWidth, minHeight: stageHeight, paddingHorizontal: wheelPadH },
+            eraseArmed && styles.wheelPadErase,
+          ]}
+        >
           <SpinWheelStage
             data={wheelData}
             wheelInnerSize={wheelInnerSize}
+            wheelInnerMax={wheelInnerMax}
             textSize={textSize}
             wheelPhysics={wheelPhysics}
             segmentColors={colors}
             bulbRingPalette={bulbRingPalette}
+            bulbRingPhase={bulbRingPhase}
+            spinFeedbackTier={spinFeedbackTier}
             textColor={textColor}
             ringPhaseResetKey={ringPhaseResetKey}
             spinLocked={spinLocked}
@@ -233,9 +269,11 @@ const RunWheelSlot = memo(function RunWheelSlot({
             onExternalSpinPress={onExternalSpinPress}
             onBulbRingPhaseChange={onBulbRingPhaseChange}
             onSpinComplete={(item) => onSpinComplete(roundIndex, item)}
+            onSpinSettled={onSpinSettled}
             scrollGrainOverlay={scrollGrainOverlay}
             spinArmEpoch={isActiveWheel ? spinArmEpoch : 0}
-            onSpinInterrupted={isActiveWheel ? clearSpinInteraction : undefined}
+            onSpinInterrupted={isActiveWheel ? onSpinInterrupted : undefined}
+            stripPanGesture={isActiveWheel ? stripPanGesture : undefined}
             slicePressEnabled={eraseArmed || (!spinLocked && !isSpinning)}
             onSlicePress={(index) => {
               if (eraseArmed) {
@@ -257,6 +295,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({
   reelUiKey: _reelUiKey,
 }: RunWheelFeedProps) {
   const { width: winW, height: winH } = useWindowDimensions();
+  const chrome = useRunChromeMetrics();
   const {
     awaitingClaim,
     isSpinning,
@@ -264,10 +303,22 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     sliceEraseMode,
     lastResultLabel,
     bossCyclePhase,
+    spinFeedbackTier,
+    washFlashEpoch,
+    washFlashTier,
   } = useRunWheelUi();
   const bossCycleUiActive = bossCyclePhase !== "none";
+  const stageFeedbackTier = washFlashTier ?? spinFeedbackTier;
+  const { stageBgStyle, overlayStyle, washColor, active: washActive } = useSpinFeedbackWash(
+    washFlashEpoch,
+    washFlashTier
+  );
   const [spinArmEpoch, setSpinArmEpoch] = useState(0);
   const prevWheelIndexRef = useRef(run.wheelIndex);
+  const armedSpinRef = useRef<{ wheelIndex: number; sliceIndex: number } | null>(null);
+  const spinGuardEpochRef = useRef(0);
+  const spinFinishEpochRef = useRef(-1);
+  const spinCompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dismissToast = useRunToastStore((s) => s.dismiss);
   const toastVisible = useRunToastStore((s) => s.toast != null);
   const clearSpinInteraction = useCallback(
@@ -277,12 +328,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({
 
   const rounds = useRunReelRounds(run, awaitingClaim, lastResultLabel, gambleFlipActive);
   const spinWheelRef = useRef<SpinWheelRef>(null);
-  const pendingSliceRef = useRef<{
-    wheelIndex: number;
-    sliceId: string;
-    sliceIndex: number;
-    isGambleFlip?: boolean;
-  } | null>(null);
+  const prevIsSpinningRef = useRef(false);
 
   const reduceMotionBoot = useReducedMotion();
   const [reduceMotion, setReduceMotion] = useState(reduceMotionBoot);
@@ -303,11 +349,13 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     [reduceMotion, stripVisualIntensity]
   );
 
-  const wheelInnerSize = useMemo(
-    () => computeWheelInnerSize(Math.min(winW, winH)),
-    [winW, winH]
+  const useLargeWheel = chrome.largeUi;
+  const stageDims = useMemo(
+    () => computeRunWheelStageDimensions(winW, pageHeight, useLargeWheel),
+    [winW, pageHeight, useLargeWheel]
   );
-  const textSize = useMemo(() => computeSpinWheelTextSize(wheelInnerSize), [wheelInnerSize]);
+  const { wheelInnerSize, wheelInnerMax, stageWidth, stageHeight, textSize } = stageDims;
+  const wheelPadH = useLargeWheel ? 2 : 6;
   const textColor = Neo.wheelSliceLabel;
 
   const reelEngineRef = useRef<ReturnType<typeof useReelStripEngine> | null>(null);
@@ -319,7 +367,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({
   const onReelAdvanced = useCallback(() => {
     const store = useRunStore.getState();
     store.clearSpinInteraction();
-    reelEngineRef.current?.onPrimaryBulbPhaseChange("idle");
+    reelEngineRef.current?.setSpinningSafe(false);
     store.healRunUi();
   }, []);
 
@@ -328,6 +376,17 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     const current = store.run;
     if (current == null || roundIndex !== current.wheelIndex) return false;
     if (!store.ui.awaitingClaim) return false;
+    if (
+      blocksReelAdvanceForTactics(
+        current,
+        store.ui.awaitingClaim,
+        store.ui.isSpinning,
+        store.ui.gambleFlipActive,
+        store.preSpinSnapshot != null
+      )
+    ) {
+      return false;
+    }
     return store.claimAndAdvance();
   }, []);
 
@@ -343,7 +402,7 @@ export const RunWheelFeed = memo(function RunWheelFeed({
       });
       return;
     }
-    showRunInfoNotice(result.reason);
+    showLaserBlockedNotice(result.reason);
   }, []);
 
   const shouldAdvanceStripAfterClaim = useCallback((roundIndex: number) => {
@@ -353,6 +412,21 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     if (current != null && isBossWheelClaim(current, roundIndex)) return false;
     return true;
   }, []);
+
+  const armedSpinSession = useRunStore((s) => s.armedSpinSession);
+  const preSpinSnapshot = useRunStore((s) => s.preSpinSnapshot);
+
+  const tacticBlocksReel = useMemo(
+    () =>
+      blocksReelAdvanceForTactics(
+        run,
+        awaitingClaim,
+        isSpinning,
+        gambleFlipActive,
+        preSpinSnapshot != null
+      ),
+    [awaitingClaim, gambleFlipActive, isSpinning, preSpinSnapshot, run]
+  );
 
   const reel = useReelStripEngine({
     pageHeight,
@@ -366,8 +440,37 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     onStripSettled,
     stripVisualIntensity,
     wheelFrostVisualIntensity,
+    panEnabled: !isSpinning && armedSpinSession == null && !tacticBlocksReel,
   });
   reelEngineRef.current = reel;
+
+  const lastWashBulbEpochRef = useRef(0);
+  const [washBulbPhase, setWashBulbPhase] = useState<BulbRingPhase | null>(null);
+
+  useEffect(() => {
+    if (washFlashEpoch <= lastWashBulbEpochRef.current || washFlashTier == null) return;
+    lastWashBulbEpochRef.current = washFlashEpoch;
+    const phase = bulbPhaseForFeedback(washFlashTier);
+    setWashBulbPhase(phase);
+    const { peak } = washFlashIntensity(washFlashTier);
+    const holdMs =
+      phase === "jackpot"
+        ? 1100
+        : Math.round(480 + peak * 520);
+    const t = setTimeout(() => setWashBulbPhase(null), holdMs);
+    return () => clearTimeout(t);
+  }, [washFlashEpoch, washFlashTier]);
+
+  const bulbRingPhase = useMemo((): BulbRingPhase => {
+    if (isSpinning) return "spinning";
+    if (washBulbPhase != null) return washBulbPhase;
+    if (spinFeedbackTier != null) return bulbPhaseForFeedback(spinFeedbackTier);
+    return "idle";
+  }, [isSpinning, washBulbPhase, spinFeedbackTier]);
+
+  useEffect(() => {
+    reelEngineRef.current?.setSpinningSafe(isSpinning);
+  }, [isSpinning]);
 
   const handleHubClaim = useCallback(() => {
     const store = useRunStore.getState();
@@ -375,95 +478,191 @@ export const RunWheelFeed = memo(function RunWheelFeed({
     if (ui.isSpinning || ui.gambleFlipActive) return;
     if (
       current != null &&
-      ui.awaitingClaim &&
-      isBossWheelClaim(current, current.wheelIndex)
+      blocksReelAdvanceForTactics(
+        current,
+        ui.awaitingClaim,
+        ui.isSpinning,
+        ui.gambleFlipActive,
+        store.preSpinSnapshot != null
+      )
     ) {
+      return;
+    }
+    if (current != null && ui.awaitingClaim) {
       store.claimAndAdvance();
       return;
     }
     reel.requestAdvance();
   }, [reel]);
 
-  const handleExternalSpinPress = useCallback(() => {
-    let current = useRunStore.getState().run;
-    if (current == null) return;
-    const synced = syncRunWheels(current);
-    if (synced !== current) {
-      useRunStore.setState({ run: synced });
-      current = synced;
+  const finishSpinRef = useRef<() => void>(() => {});
+
+  const clearSpinCompleteTimer = useCallback(() => {
+    if (spinCompleteTimerRef.current != null) {
+      clearTimeout(spinCompleteTimerRef.current);
+      spinCompleteTimerRef.current = null;
     }
+  }, []);
+
+  const scheduleSpinComplete = useCallback(
+    (delayMs: number) => {
+      clearSpinCompleteTimer();
+      spinCompleteTimerRef.current = setTimeout(() => {
+        spinCompleteTimerRef.current = null;
+        finishSpinRef.current();
+      }, delayMs);
+    },
+    [clearSpinCompleteTimer]
+  );
+
+  const finishSpinFromStore = useCallback(() => {
+    clearSpinCompleteTimer();
+
+    const store = useRunStore.getState();
+    if (!store.ui.isSpinning && store.armedSpinSession == null) return;
+    if (spinFinishEpochRef.current === store.spinCommitEpoch) return;
+    spinFinishEpochRef.current = store.spinCommitEpoch;
+
+    spinTrace("finish", {
+      wheelIndex: store.run?.wheelIndex,
+      armed: store.armedSpinSession?.sliceId ?? null,
+    });
+    const committed = store.resolveSpinInteraction();
+    armedSpinRef.current = null;
+    reelEngineRef.current?.setSpinningSafe(false);
+    const afterResolve = useRunStore.getState();
+    spinTrace("resolved", {
+      committed,
+      isSpinning: afterResolve.ui.isSpinning,
+      awaitingClaim: afterResolve.ui.awaitingClaim,
+      lastSliceId: afterResolve.ui.lastSliceId,
+      pendingRebuild: afterResolve.run?.pendingWheelRebuild,
+    });
+
+    if (afterResolve.run?.phase === "active") {
+      afterResolve.healRunUi();
+    }
+
+    if (committed && afterResolve.run?.pendingWheelRebuild) {
+      afterResolve.scheduleWheelLayoutCommit();
+    }
+
+    if (!committed) return;
+
+    const tier =
+      useRunStore.getState().ui.washFlashTier ??
+      useRunStore.getState().ui.spinFeedbackTier;
+    if (tier != null && isLossTier(tier)) {
+      runHapticNotification(Haptics.NotificationFeedbackType.Error);
+      if (tier === "loss_wipe" || tier === "loss_large") {
+        runHapticImpact(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+    } else if (tier === "gain_jackpot" || tier === "gain_large") {
+      runHapticNotification(Haptics.NotificationFeedbackType.Success);
+      runHapticImpact(Haptics.ImpactFeedbackStyle.Heavy);
+    } else if (tier != null && isGainTier(tier)) {
+      runHapticNotification(Haptics.NotificationFeedbackType.Success);
+    } else {
+      runHapticImpact(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [clearSpinCompleteTimer]);
+
+  finishSpinRef.current = finishSpinFromStore;
+
+  const handleExternalSpinPress = useCallback(() => {
+    clearSpinCompleteTimer();
+    spinFinishEpochRef.current = -1;
+
+    const store = useRunStore.getState();
+    let current = store.run;
+    if (current == null) return;
+    if (store.ui.isSpinning || store.armedSpinSession != null) return;
 
     const ri = current.wheelIndex;
     const wheel = current.wheels[ri];
-    const flipActive = useRunStore.getState().ui.gambleFlipActive;
-    if (wheel == null || !RunManager.canSpin(current, ri) || isSpinning) return;
-    if (awaitingClaim && !flipActive) return;
+    const flipActive = store.ui.gambleFlipActive;
+    if (wheel == null || !RunManager.canSpin(current, ri)) return;
+    if (store.ui.awaitingClaim && !flipActive) return;
 
-    if (flipActive) {
-      const slices = buildGambleSlices();
-      const ctx = buildResolveContext(current, wheel);
-      const { index, slice } = resolveSlice(slices, ctx);
-      pendingSliceRef.current = {
-        wheelIndex: ri,
-        sliceId: slice.id,
-        sliceIndex: index,
-        isGambleFlip: true,
-      };
-    } else {
-      const ctx = buildResolveContext(current, wheel);
-      const { index, slice } = resolveSlice(wheel.slices, ctx);
-      pendingSliceRef.current = { wheelIndex: ri, sliceId: slice.id, sliceIndex: index };
+    const ctx = buildResolveContext(current, wheel, ri);
+    const resolved = flipActive
+      ? resolveSlice(buildGambleSlices(), ctx)
+      : resolveSlice(wheel.slices, ctx);
+    const { index, slice } = resolved;
+
+    store.armSpinSession({
+      wheelIndex: ri,
+      sliceId: slice.id,
+      sliceIndex: index,
+      slice,
+      ...(flipActive ? { isGambleFlip: true as const } : {}),
+    });
+
+    const reelApi = reelEngineRef.current;
+    if (reelApi != null && reelApi.activeIndex !== ri) {
+      reelApi.snapToIndex(ri);
     }
-    runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
-    setSpinArmEpoch((e) => e + 1);
-    useRunStore.getState().setSpinning(true);
-    reel.setSpinningSafe(true);
-    spinWheelRef.current?.spinToIndex(pendingSliceRef.current.sliceIndex);
-  }, [awaitingClaim, isSpinning, reel]);
 
-  const handleSpinComplete = useCallback(
-    (roundIndex: number, item: { id: string; label?: string }) => {
-      const store = useRunStore.getState();
-      store.setSpinning(false);
-      reel.setSpinningSafe(false);
-      const current = useRunStore.getState().run;
-      if (current == null || roundIndex !== current.wheelIndex) return;
-      const pending = pendingSliceRef.current;
-      const slice = pending?.isGambleFlip
-        ? getGambleSliceById(pending.sliceId)
-        : (() => {
-            const wheel = current.wheels[roundIndex];
-            return pending?.wheelIndex === roundIndex
-              ? wheel?.slices[pending.sliceIndex] ??
-                  wheel?.slices.find((s) => s.id === pending.sliceId)
-              : wheel?.slices.find((s) => s.id === item.id);
-          })();
-      const wasGamble = pending?.isGambleFlip === true;
-      pendingSliceRef.current = null;
-      if (slice == null) {
-        store.setSpinning(false);
-        reel.setSpinningSafe(false);
-        if (wasGamble) {
-          useRunStore.setState((s) => ({
-            ui: {
-              ...s.ui,
-              gambleFlipActive: false,
-              isSpinning: false,
-              spinWheelIndex: null,
-              awaitingClaim: true,
-            },
-          }));
-        }
-        return;
-      }
-      runHapticNotification(Haptics.NotificationFeedbackType.Success);
-      if (pending?.isGambleFlip) {
-        store.applyGambleFlipResult(roundIndex, slice.id);
+    const sliceCount = wheel.slices.length;
+    const targetIndex = Math.max(0, Math.min(index, sliceCount - 1));
+    armedSpinRef.current = { wheelIndex: ri, sliceIndex: targetIndex };
+
+    const physics = physicsForProfile(wheel.definition.physicsProfileId ?? "default");
+    scheduleSpinComplete(spinSafetyTimeoutMs(physics) + 800);
+    setSpinArmEpoch((e) => e + 1);
+    store.setSpinning(true);
+    runHapticImpact(Haptics.ImpactFeedbackStyle.Medium);
+
+    spinTrace("press", {
+      wheelIndex: ri,
+      targetIndex,
+      sliceCount,
+      sliceId: slice.id,
+      hasRef: spinWheelRef.current != null,
+    });
+
+    const drive = () => {
+      if (spinWheelRef.current != null) {
+        spinWheelRef.current.spinToIndex(targetIndex);
       } else {
-        store.applySpinResult(roundIndex, slice.id);
+        spinTrace("spin_ref_missing");
       }
+    };
+    if (spinWheelRef.current != null) {
+      drive();
+    } else {
+      requestAnimationFrame(drive);
+    }
+  }, [clearSpinCompleteTimer, scheduleSpinComplete]);
+
+  /** External spins commit via `onSpinSettled` only; kept for RunWheelSlot API / Fast Refresh. */
+  const handleSpinComplete = useCallback(
+    (_roundIndex: number, _item: { id: string; label?: string }) => {},
+    []
+  );
+
+  const handleSpinInterrupted = useCallback(() => {
+    /* Remount during wedge rebuild must not relaunch spin (was freezing the app). */
+  }, []);
+
+  useEffect(() => {
+    prevIsSpinningRef.current = isSpinning;
+  }, [isSpinning]);
+
+  useEffect(() => {
+    const store = useRunStore.getState();
+    if (!store.ui.isSpinning) return;
+    if (store.armedSpinSession != null) return;
+    store.clearSpinInteraction();
+    store.healRunUi();
+    reelEngineRef.current?.setSpinningSafe(false);
+  }, [run.runId, run.wheelIndex]);
+
+  useEffect(
+    () => () => {
+      clearSpinCompleteTimer();
     },
-    [reel]
+    [clearSpinCompleteTimer]
   );
 
   const activeWheelPhysics = useMemo(() => {
@@ -478,48 +677,70 @@ export const RunWheelFeed = memo(function RunWheelFeed({
 
   useEffect(() => {
     if (!isSpinning) return;
+    const epoch = ++spinGuardEpochRef.current;
     const t = setTimeout(() => {
+      if (spinGuardEpochRef.current !== epoch) return;
       const state = useRunStore.getState();
-      if (state.ui.isSpinning) {
+      if (!state.ui.isSpinning) return;
+      if (state.armedSpinSession == null) {
         state.clearSpinInteraction();
-        reel.setSpinningSafe(false);
-        state.healRunUi();
+        reelEngineRef.current?.setSpinningSafe(false);
+        return;
       }
+      finishSpinRef.current();
     }, spinGuardMs);
     return () => clearTimeout(t);
-  }, [isSpinning, reel, spinGuardMs]);
+  }, [isSpinning, spinGuardMs]);
 
   useEffect(() => {
     if (prevWheelIndexRef.current === run.wheelIndex) return;
     prevWheelIndexRef.current = run.wheelIndex;
-    useRunStore.getState().clearSpinInteraction();
-    reel.setSpinningSafe(false);
-    reel.onPrimaryBulbPhaseChange("idle");
-  }, [reel, run.wheelIndex]);
+    clearSpinCompleteTimer();
+    const store = useRunStore.getState();
+    store.clearArmedSpinSession();
+    armedSpinRef.current = null;
+    if (store.run?.pendingWheelRebuild) {
+      store.scheduleWheelLayoutCommit();
+    }
+    store.clearSpinInteraction();
+    store.healRunUi();
+    spinTrace("wheel_enter", { wheelIndex: run.wheelIndex });
+    const reelApi = reelEngineRef.current;
+    reelApi?.setSpinningSafe(false);
+    if (reelApi != null && reelApi.activeIndex !== run.wheelIndex) {
+      reelApi.snapToIndex(run.wheelIndex);
+    }
+  }, [clearSpinCompleteTimer, run.wheelIndex]);
 
   const prevBossPhaseRef = useRef(bossCyclePhase);
   useEffect(() => {
     const prev = prevBossPhaseRef.current;
     prevBossPhaseRef.current = bossCyclePhase;
     if (prev === "reward" && bossCyclePhase === "none") {
-      reel.snapToIndex(run.wheelIndex);
-      reel.setSpinningSafe(false);
-      reel.onPrimaryBulbPhaseChange("idle");
+      const reelApi = reelEngineRef.current;
+      reelApi?.snapToIndex(run.wheelIndex);
+      reelApi?.setSpinningSafe(false);
       useRunStore.getState().clearSpinInteraction();
       useRunStore.getState().healRunUi();
     }
-  }, [bossCyclePhase, reel, run.wheelIndex]);
+  }, [bossCyclePhase, run.wheelIndex]);
 
   useEffect(() => {
     if (bossCycleUiActive) return;
-    if (reel.interactionLocked) return;
-    const store = useRunStore.getState();
     if (reel.activeIndex === run.wheelIndex) return;
-    reel.snapToIndex(run.wheelIndex);
-    reel.setSpinningSafe(false);
+    const store = useRunStore.getState();
+    const reelApi = reelEngineRef.current;
+    reelApi?.snapToIndex(run.wheelIndex);
+    reelApi?.setSpinningSafe(false);
     store.clearSpinInteraction();
-    reel.onPrimaryBulbPhaseChange("idle");
-  }, [bossCycleUiActive, reel, run.wheelIndex]);
+    store.healRunUi();
+  }, [bossCycleUiActive, reel.activeIndex, run.wheelIndex]);
+
+  useEffect(() => {
+    const store = useRunStore.getState();
+    store.clearSpinInteraction();
+    store.healRunUi();
+  }, [run.runId, run.floor]);
 
   useEffect(() => {
     if (reel.activeIndex !== run.wheelIndex) return;
@@ -563,18 +784,17 @@ export const RunWheelFeed = memo(function RunWheelFeed({
       const slotRun = run;
       const round = rounds[ri];
 
-      const isActive = ri === reel.activeIndex;
+      const isReelActive = ri === run.wheelIndex && ri === reel.activeIndex;
       const hubMode = deriveHubMode({
         run,
         roundIndex: ri,
         isSpinning,
         awaitingClaim,
         gambleFlipActive,
-        isReelActive: isActive,
+        isReelActive,
         round,
       });
       const spinLocked = deriveSpinLocked(hubMode, isSpinning);
-      const listenBulb = buffer === "a";
       return (
         <RunWheelSlot
           key={buffer === "a" ? "reel-slot-a" : "reel-slot-b"}
@@ -582,10 +802,15 @@ export const RunWheelFeed = memo(function RunWheelFeed({
           pageHeight={pageHeight}
           run={slotRun}
           wheelInnerSize={wheelInnerSize}
+          wheelInnerMax={wheelInnerMax}
+          stageWidth={stageWidth}
+          stageHeight={stageHeight}
           textSize={textSize}
           textColor={textColor}
+          wheelPadH={wheelPadH}
           spinWheelRef={buffer === "a" ? spinWheelRef : { current: null }}
           onSpinComplete={handleSpinComplete}
+          onSpinSettled={buffer === "a" ? finishSpinFromStore : undefined}
           onExternalSpinPress={buffer === "a" ? handleExternalSpinPress : NOOP}
           onHubClaimPress={buffer === "a" ? handleHubClaim : NOOP}
           isSpinning={isSpinning}
@@ -593,12 +818,15 @@ export const RunWheelFeed = memo(function RunWheelFeed({
           hubMode={buffer === "a" ? hubMode : "busy"}
           spinLocked={spinLocked}
           ringPhaseResetKey={ri}
-          onBulbRingPhaseChange={listenBulb ? reel.onPrimaryBulbPhaseChange : undefined}
+          bulbRingPhase={isReelActive ? bulbRingPhase : "idle"}
+          spinFeedbackTier={isReelActive ? stageFeedbackTier : null}
           sliceEraseMode={sliceEraseMode}
-          isActiveWheel={isActive}
-          gambleFlipActive={gambleFlipActive && isActive}
+          isActiveWheel={isReelActive}
+          gambleFlipActive={gambleFlipActive && isReelActive}
           spinArmEpoch={spinArmEpoch}
+          stripPanGesture={reel.panGesture}
           onBanishSlice={(sliceIndex) => handleBanishSlice(ri, sliceIndex)}
+          onSpinInterrupted={buffer === "a" ? handleSpinInterrupted : undefined}
         />
       );
     },
@@ -606,15 +834,17 @@ export const RunWheelFeed = memo(function RunWheelFeed({
       awaitingClaim,
       gambleFlipActive,
       spinArmEpoch,
+      finishSpinFromStore,
+      handleSpinComplete,
+      handleSpinInterrupted,
       handleBanishSlice,
       handleExternalSpinPress,
       handleHubClaim,
-      handleSpinComplete,
       isSpinning,
+      tacticBlocksReel,
       pageHeight,
       reel.stripSpringing,
       reel.activeIndex,
-      reel.onPrimaryBulbPhaseChange,
       reel.stripScrolling,
       mountNextStripSlot,
       revealNextSlot,
@@ -623,16 +853,21 @@ export const RunWheelFeed = memo(function RunWheelFeed({
       scrolling,
       sliceEraseMode,
       stripNextIndex,
+      stageFeedbackTier,
       textSize,
+      stageHeight,
+      stageWidth,
+      wheelInnerMax,
       wheelInnerSize,
+      wheelPadH,
     ]
   );
 
   return (
-    <View style={[styles.root, styles.flexFill, { backgroundColor: RUN_PAGE_BACKGROUND }]}>
+    <Animated.View style={[styles.root, styles.flexFill, stageBgStyle]}>
       <View
         style={styles.flexFill}
-        pointerEvents={reel.interactionLocked || isSpinning ? "none" : "auto"}
+        pointerEvents="box-none"
       >
         <View
           style={[styles.clip, { height: pageHeight }]}
@@ -658,28 +893,34 @@ export const RunWheelFeed = memo(function RunWheelFeed({
               }
               style={[{ width: "100%", height: pageHeight * 2 }, reel.stripStyle]}
             >
-              <View
+              <Animated.View
                 key="strip-buffer-a"
                 collapsable={false}
-                style={[
-                  styles.slotRow,
-                  { height: pageHeight, backgroundColor: RUN_PAGE_BACKGROUND },
-                ]}
+                style={[styles.slotRow, { height: pageHeight }, stageBgStyle]}
               >
                 {renderStripBuffer("a")}
-              </View>
-              <View
+              </Animated.View>
+              <Animated.View
                 key="strip-buffer-b"
                 collapsable={false}
-                style={[
-                  styles.slotRow,
-                  { height: pageHeight, backgroundColor: RUN_PAGE_BACKGROUND },
-                ]}
+                style={[styles.slotRow, { height: pageHeight }, stageBgStyle]}
               >
                 {renderStripBuffer("b")}
-              </View>
+              </Animated.View>
             </Animated.View>
           </GestureDetector>
+
+          {washActive ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFillObject,
+                styles.stageWashLayer,
+                { backgroundColor: washColor },
+                overlayStyle,
+              ]}
+            />
+          ) : null}
 
           <Animated.View
             pointerEvents="none"
@@ -692,17 +933,15 @@ export const RunWheelFeed = memo(function RunWheelFeed({
           />
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
-}, (prev: RunWheelFeedProps, next: RunWheelFeedProps) =>
-  prev.pageHeight === next.pageHeight &&
-  prev.reelUiKey === next.reelUiKey &&
-  runReelFeedKey(prev.run) === runReelFeedKey(next.run));
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   flexFill: { flex: 1 },
   clip: { overflow: "hidden", width: "100%", position: "relative" },
+  stageWashLayer: { zIndex: 1 },
   reelScrimLayer: { zIndex: 2 },
   slotRow: { width: "100%" },
   slotRowCentered: { justifyContent: "center", alignItems: "center" },
@@ -713,7 +952,7 @@ const styles = StyleSheet.create({
   },
   wheelPad: {
     alignItems: "center",
-    paddingHorizontal: 16,
+    justifyContent: "center",
   },
   wheelSlotErase: {
     borderRadius: 20,
@@ -737,6 +976,10 @@ const styles = StyleSheet.create({
     borderWidth: Neo.borderBold,
     borderColor: Neo.ink,
     borderRadius: 10,
+  },
+  eraseBannerBlocked: {
+    backgroundColor: "#FDE68A",
+    borderColor: "#B45309",
   },
   eraseBannerText: {
     fontSize: 15,

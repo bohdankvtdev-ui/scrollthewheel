@@ -1,0 +1,31 @@
+{
+  "primaryKeywords": [
+    { "term": "wheel game", "intent": "high", "competition": "medium", "relevance": "core" },
+    { "term": "spin wheel", "intent": "high", "competition": "high", "relevance": "core" },
+    { "term": "roguelike", "intent": "medium", "competition": "high", "relevance": "genre" },
+    { "term": "roguelike mobile", "intent": "medium", "competition": "medium", "relevance": "genre" },
+    { "term": "casino game", "intent": "high", "competition": "very high", "relevance": "visual-adjacent" },
+    { "term": "money game", "intent": "medium", "competition": "medium", "relevance": "mechanic" },
+    { "term": "perk game", "intent": "low", "competition": "low", "relevance": "differentiator" },
+    { "term": "luck game", "intent": "medium", "competition": "high", "relevance": "mechanic" },
+    { "term": "strategy game", "intent": "medium", "competition": "very high", "relevance": "secondary" },
+    { "term": "arcade game", "intent": "medium", "competition": "high", "relevance": "category" }
+  ],
+  "longTail": [
+    "wheel spin roguelike",
+    "build bank spin game",
+    "perk shop wheel",
+    "boss wheel game",
+    "bankruptcy game mobile",
+    "nine wheels game",
+    "balatro style mobile",
+    "spin to win game offline"
+  ],
+  "avoidOrUseCarefully": [
+    "real money casino",
+    "slots real money",
+    "gambling app",
+    "betting"
+  ],
+  "brandTerms": ["Scroll The Wheel", "scroll the wheel", "scrollthewheel"]
+}

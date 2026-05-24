@@ -1,7 +1,12 @@
 import type { SliceDefinition } from "../../schemas";
 import type { WheelConfigId } from "../wheels/database/types";
-import { buildSliceFromPrizeSlot } from "../wheels/database/loader";
-import { getAdvancementDef, hasAdvancement } from "./advancementCatalog";
+import { buildSliceFromPrizeSlot } from "../wheels/database/sliceFromPrize";
+import {
+  getAdvancementDef,
+  hasAdvancement,
+  resolveInjectPrize,
+} from "./advancementCatalog";
+import { getCycleEconomy } from "../wheels/database/cycleEconomy";
 
 const INJECT_LAND_PCT = 9;
 
@@ -62,14 +67,15 @@ export function applyAdvancementsToSlices(
   let out = [...slices];
 
   const money = getAdvancementDef("money_on_all");
+  const moneyPrize = money != null ? resolveInjectPrize(money, advancements) : undefined;
   if (
-    money?.injectPrize &&
+    moneyPrize != null &&
     hasAdvancement({ advancements }, "money_on_all") &&
-    wheelConfigId !== money.skipWheel &&
+    wheelConfigId !== money?.skipWheel &&
     !hasInjectedSlice(out, "_inj_money")
   ) {
     const inj = buildSliceFromPrizeSlot(
-      { prize: money.injectPrize, chance: INJECT_LAND_PCT },
+      { prize: moneyPrize, chance: INJECT_LAND_PCT },
       `${wheelConfigId}_inj_money`,
       90,
       cycle
@@ -78,14 +84,15 @@ export function applyAdvancementsToSlices(
   }
 
   const perk = getAdvancementDef("perk_on_all");
+  const perkPrize = perk != null ? resolveInjectPrize(perk, advancements) : undefined;
   if (
-    perk?.injectPrize &&
+    perkPrize != null &&
     hasAdvancement({ advancements }, "perk_on_all") &&
-    wheelConfigId !== perk.skipWheel &&
+    wheelConfigId !== perk?.skipWheel &&
     !hasInjectedSlice(out, "_inj_perk")
   ) {
     const inj = buildSliceFromPrizeSlot(
-      { prize: perk.injectPrize, chance: INJECT_LAND_PCT },
+      { prize: perkPrize, chance: INJECT_LAND_PCT },
       `${wheelConfigId}_inj_perk`,
       91,
       cycle
@@ -94,14 +101,15 @@ export function applyAdvancementsToSlices(
   }
 
   const pct = getAdvancementDef("percent_drip");
+  const pctPrize = pct != null ? resolveInjectPrize(pct, advancements) : undefined;
   if (
-    pct?.injectPrize &&
+    pctPrize != null &&
     hasAdvancement({ advancements }, "percent_drip") &&
-    wheelConfigId !== pct.skipWheel &&
+    wheelConfigId !== pct?.skipWheel &&
     !hasInjectedSlice(out, "_inj_pct")
   ) {
     const inj = buildSliceFromPrizeSlot(
-      { prize: pct.injectPrize, chance: INJECT_LAND_PCT },
+      { prize: pctPrize, chance: INJECT_LAND_PCT },
       `${wheelConfigId}_inj_pct`,
       92,
       cycle
@@ -117,8 +125,12 @@ export function getAdvancementPositiveWeightMult(advancements: string[] = []): n
   return getAdvancementDef("lucky_dip")?.value ?? 1.08;
 }
 
-export function getAdvancementPoolCycleBonus(advancements: string[] = []): number {
+export function getAdvancementPoolCycleBonus(
+  advancements: string[] = [],
+  cycle: number = 1
+): number {
   if (!hasAdvancement({ advancements }, "pool_scout")) return 0;
+  if (cycle < 3) return 0;
   return getAdvancementDef("pool_scout")?.value ?? 1;
 }
 
@@ -127,9 +139,14 @@ export function getAdvancementInterestMult(advancements: string[] = []): number 
   return getAdvancementDef("interest_boost")?.value ?? 2;
 }
 
-export function getAdvancementCycleStipend(advancements: string[] = []): number {
+export function getAdvancementCycleStipend(
+  advancements: string[] = [],
+  cycle: number = 1
+): number {
   if (!hasAdvancement({ advancements }, "cycle_stipend")) return 0;
-  return getAdvancementDef("cycle_stipend")?.value ?? 75;
+  const base = getAdvancementDef("cycle_stipend")?.value ?? 45;
+  const mult = getCycleEconomy(cycle).moneyMult;
+  return Math.round(base * mult);
 }
 
 export function getExtraShopOffers(advancements: string[] = []): number {

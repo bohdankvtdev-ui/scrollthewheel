@@ -11,7 +11,7 @@ import {
   grantEarlyRunChipBonusOnSpinComplete,
   EARLY_RUN_CHIP_BONUS,
 } from "./earlyRunChips";
-import { buildGambleSlices } from "./gambleWheel";
+import { buildGambleSlices, overlayGambleWheel } from "./gambleWheel";
 import {
   getMicroChoiceOffers,
   listEligibleMicroChoices,
@@ -21,6 +21,7 @@ import {
 import { tacticUsedOnWheel } from "./tacticState";
 import {
   isTacticDecisionWheel,
+  isTacticWheelEligible,
   rollTacticWheelIndices,
   TACTIC_WHEELS_PER_CYCLE,
   withTacticWheelIndices,
@@ -90,6 +91,24 @@ describe("tactics", () => {
     const indices = rollTacticWheelIndices("test-run", 1);
     expect(indices).toHaveLength(TACTIC_WHEELS_PER_CYCLE);
     expect(new Set(indices).size).toBe(TACTIC_WHEELS_PER_CYCLE);
+    expect(indices.every((i) => i >= 2)).toBe(true);
+  });
+
+  it("never offers tactics on cycle 1 wheels 1–2", () => {
+    let run = withTacticWheelIndices(RunManager.createInitialRun(1));
+    run = {
+      ...run,
+      runEffects: {
+        ...run.runEffects,
+        tacticWheelIndices: [0, 3, 5],
+      },
+    };
+    expect(isTacticWheelEligible(run, 0)).toBe(false);
+    expect(isTacticWheelEligible(run, 1)).toBe(false);
+    expect(getMicroChoiceOffers(run, 0, { hasPreSpinSnapshot: true })).toEqual([]);
+    expect(
+      shouldShowTacticPicker(run, true, false, false, true)
+    ).toBe(false);
   });
 
   it("offers only on tactic wheels", () => {
@@ -107,8 +126,18 @@ describe("tactics", () => {
   it("gamble is a 2-slice wheel", () => {
     const slices = buildGambleSlices();
     expect(slices).toHaveLength(2);
-    expect(slices[0]?.label).toBe("×2");
-    expect(slices[1]?.label).toBe("LOSE");
+    expect(slices[0]?.label).toBe("WIN ALL");
+    expect(slices[0]?.presentation?.segmentColor).toBe("#16A34A");
+    expect(slices[1]?.label).toBe("LOSE ALL");
+    expect(slices[1]?.presentation?.segmentColor).toBe("#DC2626");
+  });
+
+  it("gamble overlay keeps green and red segments", () => {
+    const run = RunManager.createInitialRun(1);
+    const base = run.wheels[0]!;
+    const overlaid = overlayGambleWheel(base);
+    expect(overlaid.slices[0]?.presentation?.segmentColor).toBe("#16A34A");
+    expect(overlaid.slices[1]?.presentation?.segmentColor).toBe("#DC2626");
   });
 
   it("tactics cost chips", () => {
@@ -147,11 +176,13 @@ describe("tactics", () => {
     }
   });
 
-  it("grants full early chips on spin complete", () => {
+  it("skips flat early chip bonus when grant amount is zero", () => {
     let run = RunManager.createInitialRun(1);
     run = { ...run, modifiers: { ...run.modifiers, chipGainMult: 0.25 } };
     const g0 = grantEarlyRunChipBonusOnSpinComplete(run, 0);
-    expect(g0.run.chipsEarnedThisRun).toBe(EARLY_RUN_CHIP_BONUS.afterWheel1);
+    expect(EARLY_RUN_CHIP_BONUS.afterWheel1).toBe(0);
+    expect(g0.grant).toBeNull();
+    expect(g0.run.chipsEarnedThisRun ?? 0).toBe(0);
   });
 
   it("never offers retry and gamble together", () => {

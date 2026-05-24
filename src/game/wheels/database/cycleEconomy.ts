@@ -1,21 +1,27 @@
 import { getCycleAdvancement } from "../../effects/cycleAdvancement";
+import type { WheelArchetype } from "../types";
 
 /**
- * Compound growth per cycle — money wedges scale faster than losses.
+ * Compound growth per cycle — money wedges scale slower than losses for tension.
  * Advancement tiers (every 3 cycles) add extra money/risk for infinite runs.
  */
 export const CYCLE_ECONOMY = {
-  /** Flat $ prizes: ~18% compound per cycle cleared */
-  moneyGrowthPerCycle: 0.14,
-  /** Losses scale closer to gains — wrong calls hurt more over time */
-  lossGrowthPerCycle: 0.14,
-  /** Bank % gains: base at cycle 1, +0.8% per cycle */
+  /** Flat $ prizes: compound per cycle cleared */
+  moneyGrowthPerCycle: 0.09,
+  /** Losses outpace gains — late cycles punish greed */
+  lossGrowthPerCycle: 0.19,
+  /** Bank % gains: base at cycle 1 */
   percentGainBase: 0.035,
-  percentGainStep: 0.008,
+  percentGainStep: 0.006,
+  /** Cap scaled positive flat $ on early cycles (jackpots use late wheels) */
+  earlyCycleMoneyCap: 90,
+  earlyCycleMoneyCapUntil: 3,
   /** Round cash to nearest $5 / $10 on big values */
   moneyRoundUnder200: 5,
   moneyRoundOver200: 10,
 } as const;
+
+const STAKES_ARCHETYPES = new Set<WheelArchetype>(["risk", "chaos", "drain"]);
 
 export type CycleEconomy = {
   cycle: number;
@@ -24,14 +30,20 @@ export type CycleEconomy = {
   percentGain: number;
 };
 
+export type CycleEconomyContext = {
+  configId?: string;
+  archetype?: WheelArchetype | null;
+};
+
 export function getCycleEconomy(cycleLevel: number): CycleEconomy {
   const cycle = Math.max(1, cycleLevel);
   const adv = getCycleAdvancement(cycle);
   const baseMoney = Math.pow(1 + CYCLE_ECONOMY.moneyGrowthPerCycle, cycle - 1);
+  const tierLossBump = adv.tier >= 2 ? 1 + (adv.tier - 1) * 0.02 : 1;
   return {
     cycle,
     moneyMult: baseMoney * adv.moneyMult,
-    lossMult: Math.pow(1 + CYCLE_ECONOMY.lossGrowthPerCycle, cycle - 1),
+    lossMult: Math.pow(1 + CYCLE_ECONOMY.lossGrowthPerCycle, cycle - 1) * tierLossBump,
     percentGain:
       CYCLE_ECONOMY.percentGainBase + (cycle - 1) * CYCLE_ECONOMY.percentGainStep,
   };
@@ -83,16 +95,33 @@ export function formatPrizeLabel(
 export function applyCycleEconomyToPayload(
   payload: Record<string, unknown>,
   kind: string,
-  cycle: number
+  cycle: number,
+  ctx: CycleEconomyContext = {}
 ): Record<string, unknown> {
   const econ = getCycleEconomy(cycle);
   const p = { ...payload };
+  const archetype = ctx.archetype ?? null;
+  const isMoneyWheel = ctx.configId === "wheel_1" || archetype === "money";
+  const lossStepMult =
+    archetype != null && STAKES_ARCHETYPES.has(archetype) ? 1 : 0.65;
 
   if (typeof p.moneyDelta === "number") {
     if (p.moneyDelta > 0) {
-      p.moneyDelta = roundMoney(p.moneyDelta * econ.moneyMult);
+      if (isMoneyWheel && cycle === 1) {
+        p.moneyDelta = roundMoney(p.moneyDelta);
+      } else {
+        let scaled = roundMoney(p.moneyDelta * econ.moneyMult);
+        if (isMoneyWheel && cycle < CYCLE_ECONOMY.earlyCycleMoneyCapUntil) {
+          scaled = Math.min(scaled, CYCLE_ECONOMY.earlyCycleMoneyCap);
+        }
+        p.moneyDelta = scaled;
+      }
     } else if (p.moneyDelta < 0) {
-      p.moneyDelta = -roundMoney(Math.abs(p.moneyDelta) * econ.lossMult);
+      if (isMoneyWheel && cycle === 1) {
+        p.moneyDelta = -roundMoney(Math.abs(p.moneyDelta));
+      } else {
+        p.moneyDelta = -roundMoney(Math.abs(p.moneyDelta) * econ.lossMult);
+      }
     }
   }
 
@@ -101,7 +130,7 @@ export function applyCycleEconomyToPayload(
   }
   if (typeof p.bankPercent === "number" && p.bankPercent < 0 && p.bankPercent > -1) {
     p.bankPercent = -roundPercent(
-      Math.abs(p.bankPercent) + (cycle - 1) * CYCLE_ECONOMY.percentGainStep * 0.65
+      Math.abs(p.bankPercent) + (cycle - 1) * CYCLE_ECONOMY.percentGainStep * lossStepMult
     );
   }
 

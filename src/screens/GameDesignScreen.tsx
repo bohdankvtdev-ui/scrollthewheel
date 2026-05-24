@@ -60,7 +60,11 @@ export function GameDesignScreen() {
       case "shop":
         return { shopTree: snap.shopTree, perks: snap.perks };
       case "scaling":
-        return { config: snap.infiniteScaling, preview: snap.scalingPreview };
+        return {
+          config: snap.infiniteScaling,
+          progressionTable: snap.progressionTable,
+          scalingPreview: snap.scalingPreview,
+        };
       default:
         return {};
     }
@@ -73,6 +77,15 @@ export function GameDesignScreen() {
           <MaterialIcons name="arrow-back" size={24} color={Neo.textOnDark} />
         </Pressable>
         <Text style={[styles.title, { fontFamily: FONT_BEBAS_NEUE }]}>Game content</Text>
+        <Pressable
+          onPress={() => router.push("/about")}
+          hitSlop={8}
+          style={styles.aboutBtn}
+          accessibilityRole="button"
+          accessibilityLabel="About and legal"
+        >
+          <MaterialIcons name="info-outline" size={22} color={Neo.textOnDark} />
+        </Pressable>
         <View
           style={[
             styles.badge,
@@ -128,6 +141,15 @@ const styles = StyleSheet.create({
   },
   back: { padding: 4 },
   title: { flex: 1, fontSize: 22, color: Neo.textOnDark, letterSpacing: 0.5 },
+  aboutBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: Neo.borderThin,
+    borderColor: "rgba(250,250,250,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   badge: {
     borderWidth: Neo.borderThin,
     borderColor: Neo.ink,

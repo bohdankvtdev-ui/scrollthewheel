@@ -53,3 +53,13 @@ export function distributeLandChances(weights: readonly number[]): number[] {
   }
   return out;
 }
+
+/** Rank-weighted land % for n slices (harsher odds on early indices when `harshFirst`). */
+export function landShapeForSliceCount(count: number, harshFirst = false): number[] {
+  const n = Math.max(6, count);
+  const weights = Array.from({ length: n }, (_, i) => {
+    const rank = harshFirst ? n - i : n - i;
+    return Math.max(1, rank * (harshFirst && i < 3 ? 1.35 : 1));
+  });
+  return distributeLandChances(weights);
+}

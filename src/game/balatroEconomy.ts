@@ -6,8 +6,8 @@ export const BALATRO_ECONOMY = {
   shopOfferCount: 5,
   advancementOfferCount: 2,
   shopRerollBaseCost: 5,
-  /** +$1 per $5 held, capped (end-of-ante interest). */
-  interestDivisor: 5,
-  interestCap: 5,
+  /** +$1 per $6 held, capped (end-of-ante interest). */
+  interestDivisor: 6,
+  interestCap: 3,
   sellRefundRatio: 0.5,
 } as const;

@@ -16,11 +16,13 @@ import { getSliceVisualTheme } from "../game/content/sliceVisualTheme";
 import { resolveSliceIcon } from "../game/content/resolveIcon";
 
 import { getArchetypeForConfigId } from "../game/wheels/database";
+import { redistributeSliceLandWeights } from "../game/wheels/sliceLandWeights";
 
 import { sliceWheelCaption } from "../utils/sliceWheelCaption";
 
 import { getEffectiveSliceCapacity } from "./PerkSystem";
 import { getPermanentWedgeBonus } from "../game/wheels/sliceCapacityBonus";
+import { summarizeCycleBeforeBoss } from "../game/boss/bossWheel";
 
 import {
 
@@ -73,16 +75,19 @@ function buildSpinItemFromSlice(
     wheelArchetype,
   });
   const resolved = resolveSliceIcon(s);
+  const chipBg = s.presentation?.chipColor ?? visual.chipBg;
+  const iconColor = s.presentation?.iconColor ?? visual.iconColor;
+  const captionColor = s.presentation?.captionColor ?? visual.captionColor;
   return {
     id: s.id,
     label: s.label,
     shortLabel: caption,
     icon: resolved.icon,
     iconFamily: resolved.iconFamily,
-    iconTint: visual.chipBg,
-    iconChipBg: visual.chipBg,
-    iconColor: visual.iconColor,
-    captionColor: visual.captionColor,
+    iconTint: chipBg,
+    iconChipBg: chipBg,
+    iconColor,
+    captionColor,
     iconTone: visual.tone,
   };
 }
@@ -114,6 +119,10 @@ export function buildWheel(
   if (scaledDef.wheelConfigId != null) {
 
     const configKey = scaledDef.wheelConfigId as FloorWheelOrderId;
+    const bossAudit =
+      configKey === "wheel_9" && run.history.some((h) => h.floor === floor && h.wheelIndex < 8)
+        ? summarizeCycleBeforeBoss(run, run.wheels)
+        : undefined;
     rawSlices = getConfiguredWheelSlices(scaledDef.wheelConfigId, scaledDef.id, {
       runId: run.runId,
       cycle: floor,
@@ -123,6 +132,7 @@ export function buildWheel(
       permanentWedgeBonus: getPermanentWedgeBonus(run),
       wheelLaserCuts: run.wheelLaserCuts,
       wheelInsureCuts: run.wheelInsureCuts,
+      bossCycleAudit: bossAudit,
     });
     rawSlices = applyAdvancementsToSlices(
       rawSlices,
@@ -208,21 +218,24 @@ export function patchResolvedWheelSlices(
       ? getArchetypeForConfigId(wheel.definition.wheelConfigId)
       : undefined;
 
-  const remapped = slices.map((s, sliceIndex) => {
+  const balanced = redistributeSliceLandWeights(slices);
+  const remapped = balanced.map((s, sliceIndex) => {
     const visual = getSliceVisualTheme(s.kind, s.weightTags, {
       sliceIndex,
       sliceCount,
       wheelArchetype,
     });
+    const customSegment = s.presentation?.segmentColor;
     return {
       ...s,
       presentation: {
         ...s.presentation,
         colorIndex: sliceIndex,
-        segmentColor: visual.segmentBg,
-        iconColor: visual.iconColor,
-        captionColor: visual.captionColor,
-        chipColor: visual.chipBg,
+        segmentColor: customSegment ?? visual.segmentBg,
+        iconColor: customSegment != null ? (s.presentation?.iconColor ?? visual.iconColor) : visual.iconColor,
+        captionColor:
+          customSegment != null ? (s.presentation?.captionColor ?? visual.captionColor) : visual.captionColor,
+        chipColor: customSegment != null ? (s.presentation?.chipColor ?? visual.chipBg) : visual.chipBg,
       },
     };
   });
@@ -286,13 +299,29 @@ export function remapWheelsAfterCapacityChange(run: RunState): RunState {
 
 
 
+const BOSS_WHEEL_INDEX = 8;
+
+/** Rebuild wheel 9 after wheels 1–8 — boss pool reacts to cycle history. */
+export function rebuildBossWheelForRun(run: RunState): RunState {
+  if (run.wheels.length <= BOSS_WHEEL_INDEX) return run;
+  const def = resolveWheelDefinitionForIndex(run, BOSS_WHEEL_INDEX, run.floor);
+  const wheels = [...run.wheels];
+  wheels[BOSS_WHEEL_INDEX] = buildWheel(def, run, run.floor, BOSS_WHEEL_INDEX);
+  return { ...run, wheels };
+}
+
 export function syncRunWheels(run: RunState): RunState {
 
   if (run.wheelDbRevision !== WHEEL_DATABASE_REVISION) {
     return { ...rebuildWheelsFromDatabase(run), wheelDbRevision: WHEEL_DATABASE_REVISION };
   }
 
-  if (run.pendingWheelRebuild) return rebuildWheelsFromDatabase(run);
+  if (run.pendingWheelRebuild) {
+    return syncRunWheels({
+      ...remapWheelsAfterCapacityChange(run),
+      pendingWheelRebuild: false,
+    });
+  }
 
   if (run.wheels.length === 0) return rebuildWheelsFromDatabase(run);
 
@@ -315,6 +344,11 @@ export function syncRunWheels(run: RunState): RunState {
   const mismatch = run.wheels.some((w, i) => {
     if (w.definition.wheelConfigId != null) {
       const configId = w.definition.wheelConfigId as FloorWheelOrderId;
+      const bossAudit =
+        configId === "wheel_9" &&
+        run.history.some((h) => h.floor === run.floor && h.wheelIndex < BOSS_WHEEL_INDEX)
+          ? summarizeCycleBeforeBoss(run, run.wheels)
+          : undefined;
       const raw = getConfiguredWheelSlices(configId, w.definition.id, {
         runId: run.runId,
         cycle: run.floor,
@@ -324,6 +358,7 @@ export function syncRunWheels(run: RunState): RunState {
         permanentWedgeBonus: getPermanentWedgeBonus(run),
         wheelLaserCuts: run.wheelLaserCuts,
         wheelInsureCuts: run.wheelInsureCuts,
+        bossCycleAudit: bossAudit,
       });
       const expected = applyAdvancementsToSlices(
         raw,

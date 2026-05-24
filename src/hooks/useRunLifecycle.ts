@@ -1,39 +1,9 @@
 import { useEffect, useState } from "react";
-import { initPersistence, loadRunCheckpoint } from "../persistence/mmkv";
+import { loadRunCheckpoint } from "../persistence/mmkv";
+import { initAppServices } from "../services/initApp";
 import { useMetaStore } from "../stores/metaStore";
-import type { RunState } from "../schemas";
-import { normalizeRunState } from "../game/runState";
-import { WHEEL_DATABASE_REVISION } from "../game/wheels/database/wheelDatabase";
-import { rebuildWheelsFromDatabase } from "../systems/WheelSystem";
+import { migrateRunCheckpoint } from "../game/runState/migrateCheckpoint";
 import { useRunStore } from "../stores/runStore";
-
-function migrateRunCheckpoint(raw: RunState): RunState {
-  const legacy = raw as RunState & { corruption?: number };
-  let next = raw;
-  if (legacy.corruption != null) {
-    const { corruption: _removed, ...rest } = legacy;
-    next = rest as RunState;
-  }
-  if (next.shields == null) next = { ...next, shields: 0 };
-  if ("boss" in (next as RunState & { boss?: unknown })) {
-    const { boss: _b, ...rest } = next as RunState & { boss?: unknown };
-    next = rest as RunState;
-  }
-  if (next.pendingWheelRebuild == null) next = { ...next, pendingWheelRebuild: false };
-  if (next.peakMoney == null) {
-    next = { ...next, peakMoney: next.money ?? 0 };
-  }
-  if (next.floorsCleared == null) {
-    next = { ...next, floorsCleared: Math.max(0, next.floor - 1) };
-  }
-  if (next.wheelDbRevision !== WHEEL_DATABASE_REVISION) {
-    next = {
-      ...rebuildWheelsFromDatabase(next),
-      wheelDbRevision: WHEEL_DATABASE_REVISION,
-    };
-  }
-  return normalizeRunState(next as import("../schemas").RunState);
-}
 
 export function useRunLifecycle(autoStart = true) {
   const hydrateMeta = useMetaStore((s) => s.hydrate);
@@ -47,7 +17,7 @@ export function useRunLifecycle(autoStart = true) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      await initPersistence();
+      await initAppServices();
       if (cancelled) return;
       hydrateMeta();
       const checkpoint = loadRunCheckpoint();

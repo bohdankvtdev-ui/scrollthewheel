@@ -1,15 +1,17 @@
 import type { RunState } from "../../schemas";
 
-/** UI flags that affect reel rounds / swipe — must bust `RunWheelFeed` memo when they change. */
+/**
+ * UI flags that affect reel round labels — bust `RunWheelFeed` memo when they change.
+ * Do not include `isSpinning`: busting the memo remounts the whole feed and wipes
+ * `armedSpinSession` mid-spin (builder wheel freeze).
+ */
 export function runReelUiKey(input: {
   awaitingClaim: boolean;
-  isSpinning: boolean;
   gambleFlipActive: boolean;
   lastResultLabel: string | null;
 }): string {
   return [
     input.awaitingClaim ? 1 : 0,
-    input.isSpinning ? 1 : 0,
     input.gambleFlipActive ? 1 : 0,
     input.lastResultLabel ?? "",
   ].join("|");
@@ -33,7 +35,6 @@ export function runReelFeedKey(run: RunState): string {
     run.chipsEarnedThisRun ?? 0,
     run.advancements?.length ?? 0,
     sliceCounts,
-    run.pendingWheelRebuild ? 1 : 0,
     run.runEffects?.microChoiceOffers?.join(",") ?? "",
   ].join("|");
 }

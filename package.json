@@ -8,11 +8,14 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "web:debug": "expo start --web --clear",
     "lint": "expo lint",
     "test": "vitest run",
     "simulate:wheel": "vitest run src/systems/ProbabilityResolver.test.ts -t \"prints yield\"",
     "validate:wheels": "vitest run src/game/wheels/database/wheelDatabase.test.ts",
-    "preview:wheels": "vitest run src/game/wheels/database/wheelDatabase.test.ts -t \"prints wheel_1\""
+    "preview:wheels": "vitest run src/game/wheels/database/wheelDatabase.test.ts -t \"prints wheel_1\"",
+    "eas:preview": "eas build --profile preview --platform all",
+    "eas:production": "eas build --profile production --platform all"
   },
   "dependencies": {
     "@expo-google-fonts/bebas-neue": "^0.4.1",

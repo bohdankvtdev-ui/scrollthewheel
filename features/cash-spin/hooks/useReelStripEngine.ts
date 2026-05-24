@@ -61,6 +61,8 @@ export type UseReelStripEngineArgs = {
    * `stripVisualIntensity` is 0 so reduce-motion users still get a muted wheel blur.
    */
   wheelFrostVisualIntensity?: number;
+  /** When false, reel pan won't claim touches (unsticks UI during store-driven spin). */
+  panEnabled?: boolean;
 };
 
 export type ReelStripEngine = {
@@ -115,6 +117,7 @@ export function useReelStripEngine({
   onStripSettled,
   stripVisualIntensity = 1,
   wheelFrostVisualIntensity: wheelFrostVisualIntensityProp,
+  panEnabled = true,
 }: UseReelStripEngineArgs): ReelStripEngine {
   const pageHStable = Math.max(1, Math.round(pageHeight));
 
@@ -141,6 +144,7 @@ export function useReelStripEngine({
   activeIndexRef.current = activeIndex;
 
   const [isSpinning, setIsSpinning] = useState(false);
+  const isSpinningRef = useRef(false);
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [stripSpringing, setStripSpringing] = useState(false);
   const [stripScrolling, setStripScrolling] = useState(false);
@@ -214,6 +218,7 @@ export function useReelStripEngine({
   }, [advanceBusy, busy, isSpinning, stripSpringing]);
 
   useEffect(() => {
+    isSpinningRef.current = false;
     setIsSpinning(false);
   }, [activeIndex]);
 
@@ -396,6 +401,7 @@ export function useReelStripEngine({
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
+        .enabled(panEnabled)
         .failOffsetX([-G.failOffsetX, G.failOffsetX])
         .activeOffsetY([-G.activeOffsetY, G.activeOffsetY])
         .onStart(() => {
@@ -459,7 +465,7 @@ export function useReelStripEngine({
           }
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- SharedValues are stable refs; gesture must stay one instance
-    [armStripSpringStart, runStripAdvanceOnJS, stripSpringCancelled]
+    [armStripSpringStart, panEnabled, runStripAdvanceOnJS, stripSpringCancelled]
   );
 
   const stripStyle = useAnimatedStyle<ViewStyle>(() => ({
@@ -518,7 +524,8 @@ export function useReelStripEngine({
   );
 
   const setSpinningSafe = useCallback((spinning: boolean) => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || isSpinningRef.current === spinning) return;
+    isSpinningRef.current = spinning;
     setIsSpinning(spinning);
   }, []);
 
@@ -532,23 +539,45 @@ export function useReelStripEngine({
   const nextIndex = activeIndex + 1 < roundCount ? activeIndex + 1 : null;
   const interactionLocked = advanceBusy || stripSpringing;
 
-  return {
-    activeIndex,
-    roundCount,
-    nextIndex,
-    interactionLocked,
-    panGesture,
-    stripStyle,
-    motionScrimStyle,
-    bottomCueScrollFadeStyle,
-    stripPageBlendStyle,
-    primaryWheelScrollFrostStyle,
-    pokeWebWheelScrollBlur,
-    setSpinningSafe,
-    onPrimaryBulbPhaseChange,
-    requestAdvance: executeStripAdvance,
-    snapToIndex,
-    stripScrolling,
-    stripSpringing,
-  };
+  return useMemo(
+    () => ({
+      activeIndex,
+      roundCount,
+      nextIndex,
+      interactionLocked,
+      panGesture,
+      stripStyle,
+      motionScrimStyle,
+      bottomCueScrollFadeStyle,
+      stripPageBlendStyle,
+      primaryWheelScrollFrostStyle,
+      pokeWebWheelScrollBlur,
+      setSpinningSafe,
+      onPrimaryBulbPhaseChange,
+      requestAdvance: executeStripAdvance,
+      snapToIndex,
+      stripScrolling,
+      stripSpringing,
+    }),
+    [
+      activeIndex,
+      advanceBusy,
+      bottomCueScrollFadeStyle,
+      executeStripAdvance,
+      interactionLocked,
+      motionScrimStyle,
+      nextIndex,
+      onPrimaryBulbPhaseChange,
+      panGesture,
+      pokeWebWheelScrollBlur,
+      primaryWheelScrollFrostStyle,
+      roundCount,
+      setSpinningSafe,
+      snapToIndex,
+      stripPageBlendStyle,
+      stripScrolling,
+      stripSpringing,
+      stripStyle,
+    ]
+  );
 }

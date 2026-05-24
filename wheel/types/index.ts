@@ -1,5 +1,6 @@
 import type { Animated } from "react-native";
 import type { ReactNode } from "react";
+import type { GestureType } from "react-native-gesture-handler";
 import type { WheelPhysicsConfig } from "../../lib/wheel/types";
 
 export type SpinWheelIconFamily = "MaterialIcons" | "MaterialCommunityIcons" | "Ionicons";
@@ -82,6 +83,8 @@ export type SpinWheelProps = {
   slicePressEnabled?: boolean;
   /** Fired when the wheel unmounts or slice count changes mid-spin (animation aborted). */
   onSpinInterrupted?: () => void;
+  /** Parent reel pan — hub press must run simultaneously or taps never arrive. */
+  stripPanGesture?: GestureType;
 };
 
 export type SpinWheelRef = {

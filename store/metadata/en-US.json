@@ -1,0 +1,53 @@
+{
+  "$schema": "./store-metadata.schema.json",
+  "locale": "en-US",
+  "appName": "Scroll The Wheel",
+  "appNameMax30": "Scroll The Wheel",
+  "subtitle": "Spin. Shop. Survive $0.",
+  "shortDescription": "Roguelike wheel run: spin 9 wheels, buy perks, grow your bank—or bust at $0.",
+  "promotionalText": "New cycle rewards & pit-stop picks. How far can you push your bank before bankruptcy?",
+  "keywordsIos": "roguelike,wheel,spin,perk,shop,mobile,game,run,bank,casino,strategy,idle,arcade",
+  "categoryPrimary": {
+    "googlePlay": "GAME_CASUAL",
+    "appStore": "Games",
+    "appStoreSub": "Casual"
+  },
+  "categorySecondary": {
+    "appStore": "Games",
+    "appStoreSub": "Strategy"
+  },
+  "contentRating": {
+    "googlePlay": "Everyone",
+    "appStore": "12+",
+    "notes": "Simulated gambling mechanics; no real-money wagering or cash-out."
+  },
+  "featureBullets": [
+    "Nine wheels per cycle — money, perks, risk, forge, tactics, and a boss finale",
+    "Roguelike shop: spend chips on perks, forge upgrades, and one-shot tactics",
+    "Start at $0 bank — every wedge can snowball your run or trigger bankruptcy",
+    "Swipe the reel between wheels; claim wedges and climb endless cycles",
+    "Leaderboards rank your peak bank — one bad spin ends the run"
+  ],
+  "screenshotOverlays": [
+    {
+      "index": 1,
+      "headline": "Spin nine wheels. Build your bank.",
+      "subline": "Roguelike money run from $0"
+    },
+    {
+      "index": 2,
+      "headline": "Shop perks & forge wedges",
+      "subline": "Spend chips between spins"
+    },
+    {
+      "index": 3,
+      "headline": "Clear the boss. Survive the cycle.",
+      "subline": "Hit $0 — run over"
+    }
+  ],
+  "longDescription": "Scroll The Wheel is a mobile roguelike built around spinning prize wheels—not slots for real money, but a tense money run where every wedge changes your bank.\n\nStart at $0 and scroll through nine wheels each cycle: cash wedges, perk shops, risk slices, forge upgrades, tactics, and a boss wheel on wheel 9. Earn shop chips as you play and spend them on perks that stack for the whole run, forge edits that reshape future money wheels, and tactics like insure, gamble, and wedge laser.\n\nROGUELIKE WHEEL GAMEPLAY\n• Swipe vertically through a reel of wheels—one spin per wheel, one claim per wedge\n• Read slices at a glance with bold icons and neo-brutal color\n• Cycle rewards and pit-stop bonuses after you clear the boss\n\nBUILD YOUR RUN\n• Perk wheels sell passive power for later cycles\n• Forge wheels change what can land on money wheels\n• Tactics add one-shot tools when the odds turn ugly\n\nHIGH STAKES, NO SAFETY NET\n• Bankruptcy at $0 bank ends the run immediately\n• Later cycles scale stakes, losses, and weird slices\n• Leaderboards track peak bank—push luck or play safe\n\nScroll The Wheel blends wheel-spin satisfaction with roguelike planning: when to shop, when to risk, and when to bail before the reel punishes greed.\n\nNot real-money gambling. No cash-out. For entertainment only.\n\nSupport: support@scrollthewheel.com",
+  "whatsNew": "Initial release: nine-wheel cycles, chip shop, boss clears, pit stops, leaderboards, and tablet support.",
+  "supportUrl": "https://scrollthewheel.bohdanium.com/support",
+  "marketingUrl": "https://scrollthewheel.bohdanium.com",
+  "privacyPolicyUrl": "https://scrollthewheel.bohdanium.com/privacy"
+}

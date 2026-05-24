@@ -23,7 +23,7 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
     scope: "all_positive",
     kind: "land_weight",
     value: 1.08,
-    line: "+8% green wedges · +2 chips on cash wins",
+    line: "+8% green wedges",
   },
   lucky_percent: {
     perkId: "lucky_percent",
@@ -45,14 +45,13 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
     kind: "land_weight",
     value: 1.1,
     line: "+10% chance on jackpot & rare wedges",
-    /** Applied via rare tag mult, not positiveWeightMult */
   },
   gold_rush: {
     perkId: "gold_rush",
     scope: "money_payout",
     kind: "payout_mult",
-    value: 1.2,
-    line: "+20% cash from +$ wedges",
+    value: 1.12,
+    line: "+12% cash from +$ wedges",
   },
   vip_roller: {
     perkId: "vip_roller",
@@ -65,8 +64,8 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
     perkId: "compounder",
     scope: "money_payout",
     kind: "payout_mult",
-    value: 0.05,
-    line: "+5% cash per cycle you clear (stacks forever)",
+    value: 0.04,
+    line: "+4% cash per cycle you clear (stacks forever)",
   },
   double_down: {
     perkId: "double_down",
@@ -99,8 +98,8 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
   ante_insurance: {
     perkId: "ante_insurance",
     scope: "meta",
-    kind: "payout_mult",
-    value: 1,
+    kind: "chip_grant",
+    value: 4,
     line: "+4 shop chips when you clear a cycle",
   },
   final_guard: {
@@ -121,8 +120,8 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
     perkId: "clutch_cash",
     scope: "boss_wheel",
     kind: "payout_mult",
-    value: 50,
-    line: "+$50 when you reach Final wheel each cycle",
+    value: 35,
+    line: "+$35 when you reach Final wheel each cycle",
   },
   green_fever: {
     perkId: "green_fever",
@@ -134,15 +133,15 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
   chip_drip: {
     perkId: "chip_drip",
     scope: "meta",
-    kind: "payout_mult",
+    kind: "chip_grant",
     value: 1,
     line: "+1 shop chip on cash wins",
   },
   deep_pockets: {
     perkId: "deep_pockets",
     scope: "meta",
-    kind: "payout_mult",
-    value: 1,
+    kind: "chip_grant",
+    value: 4,
     line: "+4 chips on cycle clear, +1 per cycle #",
   },
   drain_ward: {
@@ -162,7 +161,7 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
   streak_spark: {
     perkId: "streak_spark",
     scope: "meta",
-    kind: "payout_mult",
+    kind: "chip_grant",
     value: 1,
     line: "+1 chip on cash wins while win streak ≥ 2",
   },
@@ -176,15 +175,15 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
   purify_touch: {
     perkId: "purify_touch",
     scope: "on_acquire",
-    kind: "payout_mult",
+    kind: "curse_resist",
     value: 1,
-    line: "Removes oldest curse — or +5 chips if none",
+    line: "Removes oldest curse when bought",
   },
   hex_ward: {
     perkId: "hex_ward",
     scope: "on_acquire",
-    kind: "payout_mult",
-    value: 1,
+    kind: "curse_resist",
+    value: 0.3,
     line: "30% chance to resist new curses",
   },
   ghost_repel: {
@@ -211,16 +210,72 @@ export const PERK_EFFECT_REGISTRY: Record<string, PerkEffectDef> = {
   curse_break: {
     perkId: "curse_break",
     scope: "on_acquire",
-    kind: "payout_mult",
+    kind: "curse_resist",
     value: 1,
-    line: "Removes all curses when bought",
+    line: "Removes every curse and debuff when acquired",
   },
   cycle_momentum: {
     perkId: "cycle_momentum",
     scope: "meta",
-    kind: "payout_mult",
-    value: 1,
+    kind: "chip_grant",
+    value: 2,
     line: "+2 shop chips every 5 cycles cleared",
+  },
+  rush_hour: {
+    perkId: "rush_hour",
+    scope: "money_wheel",
+    kind: "land_weight",
+    value: 1.08,
+    line: "+8% +$ wedges on Money wheel (W1)",
+  },
+  perk_magnet: {
+    perkId: "perk_magnet",
+    scope: "perk_wheel",
+    kind: "land_weight",
+    value: 1.14,
+    line: "+14% perk wedges on Perk wheel (W4)",
+  },
+  green_chain: {
+    perkId: "green_chain",
+    scope: "all_positive",
+    kind: "land_weight",
+    value: 1.04,
+    line: "+4% on all green wedges",
+  },
+  bank_bloom: {
+    perkId: "bank_bloom",
+    scope: "money_payout",
+    kind: "payout_mult",
+    value: 1.12,
+    line: "+12% cash from +$ wedges (stacks with Gold Rush)",
+  },
+  chip_hoarder: {
+    perkId: "chip_hoarder",
+    scope: "meta",
+    kind: "chip_grant",
+    value: 2,
+    line: "+2 shop chips when you clear a cycle",
+  },
+  tax_cut: {
+    perkId: "tax_cut",
+    scope: "meta",
+    kind: "payout_mult",
+    value: 0.05,
+    line: "−5% curse money tax per stack",
+  },
+  bleed_slow: {
+    perkId: "bleed_slow",
+    scope: "risk_chaos",
+    kind: "loss_mult",
+    value: 0.92,
+    line: "−8% damage on Risk, Chaos & Drain wheels",
+  },
+  cycle_tithe: {
+    perkId: "cycle_tithe",
+    scope: "meta",
+    kind: "chip_grant",
+    value: 1,
+    line: "+1 shop chip when you clear a cycle",
   },
 };
 

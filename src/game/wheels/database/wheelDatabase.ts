@@ -5,7 +5,7 @@
 
 import type { WheelConfigEntry, WheelConfigId } from "./types";
 
-export const WHEEL_DATABASE_REVISION = 26;
+export const WHEEL_DATABASE_REVISION = 28;
 
 export const FLOOR_WHEEL_ORDER = [
   "wheel_1",
@@ -32,16 +32,16 @@ export const WHEEL_DATABASE: Record<FloorWheelOrderId, WheelConfigEntry> = {
   wheel_2: {
     title: "Percent Wheel",
     archetype: "percent",
-    role: "mini_boss",
-    physicsProfileId: "boss",
-    modifiers: { stakesBoost: 0.12 },
+    role: "yield",
+    physicsProfileId: "default",
+    modifiers: { stakesBoost: 0.08 },
   },
 
   wheel_3: {
     title: "Risk Wheel",
     archetype: "risk",
     role: "risk",
-    modifiers: { forceNegativeBias: 0.1 },
+    modifiers: { forceNegativeBias: 0.12 },
   },
 
   wheel_4: {
@@ -54,8 +54,9 @@ export const WHEEL_DATABASE: Record<FloorWheelOrderId, WheelConfigEntry> = {
   wheel_5: {
     title: "Drain Wheel",
     archetype: "drain",
-    role: "risk",
-    modifiers: { forceNegativeBias: 0.18 },
+    role: "mini_boss",
+    physicsProfileId: "boss",
+    modifiers: { forceNegativeBias: 0.32, stakesBoost: 0.24 },
   },
 
   wheel_6: {
@@ -75,7 +76,7 @@ export const WHEEL_DATABASE: Record<FloorWheelOrderId, WheelConfigEntry> = {
     archetype: "chaos",
     role: "risk",
     physicsProfileId: "boss",
-    modifiers: { forceNegativeBias: 0.22, stakesBoost: 0.15 },
+    modifiers: { forceNegativeBias: 0.26, stakesBoost: 0.18 },
   },
 
   wheel_9: {
@@ -83,6 +84,6 @@ export const WHEEL_DATABASE: Record<FloorWheelOrderId, WheelConfigEntry> = {
     archetype: "boss",
     role: "boss",
     physicsProfileId: "boss",
-    modifiers: { stakesBoost: 0.65, forceNegativeBias: 0.35 },
+    modifiers: { stakesBoost: 0.72, forceNegativeBias: 0.38 },
   },
 };

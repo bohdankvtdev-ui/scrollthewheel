@@ -6,17 +6,14 @@ export type WheelArchetypeMeta = {
   archetype: WheelArchetype;
   icon: string;
   iconFamily: IconFamily;
-  /** Short label on the wheel map (W1, W2, …). */
   mapLabel: string;
   tag: string;
   hint: string;
-  /** One-line flavor for the stage rail (e.g. "Cash — build bank"). */
-  vibe: string;
   accent: string;
   pageTint: string;
 };
 
-/** Icons and colors keyed by wheel archetype — not gameplay `role`. */
+/** RPG-leaning map icons — W1–W2 unchanged. */
 export const WHEEL_ARCHETYPE_META: Record<WheelArchetype, WheelArchetypeMeta> = {
   money: {
     archetype: "money",
@@ -24,8 +21,7 @@ export const WHEEL_ARCHETYPE_META: Record<WheelArchetype, WheelArchetypeMeta> = 
     iconFamily: "MaterialIcons",
     mapLabel: "W1",
     tag: "Money",
-    hint: "+$ slices",
-    vibe: "Cash — build bank",
+    hint: "+$",
     accent: "#FFE94D",
     pageTint: "#1a1428",
   },
@@ -36,84 +32,76 @@ export const WHEEL_ARCHETYPE_META: Record<WheelArchetype, WheelArchetypeMeta> = 
     mapLabel: "W2",
     tag: "Percent",
     hint: "% bank",
-    vibe: "Percent — slice of bank",
     accent: "#4ADE80",
     pageTint: "#121f18",
   },
   risk: {
     archetype: "risk",
-    icon: "bolt",
-    iconFamily: "MaterialIcons",
+    icon: "lightning-bolt",
+    iconFamily: "MaterialCommunityIcons",
     mapLabel: "W3",
     tag: "Risk",
-    hint: "High risk",
-    vibe: "Risk — big swings",
+    hint: "Swings",
     accent: "#FF6B9D",
     pageTint: "#22121c",
   },
   joker_offer: {
     archetype: "joker_offer",
-    icon: "star-four-points",
+    icon: "shield-sword",
     iconFamily: "MaterialCommunityIcons",
     mapLabel: "W4",
     tag: "Perks",
-    hint: "Win perks",
-    vibe: "Perks — pick modifiers",
+    hint: "Gear",
     accent: "#C4B5FD",
     pageTint: "#18122a",
   },
   drain: {
     archetype: "drain",
-    icon: "trending-down",
-    iconFamily: "MaterialIcons",
+    icon: "skull-crossbones",
+    iconFamily: "MaterialCommunityIcons",
     mapLabel: "W5",
     tag: "Drain",
-    hint: "−$ slices",
-    vibe: "Drain — cuts bank",
+    hint: "−$",
     accent: "#FB7185",
     pageTint: "#241018",
   },
   lucky: {
     archetype: "lucky",
-    icon: "emoji-events",
-    iconFamily: "MaterialIcons",
+    icon: "treasure-chest",
+    iconFamily: "MaterialCommunityIcons",
     mapLabel: "W6",
     tag: "Lucky",
-    hint: "Jackpots",
-    vibe: "Lucky — jackpots",
+    hint: "Loot",
     accent: "#FACC15",
     pageTint: "#221c08",
   },
   builder: {
     archetype: "builder",
-    icon: "build",
-    iconFamily: "MaterialIcons",
+    icon: "anvil",
+    iconFamily: "MaterialCommunityIcons",
     mapLabel: "W7",
-    tag: "Builder",
-    hint: "+wedges",
-    vibe: "Builder — grow wheel",
+    tag: "Forge",
+    hint: "+slice",
     accent: "#22D3EE",
     pageTint: "#101820",
   },
   chaos: {
     archetype: "chaos",
-    icon: "shuffle",
-    iconFamily: "MaterialIcons",
+    icon: "ghost",
+    iconFamily: "MaterialCommunityIcons",
     mapLabel: "W8",
     tag: "Chaos",
-    hint: "Mixed",
-    vibe: "Chaos — wild mix",
+    hint: "Wild",
     accent: "#F472B6",
     pageTint: "#121a22",
   },
   boss: {
     archetype: "boss",
-    icon: "gavel",
-    iconFamily: "MaterialIcons",
+    icon: "skull",
+    iconFamily: "MaterialCommunityIcons",
     mapLabel: "W9",
-    tag: "Final",
-    hint: "Boss",
-    vibe: "Final — tax & stakes",
+    tag: "Boss",
+    hint: "Final",
     accent: "#FF2D55",
     pageTint: "#1c0810",
   },
@@ -126,4 +114,9 @@ export function getWheelArchetypeMeta(archetype: WheelArchetype): WheelArchetype
 export function getWheelArchetypeMetaForIndex(wheelIndex: number): WheelArchetypeMeta {
   const archetype = getArchetypeForWheelIndexFromDb(wheelIndex) ?? "money";
   return WHEEL_ARCHETYPE_META[archetype];
+}
+
+/** Uppercase stage label — fixed width in header (no "Wheel N" prefix). */
+export function wheelStageTagLabel(meta: WheelArchetypeMeta): string {
+  return meta.tag.toUpperCase();
 }

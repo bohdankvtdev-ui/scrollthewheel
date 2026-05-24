@@ -127,14 +127,19 @@ export function canUseDesperation(
 export function payBailout(run: RunState): RunState | null {
   const paid = spendChips(run, bailoutChipCost(run));
   if (paid == null) return null;
-  const money = bailoutMoneyAmount(paid);
+  return applyBailoutRescue(paid);
+}
+
+/** Rewarded ad bailout — same cash rescue, no chip cost. */
+export function applyBailoutRescue(run: RunState): RunState {
+  const money = bailoutMoneyAmount(run);
   return {
-    ...paid,
+    ...run,
     phase: "active",
     money,
-    peakMoney: Math.max(paid.peakMoney ?? 0, money),
+    peakMoney: Math.max(run.peakMoney ?? 0, money),
     runEffects: {
-      ...paid.runEffects,
+      ...run.runEffects,
       desperationOfferedThisRun: true,
     },
   };

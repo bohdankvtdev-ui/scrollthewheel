@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { RunState } from "../schemas";
+import { InteractionManager } from "react-native";
+import type { RunState, SliceDefinition } from "../schemas";
 import { flushRunCheckpoint, saveRunCheckpoint } from "../persistence/mmkv";
 import { RUN_DEFAULTS, RUN_LOOP } from "../game/loop";
 import { createRunState, normalizeRunState, resolveWheelSpin } from "../game/runState";
@@ -18,9 +19,10 @@ import {
 } from "../game/tactics/microChoices";
 import { applyPitStopChoice, type PitStopOptionId } from "../game/tactics/cyclePitStop";
 import { grantEarlyRunChipBonusOnSpinComplete } from "../game/tactics/earlyRunChips";
+import { countDebuffCopies, countPerkCopies } from "../game/perks/perkStacks";
 import { getGambleSliceById } from "../game/tactics/gambleWheel";
 import { declineTacticOffersOnWheel, tacticUsedOnWheel } from "../game/tactics/tacticState";
-import { isTacticDecisionWheel, withTacticWheelIndices } from "../game/tactics/tacticWheels";
+import { isTacticWheelEligible, withTacticWheelIndices } from "../game/tactics/tacticWheels";
 import {
   clearTacticOffersOnRun,
   labelFromHistory,
@@ -38,12 +40,20 @@ import {
 } from "../game/cycle/cycleTransition";
 import { isBankruptMoneyReveal } from "../game/moneyReveal";
 import {
-  payBailout,
-  rollDesperationOffers,
-  type DesperationId,
-} from "../game/tactics/desperationTactics";
+  isDuplicateSpinResultApply,
+  type ArmedSpinSession,
+} from "../game/spin/spinCompletion";
+import {
+  isFlashWashTier,
+  isLossTier,
+  resolveSpinFeedback,
+  type SpinFeedbackTier,
+} from "../game/spinFeedback";
+import { buildDesperationLossFlow } from "../game/runState/runLossFlow";
+import { applyBailoutRescue, payBailout, type DesperationId } from "../game/tactics/desperationTactics";
 import { WHEEL_COUNT } from "../game/loop";
 import { commitPendingWheelRebuild } from "../systems/PerkSystem";
+import { spinTrace } from "../dev/spinTrace";
 import { useMetaStore } from "./metaStore";
 import {
   showDebuffWonNotice,
@@ -105,6 +115,11 @@ const emptyUi = {
   bossCyclePhase: "none" as "none" | "reward",
   /** Boss slice result shown on the cycle reward panel. */
   bossSliceEffect: null as RunUiEffect | null,
+  spinFeedbackTier: null as SpinFeedbackTier | null,
+  /** Bumped on each +$ / −$ spin so wheel wash fires once despite reel remounts. */
+  washFlashEpoch: 0,
+  /** Tier for the active wash flash (gain mint / loss red); not kept in `spinFeedbackTier`. */
+  washFlashTier: null as SpinFeedbackTier | null,
 };
 
 type RunUiState = typeof emptyUi;
@@ -124,6 +139,28 @@ function mergeUi(
 ): RunUiState {
   const merged = { ...currentUi, ...patch };
   return reconcileRunUi(run, merged as RunUiTacticFields) as RunUiState;
+}
+
+/** Drop in-flight spin state when starting a new run or abandoning a broken session. */
+function abortSpinInteraction(state: {
+  run: RunState | null;
+  ui: RunUiState;
+  armedSpinSession: ArmedSpinSession | null;
+  spinCommitEpoch: number;
+  spinCommitConsumedEpoch: number;
+  preSpinSnapshot: RunState | null;
+}) {
+  const nextEpoch = state.spinCommitEpoch + 1;
+  const spinOff = { isSpinning: false, spinWheelIndex: null as number | null, gambleFlipActive: false };
+  return {
+    armedSpinSession: null,
+    spinCommitEpoch: nextEpoch,
+    spinCommitConsumedEpoch: nextEpoch,
+    preSpinSnapshot: null,
+    ui: state.run
+      ? (reconcileRunUi(state.run, { ...state.ui, ...spinOff }) as RunUiState)
+      : { ...state.ui, ...spinOff },
+  };
 }
 
 function finalizeRunEnd(run: RunState): void {
@@ -153,27 +190,13 @@ function finalizeRunEnd(run: RunState): void {
 function applyLossOrDesperation(run: RunState): void {
   if (run.phase !== "lost_money") return;
   const { preSpinSnapshot } = useRunStore.getState();
-  const offers = rollDesperationOffers(run, {
-    hasPreSpinSnapshot: preSpinSnapshot != null,
-  });
-  if (offers.length > 0) {
+  const desperation = buildDesperationLossFlow(run, preSpinSnapshot != null);
+  if (desperation != null) {
     useRunStore.setState((s) => ({
-      run: {
-        ...run,
-        runEffects: { ...run.runEffects, desperationOfferedThisRun: true },
-      },
-      ui: {
-        ...s.ui,
-        showDesperationPick: true,
-        desperationOffers: offers,
-        runEndFinalized: false,
-        awaitingClaim: false,
-        moneyReveal: null,
-        isSpinning: false,
-        spinWheelIndex: null,
-      },
+      run: desperation.run,
+      ui: mergeUi(desperation.run, s.ui, desperation.ui),
     }));
-    saveRunCheckpoint(useRunStore.getState().run!);
+    saveRunCheckpoint(desperation.run);
     return;
   }
   finalizeRunEnd(run);
@@ -182,23 +205,37 @@ function applyLossOrDesperation(run: RunState): void {
 type RunStore = {
   run: RunState | null;
   preSpinSnapshot: RunState | null;
+  /** Resolved slice for the in-flight spin — source of truth for commit. */
+  armedSpinSession: ArmedSpinSession | null;
+  /** Bumped on each `armSpinSession`; commit allowed once per epoch. */
+  spinCommitEpoch: number;
+  spinCommitConsumedEpoch: number;
   ui: RunUiState;
   startRun: (floor?: number) => void;
   hydrateRun: (run: RunState | null) => void;
   healRunUi: () => void;
   clearSpinInteraction: () => void;
+  armSpinSession: (session: ArmedSpinSession) => void;
+  clearArmedSpinSession: () => void;
+  /** Apply the armed slice once; returns true when `applySpinResult` ran. */
+  commitArmedSpin: () => boolean;
+  /** Commit armed spin if present, then always clear `isSpinning` (unsticks builder / reel desync). */
+  resolveSpinInteraction: () => boolean;
   setSpinning: (v: boolean) => void;
   setScrollTarget: (index: number | null) => void;
   setLastResult: (label: string | null) => void;
-  applySpinResult: (wheelIndex: number, sliceId: string) => void;
+  applySpinResult: (wheelIndex: number, sliceOrId: string | SliceDefinition) => void;
   applyGambleFlipResult: (wheelIndex: number, sliceId: string) => void;
   claimAndAdvance: () => boolean;
+  clearSpinFeedback: () => void;
   /** After wheel scroll-off: apply cycle rewards and show reward panel. */
   commitBossCycleReward: () => void;
   clearShopPending: () => void;
   clearLastWonPerk: () => void;
   clearLastWonDebuff: () => void;
   commitWheelLayout: () => void;
+  /** Queue `commitWheelLayout` after animations (safe after builder wedge spin). */
+  scheduleWheelLayoutCommit: () => void;
   advanceWheel: () => void;
   persist: () => void;
   reset: () => void;
@@ -216,6 +253,7 @@ type RunStore = {
   commitChipReveal: () => void;
   useMicroChoice: (id: MicroChoiceId) => { ok: true } | { ok: false; reason: string };
   useDesperationChoice: (id: DesperationId) => { ok: true } | { ok: false; reason: string };
+  reviveFromRewardedAd: () => { ok: true } | { ok: false; reason: string };
   dismissDesperationPick: () => void;
   dismissTacticOffers: () => void;
   applyPitStop: (id: PitStopOptionId) => void;
@@ -224,6 +262,9 @@ type RunStore = {
 export const useRunStore = create<RunStore>((set, get) => ({
   run: null,
   preSpinSnapshot: null,
+  armedSpinSession: null,
+  spinCommitEpoch: 0,
+  spinCommitConsumedEpoch: 0,
   ui: { ...emptyUi },
 
   startRun: (floor = 1) => {
@@ -235,7 +276,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
     );
     set({
       run,
-      ui: { ...emptyUi },
+      armedSpinSession: null,
+      preSpinSnapshot: null,
+      spinCommitEpoch: 0,
+      spinCommitConsumedEpoch: 0,
+      ui: { ...emptyUi, activeWheelIndex: 0 },
     });
     saveRunCheckpoint(run);
     flushRunCheckpoint();
@@ -243,10 +288,20 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   hydrateRun: (run) => {
     if (run == null) {
-      set({ run: null, preSpinSnapshot: null, ui: { ...emptyUi } });
+      set({
+        run: null,
+        preSpinSnapshot: null,
+        armedSpinSession: null,
+        spinCommitEpoch: 0,
+        spinCommitConsumedEpoch: 0,
+        ui: { ...emptyUi },
+      });
       return;
     }
-    const normalized = normalizeRunState(run);
+    let normalized = normalizeRunState(run);
+    if (normalized.pendingWheelRebuild) {
+      normalized = commitPendingWheelRebuild(normalized);
+    }
     const wi = normalized.wheelIndex;
     const lastOnWheel = [...normalized.history]
       .reverse()
@@ -268,6 +323,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({
       run: normalized,
       preSpinSnapshot: null,
+      armedSpinSession: null,
+      spinCommitEpoch: 0,
+      spinCommitConsumedEpoch: 0,
       ui: reconcileRunUi(normalized, uiSeed) as RunUiState,
     });
   },
@@ -288,15 +346,100 @@ export const useRunStore = create<RunStore>((set, get) => ({
   },
 
   clearSpinInteraction: () => {
-    set((s) => {
-      if (!s.ui.isSpinning && s.ui.spinWheelIndex == null) return s;
-      if (s.run == null) {
-        return { ui: { ...s.ui, isSpinning: false, spinWheelIndex: null } };
+    set((s) => abortSpinInteraction(s));
+  },
+
+  armSpinSession: (session) =>
+    set((s) => ({
+      armedSpinSession: session,
+      spinCommitEpoch: s.spinCommitEpoch + 1,
+    })),
+
+  clearArmedSpinSession: () => set({ armedSpinSession: null }),
+
+  commitArmedSpin: () => {
+    const { run, armedSpinSession, spinCommitEpoch, spinCommitConsumedEpoch } = get();
+    if (armedSpinSession == null || run == null) {
+      spinTrace("commit_skip", { reason: "no_session_or_run" });
+      return false;
+    }
+    if (run.wheelIndex !== armedSpinSession.wheelIndex) return false;
+    if (spinCommitConsumedEpoch >= spinCommitEpoch) {
+      set({ armedSpinSession: null });
+      return true;
+    }
+
+    const session = armedSpinSession;
+    const historyBefore = run.history.length;
+    const alreadyApplied = run.history.some(
+      (h) =>
+        h.wheelIndex === session.wheelIndex &&
+        h.floor === run.floor &&
+        h.sliceId === session.sliceId
+    );
+    if (alreadyApplied) {
+      const { ui, run: currentRun } = get();
+      if (currentRun != null) {
+        const healed = reconcileRunUi(currentRun, {
+          ...(ui as RunUiTacticFields),
+          lastSliceId: session.sliceId,
+        }) as RunUiState;
+        set({
+          armedSpinSession: null,
+          spinCommitConsumedEpoch: spinCommitEpoch,
+          ui: healed,
+        });
+        return true;
       }
-      return {
-        ui: mergeUi(s.run, s.ui, { isSpinning: false, spinWheelIndex: null }),
-      };
+    }
+
+    if (session.isGambleFlip) {
+      get().applyGambleFlipResult(session.wheelIndex, session.slice.id);
+    } else {
+      get().applySpinResult(session.wheelIndex, session.slice);
+    }
+
+    const after = get();
+    const runAfter = after.run;
+    const applied =
+      runAfter != null &&
+      (runAfter.history.length > historyBefore ||
+        (after.ui.awaitingClaim && after.ui.lastSliceId === session.sliceId));
+
+    if (!applied) {
+      spinTrace("commit_fail", {
+        sliceId: session.sliceId,
+        wheelIndex: session.wheelIndex,
+        historyLen: runAfter?.history.length,
+        awaitingClaim: after.ui.awaitingClaim,
+      });
+      return false;
+    }
+
+    set({ armedSpinSession: null, spinCommitConsumedEpoch: spinCommitEpoch });
+    return true;
+  },
+
+  resolveSpinInteraction: () => {
+    const committed = get().commitArmedSpin();
+    set((s) => {
+      const spinOff = { isSpinning: false, spinWheelIndex: null as number | null };
+      if (s.run == null) {
+        return {
+          armedSpinSession: null,
+          ui: { ...s.ui, ...spinOff },
+        };
+      }
+      const ui = mergeUi(s.run, s.ui, spinOff);
+      if (!committed && s.armedSpinSession != null) {
+        return { ui };
+      }
+      return { armedSpinSession: null, ui };
     });
+    if (get().run?.phase === "active") {
+      get().healRunUi();
+    }
+    return committed;
   },
 
   setSpinning: (v) => {
@@ -327,28 +470,42 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   setLastResult: (label) => set((s) => ({ ui: { ...s.ui, lastResultLabel: label } })),
 
-  applySpinResult: (wheelIndex, sliceId) => {
-    const { run } = get();
+  applySpinResult: (wheelIndex, sliceOrId) => {
+    const { run, ui } = get();
     if (run == null) return;
     const wheel = run.wheels[wheelIndex];
-    const slice = wheel?.slices.find((s) => s.id === sliceId);
+    const slice =
+      typeof sliceOrId === "string"
+        ? wheel?.slices.find((s) => s.id === sliceOrId)
+        : sliceOrId;
     if (slice == null) return;
+    const sliceId = slice.id;
+    if (
+      get().armedSpinSession == null &&
+      isDuplicateSpinResultApply(ui, run.wheelIndex, wheelIndex, sliceId)
+    ) {
+      return;
+    }
     const perkId = slice.payload.perkId;
+    spinTrace("apply_start", { wheelIndex, sliceId: slice.id });
     const resolved = resolveWheelSpin(normalizeRunState(run), wheelIndex, slice);
-    const next =
-      resolved.run.pendingWheelRebuild === true
-        ? commitPendingWheelRebuild(resolved.run)
-        : resolved.run;
+    spinTrace("apply_resolved", {
+      pendingRebuild: resolved.run.pendingWheelRebuild === true,
+    });
+    /** Defer full-wheel rebuild — sync rebuild during commit was freezing wheel 7 (builder wedge). */
+    const next = resolved.run;
     const debuffId = slice.payload.debuffId;
     const relicId = slice.payload.relicId;
     const perkWasNew =
-      perkId != null && !run.perks.includes(perkId) && next.perks.includes(perkId);
+      perkId != null &&
+      countPerkCopies(next.perks, perkId) > countPerkCopies(run.perks, perkId);
     const shieldPerkWasNew =
       perkId != null &&
       !(run.shieldPerks ?? []).includes(perkId) &&
       (next.shieldPerks ?? []).includes(perkId);
     const debuffWasNew =
-      debuffId != null && !run.debuffs.includes(debuffId) && next.debuffs.includes(debuffId);
+      debuffId != null &&
+      countDebuffCopies(next.debuffs, debuffId) > countDebuffCopies(run.debuffs, debuffId);
     const relicWasNew =
       relicId != null && !run.relics.includes(relicId) && next.relics.includes(relicId);
     const display = toSliceDisplay(slice);
@@ -364,6 +521,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
       tone: visual.tone,
     };
     const moneyReveal = resolved.moneyReveal ?? null;
+    const spinFeedbackTier = resolveSpinFeedback({
+      moneyReveal,
+      sliceKind: slice.kind,
+      shieldBlocked: resolved.shieldBlocked,
+    });
     const chipsBeforeSpin = run.chipsEarnedThisRun ?? 0;
 
     let runWithOffers = next;
@@ -380,7 +542,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
     if (
       runWithOffers.phase === "active" &&
-      isTacticDecisionWheel(runWithOffers, wheelIndex) &&
+      isTacticWheelEligible(runWithOffers, wheelIndex) &&
       !tacticUsedOnWheel(runWithOffers, wheelIndex)
     ) {
       const offers = rollMicroChoiceOffers(runWithOffers, wheelIndex, {
@@ -443,30 +605,55 @@ export const useRunStore = create<RunStore>((set, get) => ({
       snap != null &&
       ((offers != null && offers.includes("reroll")) || wouldBankrupt);
 
+    const pendingBankruptReveal =
+      moneyReveal != null && isBankruptMoneyReveal(moneyReveal);
+    const desperation =
+      runWithOffers.phase === "lost_money" && !pendingBankruptReveal
+        ? buildDesperationLossFlow(runWithOffers, snap != null)
+        : null;
+    const spinUiPatch = {
+      isSpinning: false,
+      spinWheelIndex: null,
+      gambleFlipActive: false,
+      lastResultLabel: slice.label,
+      lastSliceId: slice.id,
+      shopPending:
+        RUN_LOOP.shopHighlightAfterEachWheel && runWithOffers.phase === "active",
+      sliceEraseMode: false,
+      lastEffect,
+      lastWonPerkId: perkWasNew || shieldPerkWasNew ? perkId! : null,
+      lastWonDebuffId: debuffWasNew ? debuffId! : null,
+      lastRewardKind: slice.kind,
+      moneyReveal,
+      chipReveal,
+      showCycleReward: false,
+      spinFeedbackTier: isFlashWashTier(spinFeedbackTier) ? null : spinFeedbackTier,
+      washFlashEpoch: isFlashWashTier(spinFeedbackTier)
+        ? uiNow.washFlashEpoch + 1
+        : uiNow.washFlashEpoch,
+      washFlashTier: isFlashWashTier(spinFeedbackTier) ? spinFeedbackTier : null,
+    };
+
+    if (desperation != null) {
+      set({
+        run: desperation.run,
+        preSpinSnapshot: keepPreSpinSnapshot ? snap : null,
+        ui: mergeUi(desperation.run, uiNow, { ...spinUiPatch, ...desperation.ui }),
+      });
+      saveRunCheckpoint(desperation.run);
+      return;
+    }
+
+    const uiAfterSpin = mergeUi(runWithOffers, uiNow, {
+      ...spinUiPatch,
+      awaitingClaim: runWithOffers.phase === "active",
+    });
     set({
       run: runWithOffers,
       preSpinSnapshot: keepPreSpinSnapshot ? snap : null,
-      ui: mergeUi(runWithOffers, uiNow, {
-        isSpinning: false,
-        spinWheelIndex: null,
-        gambleFlipActive: false,
-        lastResultLabel: slice.label,
-        lastSliceId: slice.id,
-        awaitingClaim: runWithOffers.phase === "active",
-        shopPending:
-          RUN_LOOP.shopHighlightAfterEachWheel && runWithOffers.phase === "active",
-        sliceEraseMode: false,
-        lastEffect,
-        lastWonPerkId: perkWasNew || shieldPerkWasNew ? perkId! : null,
-        lastWonDebuffId: debuffWasNew ? debuffId! : null,
-        lastRewardKind: slice.kind,
-        moneyReveal,
-        chipReveal,
-        showCycleReward: false,
-      }),
+      ui: uiAfterSpin,
     });
-    const pendingBankruptReveal =
-      moneyReveal != null && isBankruptMoneyReveal(moneyReveal);
+
     if (runWithOffers.phase === "lost_money" && !pendingBankruptReveal) {
       applyLossOrDesperation(runWithOffers);
     } else {
@@ -480,10 +667,18 @@ export const useRunStore = create<RunStore>((set, get) => ({
   commitWheelLayout: () => {
     const { run } = get();
     if (run == null || !run.pendingWheelRebuild) return;
+    spinTrace("layout_commit_start");
+    const t0 = Date.now();
     const next = commitPendingWheelRebuild(run);
     set({ run: next });
     saveRunCheckpoint(next);
+    spinTrace("layout_commit_done", {
+      ms: Date.now() - t0,
+      wheel7Slices: next.wheels[6]?.slices.length,
+    });
   },
+
+  scheduleWheelLayoutCommit: () => scheduleDeferredWheelLayoutCommit(),
 
   claimAndAdvance: () => {
     const { run, ui } = get();
@@ -512,10 +707,14 @@ export const useRunStore = create<RunStore>((set, get) => ({
       }
       return true;
     }
-    const committed = commitPendingWheelRebuild(afterMoney);
-    const bossClear = isBossWheelClaim(committed, committed.wheelIndex);
+    const runForAdvance =
+      afterMoney.runEffects?.microChoiceOffers != null &&
+      afterMoney.runEffects.microChoiceOffers.length > 0
+        ? declineTacticOffersOnWheel(afterMoney, afterMoney.wheelIndex)
+        : afterMoney;
+    const bossClear = isBossWheelClaim(runForAdvance, runForAdvance.wheelIndex);
     if (bossClear) {
-      const cleared = clearTacticOffersOnRun(committed);
+      const cleared = clearTacticOffersOnRun(runForAdvance);
       const bossSliceEffect = ui.lastEffect;
       const wi = cleared.wheelIndex;
       set({
@@ -541,9 +740,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
           chipReveal: null,
           gambleFlipActive: false,
           showCycleReward: false,
+          spinFeedbackTier: null,
         }),
       });
       saveRunCheckpoint(cleared);
+      if (runForAdvance.pendingWheelRebuild) scheduleDeferredWheelLayoutCommit();
       scheduleBossCycleRewardApply(() => {
         const st = get();
         if (st.run == null || st.ui.bossCyclePhase !== "reward") return;
@@ -559,7 +760,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
       });
       return true;
     }
-    const next = clearTacticOffersOnRun(normalizeRunState(RunManager.advanceWheel(committed)));
+    const advanced = normalizeRunState(RunManager.advanceWheel(runForAdvance));
+    const next = clearTacticOffersOnRun(advanced);
     if (next.phase === "lost_money") {
       applyLossOrDesperation(next);
       return true;
@@ -584,12 +786,20 @@ export const useRunStore = create<RunStore>((set, get) => ({
         chipReveal: claimChipReveal,
         gambleFlipActive: false,
         showCycleReward: false,
+        spinFeedbackTier: null,
       }),
     });
     set({ preSpinSnapshot: null });
     saveRunCheckpoint(next);
     if (next.phase !== "active") flushRunCheckpoint();
+    if (runForAdvance.pendingWheelRebuild) scheduleDeferredWheelLayoutCommit();
     return true;
+  },
+
+  clearSpinFeedback: () => {
+    set((s) => ({
+      ui: s.ui.spinFeedbackTier == null ? s.ui : { ...s.ui, spinFeedbackTier: null },
+    }));
   },
 
   commitBossCycleReward: () => {
@@ -637,10 +847,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     if (slice == null) return;
 
     const resolved = resolveWheelSpin(normalizeRunState(run), wheelIndex, slice);
-    const next =
-      resolved.run.pendingWheelRebuild === true
-        ? commitPendingWheelRebuild(resolved.run)
-        : resolved.run;
+    const next = resolved.run;
     const display = toSliceDisplay(slice);
     const visual = getSliceVisualTheme(slice.kind, slice.weightTags, { sliceIndex: 0 });
     const lastEffect: RunUiEffect = {
@@ -668,6 +875,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       }),
     });
     saveRunCheckpoint(next);
+    if (next.pendingWheelRebuild) scheduleDeferredWheelLayoutCommit();
   },
 
   useMicroChoice: (id) => {
@@ -840,6 +1048,32 @@ export const useRunStore = create<RunStore>((set, get) => ({
     return { ok: false, reason: "Unknown tactic" };
   },
 
+  reviveFromRewardedAd: () => {
+    const { run, ui } = get();
+    if (run == null) return { ok: false, reason: "No active run" };
+    if (!ui.showDesperationPick && run.phase !== "lost_money") {
+      return { ok: false, reason: "Revive not available" };
+    }
+    const rescued = applyBailoutRescue(run);
+    set({
+      run: rescued,
+      preSpinSnapshot: null,
+      ui: mergeUi(rescued, emptyUi, {
+        activeWheelIndex: rescued.wheelIndex,
+        scrollTarget: rescued.wheelIndex,
+        showDesperationPick: false,
+        desperationOffers: [],
+        runEndFinalized: false,
+        isSpinning: false,
+        spinWheelIndex: null,
+        awaitingClaim: false,
+        moneyReveal: null,
+      }),
+    });
+    saveRunCheckpoint(rescued);
+    return { ok: true };
+  },
+
   dismissDesperationPick: () => {
     const { run } = get();
     if (run == null) return;
@@ -904,6 +1138,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({
       run: null,
       preSpinSnapshot: null,
+      armedSpinSession: null,
+      spinCommitEpoch: 0,
+      spinCommitConsumedEpoch: 0,
       ui: { ...emptyUi },
     });
   },
@@ -1048,3 +1285,16 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({ ui: { ...ui, chipReveal: null } });
   },
 }));
+
+let wheelLayoutCommitScheduled = false;
+
+function scheduleDeferredWheelLayoutCommit(): void {
+  const { run } = useRunStore.getState();
+  if (run == null || !run.pendingWheelRebuild) return;
+  if (wheelLayoutCommitScheduled) return;
+  wheelLayoutCommitScheduled = true;
+  InteractionManager.runAfterInteractions(() => {
+    wheelLayoutCommitScheduled = false;
+    useRunStore.getState().commitWheelLayout();
+  });
+}

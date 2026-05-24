@@ -4,9 +4,11 @@ import type { RunState } from "../../schemas";
  * Flat chip grants after W1 / W2 spins (for shop + planning before W3 Risk).
  * Bypasses `chipGainMult` so the full amount always lands.
  */
+import { CHIP_GRANTS } from "../shop/chipGrants";
+
 export const EARLY_RUN_CHIP_BONUS = {
-  afterWheel1: 12,
-  afterWheel2: 15,
+  afterWheel1: CHIP_GRANTS.earlyAfterWheel1,
+  afterWheel2: CHIP_GRANTS.earlyAfterWheel2,
 } as const;
 
 export type EarlyChipGrant = { chips: number; label: string } | null;
@@ -27,6 +29,7 @@ export function grantEarlyRunChipBonusOnSpinComplete(
 
   if (completedWheelIndex === 0 && !fx.earlyChipBonus0) {
     const chips = EARLY_RUN_CHIP_BONUS.afterWheel1;
+    if (chips <= 0) return { run, grant: null };
     return {
       run: addChipsFlat(
         { ...run, runEffects: { ...fx, earlyChipBonus0: true } },
@@ -38,6 +41,7 @@ export function grantEarlyRunChipBonusOnSpinComplete(
 
   if (completedWheelIndex === 1 && !fx.earlyChipBonus1) {
     const chips = EARLY_RUN_CHIP_BONUS.afterWheel2;
+    if (chips <= 0) return { run, grant: null };
     return {
       run: addChipsFlat(
         { ...run, runEffects: { ...fx, earlyChipBonus1: true } },

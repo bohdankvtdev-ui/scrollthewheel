@@ -116,10 +116,17 @@ export function RunWheelActionBar({
         accessibilityLabel={`${displayChips} chips`}
       >
         <Animated.View pointerEvents="none" style={[styles.chipGlow, glowStyle]} />
-        <MaterialCommunityIcons name="poker-chip" size={20} color={Neo.neonCyan} />
-        <Text style={[styles.chipVal, { fontFamily: FONT_BEBAS_NEUE }]}>{displayChips}</Text>
+        <MaterialCommunityIcons name="poker-chip" size={chrome.wheelHud.chipIconSize} color={Neo.neonCyan} />
+        <Text style={[styles.chipVal, { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.wheelHud.chipFontSize }]}>
+          {displayChips}
+        </Text>
         {chipReveal != null && chipReveal.delta > 0 ? (
-          <Text style={[styles.chipDelta, { fontFamily: FONT_BEBAS_NEUE }]}>
+          <Text
+            style={[
+              styles.chipDelta,
+              { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.wheelHud.chipDeltaFontSize },
+            ]}
+          >
             +{chipReveal.delta}
           </Text>
         ) : null}
@@ -131,8 +138,15 @@ export function RunWheelActionBar({
         accessibilityLabel="Your Wheel — view slices and odds"
         hitSlop={8}
       >
-        <MaterialIcons name="album" size={22} color={Neo.ink} />
-        <Text style={[styles.yourWheelLbl, { fontFamily: FONT_BEBAS_NEUE }]}>Your wheel</Text>
+        <MaterialIcons name="album" size={chrome.wheelHud.btnIconSize} color={Neo.ink} />
+        <Text
+          style={[
+            styles.yourWheelLbl,
+            { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.wheelHud.btnFontSize },
+          ]}
+        >
+          Your wheel
+        </Text>
       </Pressable>
     </View>
   );
@@ -166,12 +180,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(34,211,238,0.35)",
   },
   chipVal: {
-    fontSize: 20,
     color: Neo.neonCyan,
     letterSpacing: 0.35,
   },
   chipDelta: {
-    fontSize: 14,
     color: "#67E8F9",
     letterSpacing: 0.3,
     marginLeft: 2,
@@ -191,7 +203,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.35)",
   },
   yourWheelLbl: {
-    fontSize: 15,
     color: Neo.ink,
     letterSpacing: 0.35,
   },

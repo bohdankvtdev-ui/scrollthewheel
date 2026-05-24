@@ -2,6 +2,15 @@ import type { WheelArchetype } from "../wheels/types";
 import type { ResolveContext } from "../../systems/types";
 import { listPerkEffects } from "./perkEffects";
 
+export function countPerkStacks(perkIds: string[], perkId: string): number {
+  return perkIds.filter((id) => id === perkId).length;
+}
+
+function stackedMult(perkIds: string[], perkId: string, perStack: number): number {
+  const n = countPerkStacks(perkIds, perkId);
+  return n > 0 ? Math.pow(perStack, n) : 1;
+}
+
 /** Spin odds — perks boost only matching slice kinds / tags */
 export function applyPerkSpinEffects(
   ctx: ResolveContext,
@@ -59,17 +68,19 @@ export function applyPerkSpinEffects(
     }
   }
 
-  if (archetype === "lucky" && perkIds.includes("jackpot_hunter")) {
+  const jackpotStacks = countPerkStacks(perkIds, "jackpot_hunter");
+  if (archetype === "lucky" && jackpotStacks > 0) {
     next = {
       ...next,
-      tagMults: { ...next.tagMults, rare: (next.tagMults.rare ?? 1) * 1.08 },
+      tagMults: { ...next.tagMults, rare: (next.tagMults.rare ?? 1) * Math.pow(1.08, jackpotStacks) },
     };
   }
 
-  if (perkIds.includes("hot_table")) {
+  const hotStacks = countPerkStacks(perkIds, "hot_table");
+  if (hotStacks > 0) {
     next = {
       ...next,
-      tagMults: { ...next.tagMults, rare: (next.tagMults.rare ?? 1) * 1.1 },
+      tagMults: { ...next.tagMults, rare: (next.tagMults.rare ?? 1) * Math.pow(1.1, hotStacks) },
     };
   }
 
@@ -84,12 +95,14 @@ export function applyPerkMoneyPayout(
   if (rawDelta <= 0) return rawDelta;
   let delta = rawDelta;
 
-  const gold = listPerkEffects(perkIds).find((e) => e.perkId === "gold_rush");
-  if (gold != null) delta = Math.floor(delta * gold.value);
+  delta = Math.floor(delta * stackedMult(perkIds, "gold_rush", 1.12));
+  delta = Math.floor(delta * stackedMult(perkIds, "bank_bloom", 1.12));
 
-  const compounder = listPerkEffects(perkIds).find((e) => e.perkId === "compounder");
-  if (compounder != null) {
-    delta = Math.floor(delta * (1 + Math.max(0, floorsCleared) * compounder.value));
+  const compounderStacks = countPerkStacks(perkIds, "compounder");
+  if (compounderStacks > 0) {
+    const compounder = listPerkEffects(perkIds).find((e) => e.perkId === "compounder");
+    const rate = compounder?.value ?? 0.04;
+    delta = Math.floor(delta * (1 + Math.max(0, floorsCleared) * rate * compounderStacks));
   }
 
   return delta;
@@ -102,8 +115,7 @@ export function applyPerkPercentGain(
 ): number {
   if (amount <= 0) return amount;
   let out = amount * percentGainMult;
-  const vip = listPerkEffects(perkIds).find((e) => e.perkId === "vip_roller");
-  if (vip != null) out *= vip.value;
+  out *= stackedMult(perkIds, "vip_roller", 1.15);
   return Math.floor(out);
 }
 
@@ -113,14 +125,23 @@ export function applyPerkLossMult(
   archetype: WheelArchetype | null
 ): number {
   if (rawDelta >= 0) return rawDelta;
-  if (archetype === "drain" && perkIds.includes("drain_ward")) {
-    return Math.floor(rawDelta * 0.9);
+  let delta = rawDelta;
+
+  if (archetype === "drain") {
+    delta = Math.floor(delta * stackedMult(perkIds, "drain_ward", 0.9));
   }
-  if (archetype === "chaos" && perkIds.includes("chaos_ward")) {
-    return Math.floor(rawDelta * 0.88);
+  if (archetype === "chaos") {
+    delta = Math.floor(delta * stackedMult(perkIds, "chaos_ward", 0.88));
   }
-  if (archetype !== "risk" && archetype !== "chaos" && archetype !== "drain") return rawDelta;
-  const harbor = listPerkEffects(perkIds).find((e) => e.perkId === "safe_harbor");
-  if (harbor != null) return Math.floor(rawDelta * harbor.value);
-  return rawDelta;
+
+  if (archetype === "risk" || archetype === "chaos" || archetype === "drain") {
+    delta = Math.floor(delta * stackedMult(perkIds, "safe_harbor", 0.8));
+    delta = Math.floor(delta * stackedMult(perkIds, "bleed_slow", 0.92));
+  }
+
+  if (archetype === "boss") {
+    delta = Math.floor(delta * stackedMult(perkIds, "final_guard", 0.85));
+  }
+
+  return delta;
 }

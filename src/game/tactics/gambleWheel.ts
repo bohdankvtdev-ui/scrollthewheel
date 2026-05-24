@@ -6,30 +6,43 @@ export const GAMBLE_SLICE_IDS = {
   lose: "tactic_gamble_lose",
 } as const;
 
-/** 50/50 — double bank (×2) or wipe bank. */
+const GAMBLE_WIN_GREEN = "#16A34A";
+const GAMBLE_LOSE_RED = "#DC2626";
+
+/** 50/50 — double bank (×2) or wipe bank. Pure green vs red wheel. */
 export function buildGambleSlices(): SliceDefinition[] {
   return [
     {
       id: GAMBLE_SLICE_IDS.win,
       kind: "money",
-      label: "×2",
-      icon: "trending-up",
-      iconFamily: "MaterialIcons",
+      label: "WIN ALL",
+      icon: "arrow-up-bold",
+      iconFamily: "MaterialCommunityIcons",
       baseWeight: 50,
       weightTags: ["positive"],
       payload: { bankPercent: 1 },
-      presentation: { segmentColor: "#22C55E", iconColor: "#052E16" },
+      presentation: {
+        segmentColor: GAMBLE_WIN_GREEN,
+        iconColor: "#FFFFFF",
+        chipColor: "#BBF7D0",
+        captionColor: "#052E16",
+      },
     },
     {
       id: GAMBLE_SLICE_IDS.lose,
       kind: "bank_wipe",
-      label: "LOSE",
-      icon: "trending-down",
-      iconFamily: "MaterialIcons",
+      label: "LOSE ALL",
+      icon: "arrow-down-bold",
+      iconFamily: "MaterialCommunityIcons",
       baseWeight: 50,
       weightTags: ["negative"],
       payload: { wipeBank: true },
-      presentation: { segmentColor: "#EF4444", iconColor: "#450A0A" },
+      presentation: {
+        segmentColor: GAMBLE_LOSE_RED,
+        iconColor: "#FFFFFF",
+        chipColor: "#FECACA",
+        captionColor: "#450A0A",
+      },
     },
   ];
 }

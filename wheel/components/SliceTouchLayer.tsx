@@ -1,7 +1,9 @@
 import * as Haptics from "expo-haptics";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import type { SliceIconPlacement } from "./SliceIconLayer";
 
+const WEB_PRESSABLE_RESET =
+  Platform.OS === "web" ? ({ outlineWidth: 0 } as const) : null;
 type SliceTouchLayerProps = {
   size: number;
   placements: SliceIconPlacement[];
@@ -31,6 +33,7 @@ export function SliceTouchLayer({
             key={`slice-touch-${index}`}
             style={[
               styles.hit,
+              WEB_PRESSABLE_RESET,
               {
                 width: hitR * 2,
                 height: hitR * 2,

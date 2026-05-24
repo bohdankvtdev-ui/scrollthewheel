@@ -1,6 +1,7 @@
 import type { ScrollWheelRound } from "../../../features/cash-spin/reelStripModel";
 import type { RunState } from "../../schemas";
 import { getMicroChoiceOffers } from "./microChoices";
+import { isTacticWheelEligible } from "./tacticWheels";
 import { tacticUsedOnWheel } from "./tacticState";
 
 export type HubMode = "spin" | "claim" | "busy";
@@ -36,7 +37,20 @@ export function deriveHubMode(input: WheelInteractInput): HubMode {
   if (gambleFlipActive) return "spin";
 
   /** Post-spin: hub disabled until tactic pick and/or swipe to next wheel. */
-  if (awaitingClaim) return "busy";
+  if (awaitingClaim) {
+    const offers = run.runEffects?.microChoiceOffers;
+    const offerWheel = run.runEffects?.microChoiceOffersWheel;
+    if (
+      offers != null &&
+      offers.length > 0 &&
+      offerWheel === run.wheelIndex &&
+      !tacticUsedOnWheel(run, run.wheelIndex) &&
+      isTacticWheelEligible(run, run.wheelIndex)
+    ) {
+      return "busy";
+    }
+    return "claim";
+  }
 
   if (round.status === "ready") return "spin";
 
@@ -57,8 +71,26 @@ export function shouldShowTacticPicker(
   hasPreSpinSnapshot: boolean
 ): boolean {
   if (!awaitingClaim || isSpinning || gambleFlipActive) return false;
+  if (!isTacticWheelEligible(run, run.wheelIndex)) return false;
   if (tacticUsedOnWheel(run, run.wheelIndex)) return false;
   return getMicroChoiceOffers(run, run.wheelIndex, { hasPreSpinSnapshot }).length > 0;
+}
+
+/** Reel swipe / hub advance must wait until tactic is picked or skipped. */
+export function blocksReelAdvanceForTactics(
+  run: RunState,
+  awaitingClaim: boolean,
+  isSpinning: boolean,
+  gambleFlipActive: boolean,
+  hasPreSpinSnapshot: boolean
+): boolean {
+  return shouldShowTacticPicker(
+    run,
+    awaitingClaim,
+    isSpinning,
+    gambleFlipActive,
+    hasPreSpinSnapshot
+  );
 }
 
 export function labelFromHistory(run: RunState, wheelIndex: number): string | null {
@@ -111,12 +143,18 @@ export function reconcileRunUi(run: RunState, ui: RunUiTacticFields): RunUiTacti
   }
 
   if (
+    run.phase === "active" &&
     hasHistory &&
     !next.isSpinning &&
     !next.awaitingClaim &&
-    (next.bossCyclePhase ?? "none") === "none"
+    (next.bossCyclePhase ?? "none") === "none" &&
+    !next.gambleFlipActive
   ) {
     next.awaitingClaim = true;
+    if (next.lastSliceId == null) {
+      const last = run.history.filter((h) => h.wheelIndex === wi && h.floor === run.floor).at(-1);
+      next.lastSliceId = last?.sliceId ?? null;
+    }
     if (next.lastResultLabel == null) {
       next.lastResultLabel = labelFromHistory(run, wi);
     }

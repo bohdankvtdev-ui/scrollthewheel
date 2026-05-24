@@ -105,6 +105,16 @@ export function showRunInfoNotice(title: string, body?: string, icon = "info-out
   showRunNotice({ type: "info", title, body, icon });
 }
 
+export function showLaserBlockedNotice(reason: string): void {
+  showRunNotice({
+    type: "info",
+    title: "Wedge Laser blocked",
+    body: reason,
+    icon: "ray-start",
+    durationMs: noticeDurationMs("Wedge Laser blocked", reason),
+  });
+}
+
 export function showCycleClearedNotice(reward: CycleRewardPackage): void {
   showRunNotice({
     type: "success",

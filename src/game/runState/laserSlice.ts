@@ -6,6 +6,12 @@ import { patchResolvedWheelSlices } from "../../systems/WheelSystem";
 
 export { LASER_MIN_SLICE_COUNT };
 
+export const LASER_MIN_WEDGES_MESSAGE = `This wheel must keep at least ${LASER_MIN_SLICE_COUNT} wedges`;
+
+export function isWheelAtLaserMinimum(sliceCount: number): boolean {
+  return sliceCount <= LASER_MIN_SLICE_COUNT;
+}
+
 /** Remove one wedge from the active wheel and consume a Wedge Laser charge. */
 export function laserRemoveSliceFromWheel(
   run: RunState,
@@ -21,11 +27,8 @@ export function laserRemoveSliceFromWheel(
   if (wheelIndex !== run.wheelIndex) {
     return { ok: false, reason: "Can only laser the current wheel" };
   }
-  if (wheel.slices.length <= LASER_MIN_SLICE_COUNT) {
-    return {
-      ok: false,
-      reason: `This wheel needs at least ${LASER_MIN_SLICE_COUNT} wedges`,
-    };
+  if (isWheelAtLaserMinimum(wheel.slices.length)) {
+    return { ok: false, reason: LASER_MIN_WEDGES_MESSAGE };
   }
 
   const afterEraser = useWedgeEraser(run);

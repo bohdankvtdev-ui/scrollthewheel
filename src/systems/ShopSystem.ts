@@ -10,6 +10,12 @@ import { BALATRO_ECONOMY } from "../game/balatroEconomy";
 import { SHOP_PERK_TREE } from "../game/loop";
 import { getSpendableChips, grantChipsInRun, shopChipCost, spendChips } from "../game/shop/chipEconomy";
 import { countJokers, isJokerSlotFull } from "../game/shop/jokerSlots";
+import {
+  canAddPerkCopy,
+  getLoadoutStacks,
+  perkHiddenFromShop,
+  removeOnePerkCopy,
+} from "../game/perks/perkStacks";
 import { meetsShopPerkRequirement } from "../game/shields/shieldRules";
 import { getExtraShopOffers } from "../game/advancements/applyAdvancements";
 import { getRunMaxSliceCount } from "../game/advancements/sliceCount";
@@ -56,10 +62,15 @@ export class ShopSystem {
     if (node == null) return { ok: false, reason: "Not in shop" };
     if (PERK_CATALOG[perkId] == null) return { ok: false, reason: "Unknown perk" };
 
-    if (run.perks.includes(perkId)) {
-      return { ok: false, reason: "Already owned" };
+    if (!canAddPerkCopy(run, perkId)) {
+      if (perkHiddenFromShop(run, perkId)) {
+        return { ok: false, reason: "Already owned" };
+      }
+      return { ok: false, reason: "Max stacks reached" };
     }
-    if (isJokerSlotFull(run)) {
+    const curseCleanseOnly =
+      perkId === "curse_break" && run.debuffs.length > 0 && isJokerSlotFull(run);
+    if (isJokerSlotFull(run) && !curseCleanseOnly) {
       return { ok: false, reason: `Perk slots full (${BALATRO_ECONOMY.maxJokerSlots})` };
     }
 
@@ -120,22 +131,27 @@ export class ShopSystem {
   }
 
   static sell(run: RunState, perkId: string): ShopBuyResult {
-    if (!run.perks.includes(perkId)) return { ok: false, reason: "Not owned" };
+    const ownedInPerks = run.perks.includes(perkId);
+    const ownedShield = (run.shieldPerks ?? []).includes(perkId);
+    if (!ownedInPerks && !ownedShield) return { ok: false, reason: "Not owned" };
 
     const node = SHOP_PERK_TREE.find((n) => n.perkId === perkId);
     const base = node?.cost ?? 4;
     const refund = sellRefundAmount(shopChipCost(run, base));
 
-    return {
-      ok: true,
-      run: grantChipsInRun(
-        {
-          ...run,
-          perks: run.perks.filter((id) => id !== perkId),
-        },
-        refund
-      ),
-    };
+    let next: RunState;
+    if (perkId === "iron_reserve" && ownedShield) {
+      const shieldPerks = (run.shieldPerks ?? []).filter((id) => id !== perkId);
+      next = {
+        ...run,
+        shields: Math.max(0, (run.shields ?? 0) - 1),
+        shieldPerks,
+      };
+    } else {
+      next = removeOnePerkCopy(run, perkId);
+    }
+
+    return { ok: true, run: grantChipsInRun(next, refund) };
   }
 
   static buyConsumable(run: RunState, id: ConsumableId): ShopBuyResult {
@@ -241,16 +257,19 @@ export class ShopSystem {
   }
 
   static listOwnedJokers(run: RunState) {
-    return run.perks
-      .map((perkId) => {
+    return getLoadoutStacks(run)
+      .filter((s) => s.kind === "perk")
+      .map(({ id: perkId, count }) => {
         const node = SHOP_PERK_TREE.find((n) => n.perkId === perkId);
         const catalog = PERK_CATALOG[perkId];
         const base = node?.cost ?? 4;
         const resolved = resolveEntityIcon("perk", perkId);
         const detailLines = getPerkDetailLines(perkId);
+        const stackLabel = count > 1 ? ` ×${count}` : "";
         return {
           perkId,
-          name: catalog?.name ?? perkId,
+          stackCount: count,
+          name: (catalog?.name ?? perkId) + stackLabel,
           description: detailLines[0] ?? catalog?.description ?? "",
           icon: resolved.icon,
           iconFamily: resolved.iconFamily,
@@ -272,7 +291,7 @@ export class ShopSystem {
   }
 
   private static nodeView(run: RunState, node: (typeof SHOP_PERK_TREE)[number]) {
-    const owned = run.perks.includes(node.perkId);
+    const owned = perkHiddenFromShop(run, node.perkId);
     const locked = node.requires.some((r) => !meetsShopPerkRequirement(run, r));
     const catalog = PERK_CATALOG[node.perkId];
     const cost = shopChipCost(run, node.cost);

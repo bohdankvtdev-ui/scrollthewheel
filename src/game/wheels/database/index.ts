@@ -7,9 +7,8 @@ export {
   WHEEL_DATABASE_REVISION,
   type FloorWheelOrderId,
 } from "./wheelDatabase";
+export { buildSliceFromPrizeSlot, buildSlicesFromPrizes } from "./sliceFromPrize";
 export {
-  buildSliceFromPrizeSlot,
-  buildSlicesFromPrizes,
   getWheelConfig,
   getConfiguredWheelSlices,
   wheelDefinitionFromConfig,

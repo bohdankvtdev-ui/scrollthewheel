@@ -2,8 +2,10 @@
  * Game loop database — wheels rotation, economy, infinite scaling, shop tree.
  */
 import type { IconFamily, InfiniteScalingParams, SliceCount, WheelDefinition, WheelRole } from "../schemas";
+import { RUN_DEFAULTS } from "./config/run.defaults";
 import { FLOOR_WHEEL_COUNT, prototypeToWheelDefinitions } from "./wheels";
 
+export { RUN_DEFAULTS, type RunDefaults } from "./config/run.defaults";
 export {
   GDD_PACING,
   GDD_LOOP_SUMMARY,
@@ -12,47 +14,11 @@ export {
   getWheelDifficultyBias,
 } from "./gdd";
 
-export const RUN_DEFAULTS = {
-  startingMoney: 0,
-  /** Spendable in perk shop during the run */
-  startingChips: 0,
-  startingFloor: 1,
-  startingSliceCapacity: 6 as SliceCount,
-  maxSliceCapacity: 24 as SliceCount,
-  minSliceCapacity: 6 as SliceCount,
-  historyMaxEvents: 50,
-  /** Run ends when bank is $0 or below. */
-  bankruptcyThreshold: 0,
-} as const;
-
-export const INFINITE_SCALING = {
-  negativeWeightStep: 0.15,
-  stakesMultStep: 0.12,
-  moneyInflationStep: 0.065,
-  /** Extra negative bias per wheel index within a floor (0–8) */
-  wheelIndexNegativeStep: 0.035,
-  sliceCapacityBonusFromFloor: 4,
-  sliceCapacityBonus: 0,
-} as const;
-
-/** Ante labels — Balatro-style escalation. */
-export function getBlindLabel(floor: number): string {
-  const f = Math.max(1, floor);
-  return `Cycle ${f}`;
-}
-
-export function getScalingParams(floor: number): InfiniteScalingParams {
-  const f = Math.max(1, floor);
-  const c = INFINITE_SCALING;
-  return {
-    floor: f,
-    blindLabel: getBlindLabel(f),
-    negativeWeightMult: 1 + (f - 1) * c.negativeWeightStep,
-    stakesMult: 1 + (f - 1) * c.stakesMultStep,
-    moneyInflationMult: 1 + (f - 1) * c.moneyInflationStep,
-    sliceCapacityBonus: f >= c.sliceCapacityBonusFromFloor ? c.sliceCapacityBonus : 0,
-  };
-}
+export {
+  INFINITE_SCALING,
+  getBlindLabel,
+  getScalingParams,
+} from "./infiniteScalingConfig";
 
 export function applySliceCapacityFromScaling(current: SliceCount, params: InfiniteScalingParams): SliceCount {
   const next = current + params.sliceCapacityBonus;
@@ -117,7 +83,7 @@ export const SHOP_PERK_TREE: ShopPerkNode[] = [
   { perkId: "gold_rush", cost: 11, requires: ["lucky_money"], tier: 1, column: 1 },
   { perkId: "clutch_cash", cost: 11, requires: ["gold_rush"], tier: 1, column: 2 },
   { perkId: "safe_harbor", cost: 11, requires: ["iron_reserve"], tier: 1, column: 3 },
-  { perkId: "drain_ward", cost: 8, requires: ["iron_reserve"], tier: 1, column: 4 },
+  { perkId: "drain_ward", cost: 8, requires: ["safe_harbor"], tier: 1, column: 4 },
   { perkId: "chaos_ward", cost: 8, requires: ["iron_reserve"], tier: 1, column: 5 },
   { perkId: "final_guard", cost: 10, requires: ["iron_reserve"], tier: 1, column: 6 },
   { perkId: "deep_pockets", cost: 9, requires: ["ante_insurance"], tier: 1, column: 7 },
@@ -136,6 +102,14 @@ export const SHOP_PERK_TREE: ShopPerkNode[] = [
   { perkId: "percent_focus", cost: 9, requires: ["lucky_percent"], tier: 1, column: 4 },
   { perkId: "cycle_momentum", cost: 14, requires: ["ante_insurance"], tier: 2, column: 7 },
   { perkId: "curse_break", cost: 24, requires: ["purify_touch", "hex_ward"], tier: 3, column: 4 },
+  { perkId: "rush_hour", cost: 8, requires: ["lucky_money"], tier: 1, column: 0 },
+  { perkId: "perk_magnet", cost: 12, requires: ["lucky_perk"], tier: 2, column: 1 },
+  { perkId: "green_chain", cost: 5, requires: ["green_fever"], tier: 1, column: 6 },
+  { perkId: "bank_bloom", cost: 12, requires: ["gold_rush"], tier: 2, column: 2 },
+  { perkId: "chip_hoarder", cost: 11, requires: ["chip_drip"], tier: 2, column: 7 },
+  { perkId: "tax_cut", cost: 13, requires: ["hex_ward"], tier: 2, column: 1 },
+  { perkId: "bleed_slow", cost: 9, requires: ["safe_harbor"], tier: 1, column: 4 },
+  { perkId: "cycle_tithe", cost: 10, requires: ["ante_insurance"], tier: 1, column: 5 },
 ];
 
 export const RUN_LOOP = {

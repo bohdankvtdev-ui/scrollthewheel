@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { Asset } from "expo-asset";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,7 +13,8 @@ import { RunLoadoutDock } from "../components/run/RunLoadoutDock";
 import { RunLoadingShell } from "../components/run/RunLoadingShell";
 import { RunStageRail } from "../components/run/RunStageRail";
 import { RunNoticeHost } from "../components/run/RunNoticeHost";
-import { DesperationPickBar } from "../components/run/DesperationPickBar";
+import { RunDesperationOverlay } from "../components/run/RunDesperationOverlay";
+import { shouldShowRunEndModal } from "../game/runState/runLossFlow";
 import { RunPrizeFlash } from "../components/run/RunPrizeFlash";
 import { useTacticHud } from "../hooks/useTacticHud";
 import { ShopModal } from "../components/run/ShopModal";
@@ -26,16 +27,24 @@ import { ShopSystem } from "../systems/ShopSystem";
 import { useRunStore } from "../stores/runStore";
 import { runReelUiKey } from "../game/runState/runReelFeedKey";
 import { showRunInfoNotice, showRunNotice } from "../game/notices/runNotices";
+import { Ads } from "../ads";
 import { LAST_WHEEL_INDEX } from "../game/cycle/cycleTransition";
+import { useRunChromeMetrics } from "../../lib/layout/runChrome";
+import { estimateRunWheelFeedHeight } from "../../lib/layout/runStageLayout";
 
 const SPIN_HUB_ASSET = require("../../assets/images/middle.png");
 
 export function RunScreen() {
-  const [pageHeight, setPageHeight] = useState(320);
+  const chrome = useRunChromeMetrics();
+  const estimatedFeedHeight = useMemo(
+    () => estimateRunWheelFeedHeight(chrome),
+    [chrome]
+  );
+  const [pageHeight, setPageHeight] = useState(estimatedFeedHeight);
   const [shopOpen, setShopOpen] = useState(false);
   const [yourWheelOpen, setYourWheelOpen] = useState(false);
   const [shopRerolls, setShopRerolls] = useState(0);
-  const feedHeightRef = useRef(320);
+  const feedHeightRef = useRef(estimatedFeedHeight);
 
   const { ready, run } = useRunLifecycle(true);
   const awaitingClaim = useRunStore((s) => s.ui.awaitingClaim);
@@ -43,6 +52,8 @@ export function RunScreen() {
   const clearShopPending = useRunStore((s) => s.clearShopPending);
   const isSpinning = useRunStore((s) => s.ui.isSpinning);
   const lastEffect = useRunStore((s) => s.ui.lastEffect);
+  const spinFeedbackTier = useRunStore((s) => s.ui.spinFeedbackTier);
+  const washFlashTier = useRunStore((s) => s.ui.washFlashTier);
   const lastWonPerkId = useRunStore((s) => s.ui.lastWonPerkId);
   const lastWonDebuffId = useRunStore((s) => s.ui.lastWonDebuffId);
   const lastRewardKind = useRunStore((s) => s.ui.lastRewardKind);
@@ -63,7 +74,28 @@ export function RunScreen() {
   const dismissTacticOffers = useRunStore((s) => s.dismissTacticOffers);
   const showDesperationPick = useRunStore((s) => s.ui.showDesperationPick);
   const desperationOffers = useRunStore((s) => s.ui.desperationOffers);
+  const runEndFinalized = useRunStore((s) => s.ui.runEndFinalized);
   const dismissDesperationPick = useRunStore((s) => s.dismissDesperationPick);
+  const reviveFromRewardedAd = useRunStore((s) => s.reviveFromRewardedAd);
+
+  const handleWatchAdContinue = useCallback(async () => {
+    const earned = await Ads.showRewarded();
+    if (!earned) {
+      showRunInfoNotice("Ad not available — try again in a moment");
+      return;
+    }
+    const result = reviveFromRewardedAd();
+    if (result.ok) {
+      showRunNotice({
+        type: "success",
+        title: "Bailout",
+        body: "Reward claimed — you're back in the run.",
+        icon: "lifebuoy",
+      });
+    } else {
+      showRunInfoNotice(result.reason);
+    }
+  }, [reviveFromRewardedAd]);
   const tacticHud = useTacticHud({
     run,
     awaitingClaim,
@@ -75,14 +107,39 @@ export function RunScreen() {
 
   const pageBg = RUN_PAGE_BACKGROUND;
 
-  const onWheelStageLayout = useCallback((h: number) => {
-    const rounded = Math.floor(h);
-    if (rounded < 200 || Math.abs(feedHeightRef.current - rounded) < 2) return;
-    feedHeightRef.current = rounded;
-    setPageHeight(rounded);
-  }, []);
+  useLayoutEffect(() => {
+    feedHeightRef.current = estimatedFeedHeight;
+    setPageHeight(estimatedFeedHeight);
+  }, [estimatedFeedHeight]);
+
+  const onWheelStageLayout = useCallback(
+    (h: number) => {
+      const rounded = Math.floor(h);
+      if (rounded < 200) return;
+      const useLargeWheel = chrome.largeUi;
+      const minHeight = useLargeWheel
+        ? estimatedFeedHeight
+        : Math.round(estimatedFeedHeight * 0.92);
+      const blended = Math.max(rounded, minHeight);
+      if (Math.abs(feedHeightRef.current - blended) < 6) return;
+      feedHeightRef.current = blended;
+      setPageHeight(blended);
+    },
+    [estimatedFeedHeight, chrome.largeUi]
+  );
 
   const bossOverlay = isBossCycleOverlay(bossCyclePhase);
+
+  const showRunEnd = useMemo(() => {
+    if (run == null) return false;
+    return shouldShowRunEndModal({
+      phase: run.phase,
+      bossCyclePhase,
+      showDesperationPick,
+      runEndFinalized,
+      moneyReveal,
+    });
+  }, [bossCyclePhase, moneyReveal, run, runEndFinalized, showDesperationPick]);
 
   useEffect(() => {
     void Asset.fromModule(SPIN_HUB_ASSET as number)
@@ -233,7 +290,6 @@ export function RunScreen() {
     awaitingClaim && run.wheelIndex === LAST_WHEEL_INDEX && bossCyclePhase === "none";
   const reelUiKey = runReelUiKey({
     awaitingClaim,
-    isSpinning,
     gambleFlipActive,
     lastResultLabel,
   });
@@ -241,6 +297,7 @@ export function RunScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: pageBg }]} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="light" />
+      <View style={styles.screenStack} pointerEvents="box-none">
       <RunCasinoBar
         run={run}
         moneyReveal={moneyReveal}
@@ -278,24 +335,25 @@ export function RunScreen() {
         />
       ) : null}
       {!hidePrizeBar ? (
-        showDesperationPick ? (
-          <DesperationPickBar
-            run={run}
-            offers={desperationOffers}
-            onGiveUp={dismissDesperationPick}
-          />
-        ) : (
-          <RunPrizeFlash
-            effect={lastEffect}
-            awaitingClaim={awaitingClaim}
-            isSpinning={isSpinning}
-            lastRewardKind={lastRewardKind}
-            tacticPick={tacticHud.phase === "pick"}
-            run={run}
-            onDismissTactic={dismissTacticOffers}
-            bossEndCycleHint={isBossAwaitingClaim}
-          />
-        )
+        <RunPrizeFlash
+          effect={lastEffect}
+          awaitingClaim={awaitingClaim}
+          isSpinning={isSpinning}
+          lastRewardKind={lastRewardKind}
+          tacticPick={tacticHud.phase === "pick"}
+          run={run}
+          onDismissTactic={dismissTacticOffers}
+          bossEndCycleHint={isBossAwaitingClaim}
+          spinFeedbackTier={washFlashTier ?? spinFeedbackTier}
+        />
+      ) : null}
+      {showDesperationPick ? (
+        <RunDesperationOverlay
+          run={run}
+          offers={desperationOffers}
+          onGiveUp={dismissDesperationPick}
+          onWatchAd={handleWatchAdContinue}
+        />
       ) : null}
       <ShopModal
         visible={shopOpen}
@@ -309,27 +367,26 @@ export function RunScreen() {
         onReroll={handleReroll}
       />
       <YourWheelSheet visible={yourWheelOpen} run={run} onClose={() => setYourWheelOpen(false)} />
-      {((run.phase === "alpha_won" && bossCyclePhase === "none") ||
-        (run.phase !== "active" &&
-          run.phase !== "won" &&
-          run.phase !== "alpha_won" &&
-          bossCyclePhase === "none" &&
-          !showDesperationPick &&
-          (moneyReveal == null || run.phase === "lost_money"))) ? (
+      {showRunEnd ? (
         <RunEndModal
           phase={run.phase}
           floor={run.floor}
           money={run.money}
           peakMoney={run.peakMoney}
           onRestart={handleReset}
+          onWatchAd={handleWatchAdContinue}
         />
       ) : null}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  screenStack: {
+    flex: 1,
+  },
   loadoutStack: {
     position: "relative",
     zIndex: 40,

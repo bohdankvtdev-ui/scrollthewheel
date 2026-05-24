@@ -13,6 +13,7 @@ import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { buildRunWheelOddsReport } from "../../game/wheels/wheelOddsReport";
 import { getWheelArchetypeMetaForIndex } from "../../data/wheelArchetypeMeta";
+import { WheelMapIcon } from "./WheelMapIcon";
 import type { RunState } from "../../schemas";
 
 const UI = {
@@ -98,11 +99,7 @@ export function YourWheelSheet({ visible, run, onClose }: YourWheelSheetProps) {
                   style={[styles.wheelCard, w.isCurrent && styles.wheelCardCurrent]}
                 >
                   <View style={styles.wheelCardHeader}>
-                    <MaterialIcons
-                      name={meta.icon as keyof typeof MaterialIcons.glyphMap}
-                      size={20}
-                      color={meta.accent}
-                    />
+                    <WheelMapIcon meta={meta} size={20} color={meta.accent} />
                     <Text style={[styles.wheelTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
                       {meta.mapLabel} · {w.title}
                     </Text>

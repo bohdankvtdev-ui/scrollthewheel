@@ -15,10 +15,10 @@ describe("shieldRules", () => {
   it("shield blocks money loss with no bank change", () => {
     let run = RunManager.createInitialRun(1);
     run = { ...run, money: 200, shields: 1 };
-    const wheel = run.wheels[2]!;
+    const wheel = run.wheels[0]!;
     const loss = wheel.slices.find((s) => (s.payload.moneyDelta ?? 0) < 0);
     expect(loss).toBeDefined();
-    const resolved = resolveAndApplyWheel(run, 2, loss!);
+    const resolved = resolveAndApplyWheel(run, 0, loss!);
     expect(resolved.shieldBlocked).toBe(true);
     expect(resolved.run.money).toBe(200);
     expect(resolved.run.shields).toBe(0);

@@ -1,15 +1,15 @@
-import type { SliceDefinition, SliceCount, WheelDefinition } from "../../../schemas";
-import { MIN_SLICE_COUNT, MAX_SLICE_COUNT } from "../../../schemas/wheel.schema";
+import type { SliceDefinition, WheelDefinition } from "../../../schemas";
 import { getSliceCountForWheel } from "../../advancements/sliceCount";
-import { PRIZE_CATALOG, type PrizeCatalogId } from "./prizeCatalog";
-import type { PrizeDef, WheelConfigEntry, WheelConfigId, WheelPrizeSlot } from "./types";
-import { resolvePrizeIcon } from "../../content/prizeIcons";
+import type { WheelConfigEntry, WheelConfigId, WheelPrizeSlot } from "./types";
+import type { BossCycleAudit } from "../../boss/bossWheel";
+import { FLOOR_WHEEL_ORDER, WHEEL_DATABASE, type FloorWheelOrderId } from "./wheelDatabase";
+import { buildSlicesFromPrizes } from "./sliceFromPrize";
 import {
   buildPrizeSlotsForWheel,
-  finalizeSlicePayload,
   type BuildWheelPrizeOptions,
 } from "./wheelPrizeBuilder";
-import { FLOOR_WHEEL_ORDER, WHEEL_DATABASE, type FloorWheelOrderId } from "./wheelDatabase";
+
+export { buildSliceFromPrizeSlot, buildSlicesFromPrizes } from "./sliceFromPrize";
 
 export type WheelLayoutContext = BuildWheelPrizeOptions;
 
@@ -28,6 +28,7 @@ function normalizeLayoutContext(
       permanentWedgeBonus: 0,
       wheelLaserCuts: {},
       wheelInsureCuts: {},
+      bossCycleAudit: undefined,
     };
   }
   return {
@@ -39,62 +40,8 @@ function normalizeLayoutContext(
     permanentWedgeBonus: ctx?.permanentWedgeBonus ?? 0,
     wheelLaserCuts: ctx?.wheelLaserCuts ?? {},
     wheelInsureCuts: ctx?.wheelInsureCuts ?? {},
+    bossCycleAudit: ctx?.bossCycleAudit,
   };
-}
-
-function assertPrize(prizeId: string): void {
-  if (PRIZE_CATALOG[prizeId as PrizeCatalogId] == null) {
-    throw new Error(`Unknown prize "${prizeId}" — add it to prizeCatalog.ts`);
-  }
-}
-
-export function buildSliceFromPrizeSlot(
-  slot: WheelPrizeSlot,
-  wheelId: string,
-  index: number,
-  cycle: number = 1
-): SliceDefinition {
-  assertPrize(slot.prize);
-  const template = PRIZE_CATALOG[slot.prize as PrizeCatalogId] as PrizeDef;
-  const { payload, label } = finalizeSlicePayload(
-    { ...template.payload } as Record<string, unknown>,
-    template.kind,
-    template.label,
-    cycle
-  );
-  const { icon, iconFamily } = resolvePrizeIcon(slot.prize, template, { wheelId });
-  return {
-    id: `${wheelId}_${slot.prize}_${index}`,
-    kind: template.kind,
-    label,
-    icon,
-    iconFamily,
-    baseWeight: slot.chance,
-    weightTags: template.weightTags ? [...template.weightTags] : undefined,
-    payload: payload as PrizeDef["payload"],
-    presentation: template.presentation ? { ...template.presentation } : undefined,
-  };
-}
-
-/**
- * Every prize row → one visible slice. `chance` becomes spin weight (land %).
- * Rows with chance 0 still appear on the wheel but never win.
- */
-export function buildSlicesFromPrizes(
-  prizes: WheelPrizeSlot[],
-  wheelId: string,
-  cycle: number = 1
-): SliceDefinition[] {
-  if (prizes.length < MIN_SLICE_COUNT || prizes.length > MAX_SLICE_COUNT) {
-    throw new Error(
-      `Wheel "${wheelId}" must have ${MIN_SLICE_COUNT}–${MAX_SLICE_COUNT} prizes (got ${prizes.length})`
-    );
-  }
-  const hasWinner = prizes.some((slot) => slot.chance > 0);
-  if (!hasWinner) {
-    throw new Error(`Wheel "${wheelId}" needs at least one prize with chance > 0`);
-  }
-  return prizes.map((slot, index) => buildSliceFromPrizeSlot(slot, wheelId, index, cycle));
 }
 
 export function getWheelConfig(configId: WheelConfigId): WheelConfigEntry {
@@ -119,6 +66,7 @@ export function getPrizeSlotsForWheel(
     permanentWedgeBonus,
     wheelLaserCuts,
     wheelInsureCuts,
+    bossCycleAudit,
   } = normalizeLayoutContext(ctx);
   return buildPrizeSlotsForWheel(configId, {
     runId,
@@ -129,8 +77,11 @@ export function getPrizeSlotsForWheel(
     permanentWedgeBonus,
     wheelLaserCuts,
     wheelInsureCuts,
+    bossCycleAudit,
   });
 }
+
+export type { BossCycleAudit };
 
 /** Slices for a configured wheel (before floor scaling / capacity padding). */
 export function getConfiguredWheelSlices(

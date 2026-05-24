@@ -849,6 +849,15 @@ export const PRIZE_CATALOG = {
     weightTags: ["negative", "stakes"],
     payload: { runEffectId: "boss_overhead" },
   },
+  drain_tax: {
+    kind: "run_effect",
+    label: "Drain Tax",
+    icon: "cash-remove",
+    iconFamily: "MaterialCommunityIcons",
+    weightTags: ["negative", "stakes"],
+    payload: { runEffectId: "boss_overhead" },
+    presentation: { rarity: "rare" },
+  },
   boss_shield_break: {
     kind: "run_effect",
     label: "Shield Break",

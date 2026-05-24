@@ -5,7 +5,11 @@ import { LegalDocumentScreen } from "../src/screens/LegalDocumentScreen";
 export default function CreditsRoute() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <LegalDocumentScreen title={CREDITS_TITLE} sections={CREDITS_SECTIONS} />
+      <LegalDocumentScreen
+        title={CREDITS_TITLE}
+        sections={CREDITS_SECTIONS}
+        legalHubExcludeRoute="/credits"
+      />
     </GestureHandlerRootView>
   );
 }

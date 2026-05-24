@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { memo, useCallback, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
+import { useRunChromeMetrics } from "../../../lib/layout/runChrome";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { showRunInfoNotice, showTacticChosenNotice } from "../../game/notices/runNotices";
@@ -16,22 +16,15 @@ import {
 import { WHEEL_COUNT } from "../../game/loop";
 import { useRunStore } from "../../stores/runStore";
 
-const BAR_H = RUN_LAYOUT.prizeFlash;
-const ROW_H = 54;
-
-const TACTIC_STYLE: Record<MicroChoiceId, string> = {
-  reroll: "#FDBA74",
-  insure: "#4ADE80",
-  gamble: Neo.neonYellow,
-};
-
 type TacticPickBarProps = {
   run: RunState;
   onDismiss: () => void;
 };
 
-/** Single tactic offer in the 72px prize-flash bar. */
+/** Single tactic offer in the prize-flash bar. */
 export function TacticPickBar({ run, onDismiss }: TacticPickBarProps) {
+  const chrome = useRunChromeMetrics();
+  const rowH = Math.round(54 * chrome.scale);
   const useMicroChoice = useRunStore((s) => s.useMicroChoice);
   const hasSnapshot = useRunStore((s) => s.preSpinSnapshot != null);
 
@@ -59,26 +52,51 @@ export function TacticPickBar({ run, onDismiss }: TacticPickBarProps) {
   if (offer == null) return null;
 
   return (
-    <View style={styles.bar}>
+    <View
+      style={[
+        styles.bar,
+        {
+          height: chrome.layout.prizeFlash,
+          maxWidth: chrome.layout.prizeFlashMaxWidth,
+          paddingHorizontal: chrome.bar.padH,
+        },
+      ]}
+    >
       <TacticChip
         id={offer}
         run={run}
         offers={offers}
         hasSnapshot={hasSnapshot}
+        rowH={rowH}
+        scale={chrome.scale}
         onPress={() => onPick(offer)}
       />
       <Pressable
         onPress={onDismiss}
         hitSlop={6}
-        style={({ pressed }) => [styles.skip, pressed && styles.skipPressed]}
+        style={({ pressed }) => [styles.skip, { width: Math.round(58 * chrome.scale), height: rowH }, pressed && styles.skipPressed]}
         accessibilityRole="button"
-        accessibilityLabel="Skip tactic"
+        accessibilityLabel="Skip tactic and continue"
       >
-        <Text style={[styles.skipText, { fontFamily: FONT_BEBAS_NEUE }]}>Skip</Text>
+        <MaterialCommunityIcons name="check-bold" size={Math.round(18 * chrome.scale)} color={Neo.ink} />
+        <Text
+          style={[
+            styles.skipText,
+            { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(14 * chrome.scale) },
+          ]}
+        >
+          Skip
+        </Text>
       </Pressable>
     </View>
   );
 }
+
+const TACTIC_STYLE: Record<MicroChoiceId, string> = {
+  reroll: "#FDBA74",
+  insure: "#4ADE80",
+  gamble: "#DC2626",
+};
 
 export const TacticPickPanel = TacticPickBar;
 
@@ -87,12 +105,16 @@ const TacticChip = memo(function TacticChip({
   run,
   offers,
   hasSnapshot,
+  rowH,
+  scale,
   onPress,
 }: {
   id: MicroChoiceId;
   run: RunState;
   offers: MicroChoiceId[];
   hasSnapshot: boolean;
+  rowH: number;
+  scale: number;
   onPress: () => void;
 }) {
   const meta = MICRO_CHOICE_META[id];
@@ -107,12 +129,13 @@ const TacticChip = memo(function TacticChip({
     gambleFlipActive: useRunStore.getState().ui.gambleFlipActive,
   });
   const disabled = !check.ok;
+  const iconWrap = Math.round(34 * scale);
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: disabled ? "#E8E4DC" : bg },
+        { minHeight: rowH, backgroundColor: disabled ? "#E8E4DC" : bg },
         pressed && !disabled && styles.chipPressed,
       ]}
       disabled={disabled}
@@ -120,19 +143,39 @@ const TacticChip = memo(function TacticChip({
       accessibilityRole="button"
       accessibilityLabel={`${meta.label}. ${meta.pickerHint}. ${cost} chips`}
     >
-      <View style={[styles.iconWrap, disabled && styles.iconWrapDisabled]}>
+      <View
+        style={[
+          styles.iconWrap,
+          { width: iconWrap, height: iconWrap, borderRadius: Math.round(9 * scale) },
+          disabled && styles.iconWrapDisabled,
+        ]}
+      >
         <MaterialCommunityIcons
           name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-          size={22}
+          size={Math.round(22 * scale)}
           color={disabled ? "rgba(10,10,10,0.28)" : Neo.ink}
         />
       </View>
 
-      <Text style={[styles.chipHint, { fontFamily: FONT_BEBAS_NEUE }]}>{meta.pickerHint}</Text>
+      <Text
+        style={[
+          styles.chipHint,
+          { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(12 * scale), lineHeight: Math.round(14 * scale) },
+        ]}
+      >
+        {meta.pickerHint}
+      </Text>
 
       <View style={styles.cost}>
-        <MaterialCommunityIcons name="poker-chip" size={10} color={Neo.ink} />
-        <Text style={[styles.costText, { fontFamily: FONT_BEBAS_NEUE }]}>{cost}</Text>
+        <MaterialCommunityIcons name="poker-chip" size={Math.round(10 * scale)} color={Neo.ink} />
+        <Text
+          style={[
+            styles.costText,
+            { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(11 * scale) },
+          ]}
+        >
+          {cost}
+        </Text>
       </View>
     </Pressable>
   );
@@ -140,18 +183,14 @@ const TacticChip = memo(function TacticChip({
 
 const styles = StyleSheet.create({
   bar: {
-    height: BAR_H,
     width: "100%",
-    maxWidth: RUN_LAYOUT.prizeFlashMaxWidth,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
     gap: 8,
   },
   chip: {
     flex: 1,
-    minHeight: ROW_H,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
@@ -166,9 +205,6 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
     borderWidth: Neo.borderThin,
     borderColor: Neo.ink,
     backgroundColor: "rgba(255,255,255,0.55)",
@@ -182,8 +218,6 @@ const styles = StyleSheet.create({
   chipHint: {
     flex: 1,
     flexShrink: 1,
-    fontSize: 12,
-    lineHeight: 14,
     color: Neo.ink,
     letterSpacing: 0.2,
   },
@@ -200,25 +234,23 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   costText: {
-    fontSize: 11,
     color: Neo.ink,
   },
   skip: {
-    width: 52,
-    height: ROW_H,
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
     borderRadius: 11,
     borderWidth: Neo.borderBold,
     borderColor: Neo.ink,
-    backgroundColor: "rgba(255,255,255,0.45)",
+    backgroundColor: "#4ADE80",
     flexShrink: 0,
   },
   skipPressed: {
-    backgroundColor: "rgba(255,255,255,0.65)",
+    backgroundColor: "#22C55E",
+    opacity: 0.92,
   },
   skipText: {
-    fontSize: 14,
     color: Neo.ink,
     letterSpacing: 0.35,
   },

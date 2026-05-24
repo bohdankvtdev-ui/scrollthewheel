@@ -1,5 +1,7 @@
 import type { RunState } from "../runState/types";
 import { getArchetypeForWheelIndex } from "../wheels";
+import { floorClearChipBase } from "../shop/chipGrants";
+import { countPerkCopies } from "./perkStacks";
 import type { JokerEvent } from "./joker.types";
 
 export type JokerEngineResult = {
@@ -13,56 +15,26 @@ export type JokerEngineResult = {
  * Money multipliers live in PerkSystem.applyMoneyDelta — only chip/meta bonuses here.
  */
 export function applyJokerEvent(run: RunState, event: JokerEvent): JokerEngineResult {
-  let next = run;
+  const next = run;
   let chipsBonus = 0;
   const moneyDeltaBonus = 0;
 
-  const owns = (id: string) => next.perks.includes(id);
-
-  if (event.type === "onSpin") {
-    if (event.archetype === "boss" && owns("lucky_streak")) {
-      chipsBonus += 2;
-    }
-  }
-
   if (event.type === "onGainMoney" && event.amount > 0) {
-    if (owns("lucky_streak")) {
-      chipsBonus += 2;
+    chipsBonus += countPerkCopies(next.perks, "chip_drip");
+    if (countPerkCopies(next.perks, "streak_spark") > 0 && (next.winStreak ?? 0) >= 2) {
+      chipsBonus += countPerkCopies(next.perks, "streak_spark");
     }
-    if (owns("gold_rush")) {
-      chipsBonus += 1;
-    }
-    if (owns("chip_drip")) {
-      chipsBonus += 1;
-    }
-    if (owns("streak_spark") && (next.winStreak ?? 0) >= 2) {
-      chipsBonus += 1;
-    }
-  }
-
-  if (event.type === "onLoseMoney" && event.amount < 0) {
-    if (owns("lucky_streak")) {
-      chipsBonus += 1;
-    }
-  }
-
-  if (event.type === "onBoss") {
-    chipsBonus += 1;
   }
 
   if (event.type === "onFloorEnd" && event.cleared) {
-    chipsBonus += 8 + event.floor * 3;
-    if (owns("compounder")) {
-      chipsBonus += Math.floor(event.floor * 2);
+    chipsBonus += floorClearChipBase(event.floor);
+    chipsBonus += countPerkCopies(next.perks, "ante_insurance") * 4;
+    const deepStacks = countPerkCopies(next.perks, "deep_pockets");
+    if (deepStacks > 0) {
+      chipsBonus += deepStacks * (4 + Math.max(0, event.floor));
     }
-    if (owns("ante_insurance")) {
-      chipsBonus += 4;
-    }
-    if (owns("deep_pockets")) {
-      chipsBonus += 4 + Math.max(0, event.floor);
-    }
-    if (owns("cycle_momentum") && event.floor > 0 && event.floor % 5 === 0) {
-      chipsBonus += 2;
+    if (countPerkCopies(next.perks, "cycle_momentum") > 0 && event.floor > 0 && event.floor % 5 === 0) {
+      chipsBonus += countPerkCopies(next.perks, "cycle_momentum") * 2;
     }
   }
 

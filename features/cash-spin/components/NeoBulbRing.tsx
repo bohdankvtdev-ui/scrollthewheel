@@ -383,11 +383,18 @@ export const NeoBulbRing = memo(function NeoBulbRing({ layout, phase, palette: p
   }, [phase]);
 
   useEffect(() => {
-    if (phase === "victory") {
+    if (phase === "victory" || phase === "jackpot" || phase === "damage") {
+      const holdMs =
+        phase === "jackpot"
+          ? NeoBulbRingTheme.victoryHoldMs + 400
+          : phase === "damage"
+            ? 720
+            : NeoBulbRingTheme.victoryHoldMs;
+      const peakIn = phase === "damage" ? 280 : phase === "jackpot" ? 480 : 420;
       burst.value = withSequence(
-        withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: peakIn, easing: Easing.out(Easing.cubic) }),
         withDelay(
-          NeoBulbRingTheme.victoryHoldMs,
+          holdMs,
           withTiming(0, {
             duration: NeoBulbRingTheme.victoryFadeMs,
             easing: Easing.inOut(Easing.cubic),
@@ -400,14 +407,20 @@ export const NeoBulbRing = memo(function NeoBulbRing({ layout, phase, palette: p
     }
   }, [phase, burst]);
 
+  const ringVictory = NeoBulbRingTheme.ringBorderVictory;
+  const ringJackpot = "#FFE566";
+  const ringDamage = "#FF9EB0";
+
   const ringStyle = useAnimatedStyle(() => {
     const b = burst.value;
     const base = NeoWheel.segmentStrokeWidth;
+    const borderEnd =
+      phase === "damage" ? ringDamage : phase === "jackpot" ? ringJackpot : ringVictory;
     return {
       borderWidth: clamp(base + b * 2.15, base, base + 2.75),
-      borderColor: interpolateColor(b, [0, 1], [NeoWheel.segmentStroke, NeoBulbRingTheme.ringBorderVictory]),
+      borderColor: interpolateColor(b, [0, 1], [NeoWheel.segmentStroke, borderEnd]),
     };
-  }, []);
+  }, [phase]);
 
   const common = { bulbCount, clockMs, chase, chaseBoost, burst, palette } as const;
 

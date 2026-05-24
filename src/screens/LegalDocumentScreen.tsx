@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
+import { LegalLinksFooter } from "../components/legal/LegalLinksFooter";
 import { FONT_BEBAS_NEUE } from "../../theme/fonts";
 import { Neo, neoCardStyle } from "../../theme/neoBrutal";
 
@@ -9,9 +10,18 @@ type LegalDocumentScreenProps = {
   title: string;
   meta?: string;
   sections: { heading: string; body: string }[];
+  /** Omitted from footer link hub (in-app route or web id). */
+  legalHubExcludeId?: string;
+  legalHubExcludeRoute?: string;
 };
 
-export function LegalDocumentScreen({ title, meta, sections }: LegalDocumentScreenProps) {
+export function LegalDocumentScreen({
+  title,
+  meta,
+  sections,
+  legalHubExcludeId,
+  legalHubExcludeRoute,
+}: LegalDocumentScreenProps) {
   const router = useRouter();
 
   return (
@@ -46,6 +56,7 @@ export function LegalDocumentScreen({ title, meta, sections }: LegalDocumentScre
             <Text style={styles.sectionBody}>{section.body}</Text>
           </View>
         ))}
+        <LegalLinksFooter excludeId={legalHubExcludeId} excludeRoute={legalHubExcludeRoute} />
       </ScrollView>
     </SafeAreaView>
   );

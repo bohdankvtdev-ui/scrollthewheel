@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { onRunEnded as recordRankOnRunEnd } from "../ranks";
 import { DEFAULT_META, loadMeta, saveMeta, type MetaPersist } from "../persistence/mmkv";
 
 function persistMeta(state: MetaPersist): void {
@@ -59,6 +60,7 @@ export const useMetaStore = create<MetaStore>((set, get) => ({
       bestPeakMoney,
       totalRuns: next.totalRuns,
     });
+    void recordRankOnRunEnd({ peakMoney, floor });
   },
 
   grantChips: (amount) => {

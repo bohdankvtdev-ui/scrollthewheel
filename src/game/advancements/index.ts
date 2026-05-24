@@ -10,6 +10,7 @@ export {
   BASE_SLICES_PER_WHEEL,
   getExtraSlicesForWheel,
   getRunMaxSliceCount,
+  getSliceCountForCycle,
   getSliceCountForWheel,
 } from "./sliceCount";
 export {

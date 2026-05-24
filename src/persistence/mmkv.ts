@@ -2,8 +2,8 @@
  * Run persistence — AsyncStorage backend (Expo Go compatible).
  * MMKV/Nitro is not available in Expo Go; swap to createMMKV when using dev builds.
  */
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MMKV_KEYS } from "./keys";
+import { loadProgress, resetProgress, saveProgress } from "./saveManager";
 import type { RunState } from "../schemas";
 import { RUN_SCHEMA_VERSION } from "../schemas";
 
@@ -42,23 +42,12 @@ const CHECKPOINT_DEBOUNCE_MS = 1500;
 let checkpointTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function readMetaFromDisk(): Promise<MetaPersist> {
-  const raw = await AsyncStorage.getItem(MMKV_KEYS.meta);
-  if (raw == null) return { ...DEFAULT_META };
-  try {
-    return { ...DEFAULT_META, ...JSON.parse(raw) };
-  } catch {
-    return { ...DEFAULT_META };
-  }
+  const stored = await loadProgress<MetaPersist>(MMKV_KEYS.meta);
+  return stored != null ? { ...DEFAULT_META, ...stored } : { ...DEFAULT_META };
 }
 
 async function readRunFromDisk(): Promise<RunState | null> {
-  const raw = await AsyncStorage.getItem(MMKV_KEYS.runCheckpoint);
-  if (raw == null) return null;
-  try {
-    return JSON.parse(raw) as RunState;
-  } catch {
-    return null;
-  }
+  return loadProgress<RunState>(MMKV_KEYS.runCheckpoint);
 }
 
 /** Load meta + run checkpoint from disk into memory. Call once before reading. */
@@ -79,7 +68,7 @@ export function loadMeta(): MetaPersist {
 
 export function saveMeta(meta: MetaPersist): void {
   metaCache = meta;
-  void AsyncStorage.setItem(MMKV_KEYS.meta, JSON.stringify(meta));
+  void saveProgress(MMKV_KEYS.meta, meta);
 }
 
 export function loadRunCheckpoint(): RunState | null {
@@ -88,10 +77,10 @@ export function loadRunCheckpoint(): RunState | null {
 
 function writeRunCheckpointToDisk(run: RunState | null): void {
   if (run == null) {
-    void AsyncStorage.removeItem(MMKV_KEYS.runCheckpoint);
+    void resetProgress(MMKV_KEYS.runCheckpoint);
     return;
   }
-  void AsyncStorage.setItem(MMKV_KEYS.runCheckpoint, JSON.stringify(run));
+  void saveProgress(MMKV_KEYS.runCheckpoint, run);
 }
 
 /** Persist run checkpoint immediately (e.g. app background / unmount). */

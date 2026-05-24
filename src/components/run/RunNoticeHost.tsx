@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { VectorIcon } from "../../../lib/ui/VectorIcon";
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { RUN_LAYOUT } from "../../../lib/layout/runLayout";
+import { useRunChromeMetrics } from "../../../lib/layout/runChrome";
 import { Neo } from "../../../theme/neoBrutal";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { useRunToastStore, type RunToastType } from "../../stores/runToastStore";
@@ -13,13 +13,14 @@ const TYPE_STYLE: Record<RunToastType, { bg: string; accent: string; icon: strin
   info: { bg: Neo.neonCyan, accent: "#67E8F9", icon: "info-outline" },
 };
 
-function ToastIcon({ name, type }: { name?: string; type: RunToastType }) {
+function ToastIcon({ name, type, size }: { name?: string; type: RunToastType; size: number }) {
   const iconName = name ?? TYPE_STYLE[type].icon;
-  return <VectorIcon name={iconName} size={14} color={Neo.ink} />;
+  return <VectorIcon name={iconName} size={size} color={Neo.ink} />;
 }
 
 /** Compact notice directly under the perk loadout (in `loadoutStack`). */
 export function RunNoticeHost() {
+  const chrome = useRunChromeMetrics();
   const toast = useRunToastStore((s) => s.toast);
   const dismiss = useRunToastStore((s) => s.dismiss);
 
@@ -34,10 +35,20 @@ export function RunNoticeHost() {
   const palette = TYPE_STYLE[toast.type];
 
   return (
-    <View style={styles.anchor} pointerEvents="box-none">
+    <View
+      style={[styles.anchor, { top: chrome.layout.loadout + 2 }]}
+      pointerEvents="box-none"
+    >
       <Pressable
         onPress={dismiss}
-        style={[styles.card, { backgroundColor: palette.bg, borderColor: palette.accent }]}
+        style={[
+          styles.card,
+          {
+            backgroundColor: palette.bg,
+            borderColor: palette.accent,
+            maxWidth: chrome.notice.maxWidth,
+          },
+        ]}
         accessibilityRole="button"
         accessibilityLabel={
           toast.body != null && toast.body.length > 0
@@ -45,16 +56,25 @@ export function RunNoticeHost() {
             : toast.title
         }
       >
-        <View style={styles.iconDot}>
-          <ToastIcon name={toast.icon} type={toast.type} />
+        <View style={[styles.iconDot, { width: chrome.notice.iconSize + 8, height: chrome.notice.iconSize + 8 }]}>
+          <ToastIcon name={toast.icon} type={toast.type} size={chrome.notice.iconSize} />
         </View>
         <View style={styles.copy}>
-          <Text style={[styles.title, { fontFamily: FONT_BEBAS_NEUE }]}>{toast.title}</Text>
+          <Text
+            style={[
+              styles.title,
+              { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.notice.titleFontSize, lineHeight: chrome.notice.titleFontSize + 2 },
+            ]}
+          >
+            {toast.title}
+          </Text>
           {toast.body != null && toast.body.length > 0 ? (
-            <Text style={styles.body}>{toast.body}</Text>
+            <Text style={[styles.body, { fontSize: chrome.notice.bodyFontSize, lineHeight: chrome.notice.bodyFontSize + 3 }]}>
+              {toast.body}
+            </Text>
           ) : null}
         </View>
-        <MaterialIcons name="close" size={14} color="rgba(15,15,20,0.38)" style={styles.close} />
+        <MaterialIcons name="close" size={chrome.notice.iconSize} color="rgba(15,15,20,0.38)" style={styles.close} />
       </Pressable>
     </View>
   );
@@ -65,7 +85,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    top: RUN_LAYOUT.loadout + 2,
     zIndex: 150,
     elevation: 150,
     alignItems: "center",
@@ -74,7 +93,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     width: "100%",
-    maxWidth: 340,
     borderWidth: Neo.borderThin,
     borderRadius: 10,
     paddingVertical: 6,
@@ -87,8 +105,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   iconDot: {
-    width: 22,
-    height: 22,
     marginTop: 1,
     borderRadius: 6,
     borderWidth: Neo.borderThin,
@@ -106,16 +122,12 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   title: {
-    fontSize: 14,
     color: Neo.ink,
     letterSpacing: 0.25,
-    lineHeight: 16,
     flexShrink: 1,
   },
   body: {
     marginTop: 2,
-    fontSize: 11,
-    lineHeight: 14,
     color: "rgba(15,15,20,0.85)",
     flexShrink: 1,
   },

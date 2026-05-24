@@ -1,177 +1,194 @@
 import * as Haptics from "expo-haptics";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import { HomeWheelDeco } from "../components/home/HomeWheelDeco";
-import { APP_DISPLAY_NAME } from "../constants/appBranding";
+import { useCallback } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { HomeBackdrop } from "../components/home/HomeBackdrop";
+import { HomeEdgeButton, HomeMiniStat } from "../components/home/HomeEdgeButton";
+import { HomeHeroStage } from "../components/home/HomeHeroWheels";
+import { HomePlayButton } from "../components/home/HomePlayButton";
+import { useHomeScreen } from "../hooks/useHomeScreen";
 import { useMetaStore } from "../stores/metaStore";
+import { useRunStore } from "../stores/runStore";
 import { formatMoney } from "../utils/formatMoney";
 import { FONT_BEBAS_NEUE } from "../../theme/fonts";
-import { Neo, neoSubtitleOnDark, neoTitleOnDark } from "../../theme/neoBrutal";
-
-const TAGS = ["9 wheels", "Chip shop", "One life"] as const;
-
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statPill}>
-      <Text style={[styles.statValue, { fontFamily: FONT_BEBAS_NEUE }]}>{value}</Text>
-      <Text style={[styles.statLabel, { fontFamily: FONT_BEBAS_NEUE }]}>{label}</Text>
-    </View>
-  );
-}
-
-function FeatureChip({ text, color }: { text: string; color: string }) {
-  return (
-    <View style={[styles.featureChip, { backgroundColor: color }]}>
-      <Text style={[styles.featureChipText, { fontFamily: FONT_BEBAS_NEUE }]}>{text}</Text>
-    </View>
-  );
-}
+import { useRunChromeMetrics } from "../../lib/layout/runChrome";
+import { homeBrutalCard, homeKickerStyle, HomePalette, HomeScreenTheme as T } from "../../theme/homeScreen";
 
 export function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const chrome = useRunChromeMetrics();
+  const uiScale = chrome.largeUi ? chrome.scale : 1;
+  const { ready } = useHomeScreen();
   const bestFloor = useMetaStore((s) => s.bestFloor);
   const bestPeakMoney = useMetaStore((s) => s.bestPeakMoney ?? 0);
-  const totalChips = useMetaStore((s) => s.totalChips ?? 0);
   const totalRuns = useMetaStore((s) => s.totalRuns ?? 0);
-  const hasRecords = bestFloor > 0 || bestPeakMoney > 0 || totalChips > 0;
 
   const version =
     Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "1.0.0";
+  const isNewPlayer = totalRuns === 0;
 
-  const goRun = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const startNewRun = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    useRunStore.getState().startRun(1);
     router.push("/run");
-  };
+  }, [router]);
 
-  const goDesign = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push("/design");
-  };
+  const go = useCallback(
+    (path: "/leaderboard" | "/wheel-odds" | "/progression" | "/about") => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push(path);
+    },
+    [router]
+  );
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={HomePalette.purple} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const bankLabel = bestPeakMoney > 0 ? formatMoney(bestPeakMoney) : "—";
+  const cycleLabel = bestFloor > 0 ? String(bestFloor) : "—";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.hero}>
-          <View style={styles.decoBlobA} />
-          <View style={styles.decoBlobB} />
-          <HomeWheelDeco />
-          <Text style={[styles.kicker, { fontFamily: FONT_BEBAS_NEUE }]}>Roguelike wheel run</Text>
-          <Text style={[styles.title, { fontFamily: FONT_BEBAS_NEUE }]} accessibilityRole="header">
-            {APP_DISPLAY_NAME.toUpperCase()}
-          </Text>
-          <Text style={neoSubtitleOnDark(15)}>
-            Spin the strip. Bank the cash. Don&apos;t hit zero.
-          </Text>
-          <View style={styles.tagRow}>
-            {TAGS.map((tag, i) => (
-              <FeatureChip
-                key={tag}
-                text={tag}
-                color={
-                  i === 0 ? Neo.neonYellow : i === 1 ? Neo.neonCyan : Neo.neonMagenta
-                }
-              />
-            ))}
-          </View>
-        </View>
+      <HomeBackdrop />
+      <HomeHeroStage />
 
-        {hasRecords ? (
-          <View style={styles.statsCard}>
-            <Text style={[styles.statsTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-              Your legend
-            </Text>
-            <View style={styles.statsRow}>
-              {bestPeakMoney > 0 ? (
-                <StatPill label="Best bank" value={formatMoney(bestPeakMoney)} />
-              ) : null}
-              {bestFloor > 0 ? (
-                <StatPill label="Best cycle" value={`${bestFloor}`} />
-              ) : null}
-              {totalChips > 0 ? (
-                <StatPill label="Meta chips" value={`${totalChips}`} />
-              ) : null}
-              {totalRuns > 0 ? (
-                <StatPill label="Runs" value={`${totalRuns}`} />
-              ) : null}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.firstRunCard}>
-            <MaterialCommunityIcons name="cards-playing-outline" size={28} color={Neo.ink} />
-            <Text style={[styles.firstRunTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-              First run?
-            </Text>
-            <Text style={styles.firstRunBody}>
-              Clear nine wheels per cycle. Spend chips in the shop. Trick-or-treat tactics
-              appear on special wheels.
-            </Text>
-          </View>
-        )}
-
-        <Pressable
-          style={({ pressed }) => [styles.heroBtn, pressed && styles.heroBtnPressed]}
-          onPress={goRun}
-          accessibilityRole="button"
-          accessibilityLabel="Start roguelike run"
+      <View style={[styles.hud, { paddingTop: insets.top > 0 ? 4 : 8, paddingHorizontal: Math.round(14 * uiScale) }]}>
+        <Text
+          style={[
+            styles.cornerHint,
+            homeKickerStyle(),
+            { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(11 * uiScale) },
+          ]}
         >
-          <View style={styles.heroBtnInner}>
-            <View style={styles.heroBtnIcon}>
-              <MaterialCommunityIcons name="play-circle" size={36} color={Neo.ink} />
-            </View>
-            <View style={styles.heroBtnCopy}>
-              <Text style={[styles.heroBtnTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-                Start run
-              </Text>
-              <Text style={[styles.heroBtnSub, { fontFamily: FONT_BEBAS_NEUE }]}>
-                New cycle · spin · swipe · survive
+          Menu
+        </Text>
+
+        <View style={styles.topBar}>
+          <HomeEdgeButton
+            icon="trophy"
+            label="Scores"
+            hint="See leaderboard"
+            accent={HomePalette.yellow}
+            uiScale={uiScale}
+            onPress={() => go("/leaderboard")}
+          />
+          <View style={styles.titleWrap}>
+            <View style={[homeBrutalCard(HomePalette.yellow, styles.titleCard), { paddingVertical: Math.round(8 * uiScale), paddingHorizontal: Math.round(14 * uiScale) }]}>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    fontFamily: FONT_BEBAS_NEUE,
+                    fontSize: Math.round(26 * uiScale),
+                    lineHeight: Math.round(28 * uiScale),
+                  },
+                ]}
+                accessibilityRole="header"
+              >
+                Scroll <Text style={styles.titleThe}>The</Text> Wheel
               </Text>
             </View>
-            <MaterialIcons name="chevron-right" size={28} color={Neo.ink} />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
-          onPress={goDesign}
-          accessibilityRole="button"
-          accessibilityLabel="Open game data reference"
-        >
-          <MaterialIcons name="data-object" size={22} color={Neo.ink} />
-          <Text style={[styles.secondaryBtnText, { fontFamily: FONT_BEBAS_NEUE }]}>
-            Game data & odds
-          </Text>
-        </Pressable>
-
-        <View style={styles.footer}>
-          <Pressable
-            onPress={() => router.push("/credits")}
-            hitSlop={8}
-            accessibilityRole="link"
-            accessibilityLabel="Credits"
-          >
-            <Text style={[styles.footerLink, { fontFamily: FONT_BEBAS_NEUE }]}>Credits</Text>
-          </Pressable>
-          <Text style={styles.footerDot}>·</Text>
-          <Pressable
-            onPress={() => router.push("/privacy")}
-            hitSlop={8}
-            accessibilityRole="link"
-            accessibilityLabel="Privacy policy"
-          >
-            <Text style={[styles.footerLink, { fontFamily: FONT_BEBAS_NEUE }]}>
-              Privacy Policy
+            <Text
+              style={[
+                styles.tagline,
+                { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(12 * uiScale) },
+              ]}
+            >
+              Spin · grow your bank · don&apos;t hit $0
             </Text>
-          </Pressable>
+          </View>
+          <HomeEdgeButton
+            icon="chart-donut-variant"
+            label="Chances"
+            hint="What wheels can land"
+            accent={HomePalette.purpleBright}
+            uiScale={uiScale}
+            onPress={() => go("/wheel-odds")}
+          />
         </View>
-        <Text style={styles.version}>v{version}</Text>
-      </ScrollView>
+
+        <View style={[styles.midRow, styles.hudCenter]}>
+          <HomeEdgeButton
+            icon="book-open-page-variant"
+            label="How to play"
+            hint="Rules and tips"
+            accent={HomePalette.orange}
+            uiScale={uiScale}
+            onPress={() => go("/about")}
+          />
+          <View style={styles.centerGap} pointerEvents="none">
+            <Text style={[styles.wheelsHint, { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(10 * uiScale) }]}>
+              Preview
+            </Text>
+          </View>
+          <HomeEdgeButton
+            icon="chart-line-variant"
+            label="Progress"
+            hint="How runs scale up"
+            accent={HomePalette.greenBright}
+            uiScale={uiScale}
+            onPress={() => go("/progression")}
+          />
+        </View>
+
+        <View style={styles.playZone}>
+          <Text
+            style={[
+              styles.playKicker,
+              homeKickerStyle(),
+              { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(11 * uiScale) },
+            ]}
+          >
+            Tap to play
+          </Text>
+          <MaterialCommunityIcons
+            name="chevron-down"
+            size={Math.round(22 * uiScale)}
+            color={HomePalette.yellow}
+            style={styles.playArrow}
+          />
+          <HomePlayButton onPress={startNewRun} uiScale={uiScale} />
+          <Text
+            style={[
+              styles.playGoal,
+              { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(12 * uiScale), lineHeight: Math.round(16 * uiScale) },
+            ]}
+          >
+            {isNewPlayer
+              ? "Your first run starts here — spin wheels and build money."
+              : "Beat your best bank score in the next run."}
+          </Text>
+        </View>
+
+        <Text
+          style={[
+            styles.statsHead,
+            homeKickerStyle(),
+            { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(11 * uiScale) },
+          ]}
+        >
+          Your best
+        </Text>
+        <View style={styles.bottomBar}>
+          <HomeMiniStat label="Best score" value={bankLabel} uiScale={uiScale} />
+          <HomeMiniStat label="Best round" value={cycleLabel} uiScale={uiScale} />
+          <HomeMiniStat label="Games" value={String(totalRuns)} uiScale={uiScale} />
+        </View>
+        <Text style={[styles.version, { fontFamily: FONT_BEBAS_NEUE, fontSize: Math.round(10 * uiScale) }]}>
+          v{version}
+        </Text>
+      </View>
     </SafeAreaView>
   );
 }
@@ -179,241 +196,121 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: Neo.pageBg,
+    backgroundColor: T.background,
   },
-  scroll: {
+  loading: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 22,
-    paddingBottom: 28,
     alignItems: "center",
-  },
-  hero: {
-    width: "100%",
-    alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 20,
-    position: "relative",
-  },
-  decoBlobA: {
-    position: "absolute",
-    top: 40,
-    left: -24,
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Neo.neonMagenta,
-    opacity: 0.35,
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
-  },
-  decoBlobB: {
-    position: "absolute",
-    top: 120,
-    right: -20,
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: Neo.neonCyan,
-    opacity: 0.4,
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
-    transform: [{ rotate: "12deg" }],
-  },
-  kicker: {
-    fontSize: 14,
-    color: Neo.neonYellow,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginTop: 4,
-  },
-  title: {
-    ...neoTitleOnDark(42),
-    lineHeight: 44,
-    marginTop: 4,
-    maxWidth: 340,
-  },
-  tagRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     justifyContent: "center",
-    gap: 8,
-    marginTop: 16,
+    backgroundColor: T.background,
   },
-  featureChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
+  hud: {
+    flex: 1,
+    zIndex: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
   },
-  featureChipText: {
-    fontSize: 13,
-    color: Neo.ink,
-    letterSpacing: 0.35,
+  hudCenter: {
+    pointerEvents: "box-none",
   },
-  statsCard: {
-    width: "100%",
-    maxWidth: 380,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 18,
+  cornerHint: {
+    alignSelf: "center",
+    marginBottom: 2,
+    opacity: 0.85,
   },
-  statsTitle: {
-    fontSize: 16,
-    color: Neo.textOnDark,
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  statsRow: {
+  topBar: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 10,
-  },
-  statPill: {
-    minWidth: 88,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: Neo.neonYellow,
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 18,
-    color: Neo.ink,
-    letterSpacing: 0.3,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: Neo.inkMuted,
-    letterSpacing: 0.35,
-    marginTop: 2,
-  },
-  firstRunCard: {
-    width: "100%",
-    maxWidth: 380,
-    backgroundColor: Neo.neonCyan,
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 18,
-    alignItems: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 6,
   },
-  firstRunTitle: {
-    fontSize: 20,
-    color: Neo.ink,
-    letterSpacing: 0.4,
+  titleWrap: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 2,
   },
-  firstRunBody: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: Neo.inkMuted,
+  titleCard: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  title: {
+    fontSize: 26,
+    lineHeight: 28,
+    color: T.textOnSticker,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
     textAlign: "center",
   },
-  heroBtn: {
-    width: "100%",
-    maxWidth: 380,
-    backgroundColor: Neo.neonYellow,
-    borderWidth: Neo.borderBold,
-    borderColor: Neo.ink,
-    borderRadius: 16,
-    marginBottom: 12,
-    shadowColor: Neo.ink,
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 0,
+  titleThe: {
+    color: "#9333EA",
   },
-  heroBtnPressed: {
-    transform: [{ translateX: 4 }, { translateY: 4 }],
-    shadowOffset: { width: 2, height: 2 },
+  tagline: {
+    fontSize: 12,
+    color: HomePalette.magenta,
+    letterSpacing: 0.35,
+    textAlign: "center",
+    paddingHorizontal: 4,
   },
-  heroBtnInner: {
+  midRow: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    gap: 12,
+    justifyContent: "space-between",
+    paddingVertical: 6,
   },
-  heroBtnIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.55)",
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
+  centerGap: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  heroBtnCopy: {
-    flex: 1,
+  wheelsHint: {
+    fontSize: 10,
+    color: "rgba(250,250,250,0.45)",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  playZone: {
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 8,
+    zIndex: 12,
     gap: 2,
   },
-  heroBtnTitle: {
-    fontSize: 26,
-    color: Neo.ink,
-    letterSpacing: 0.5,
+  playKicker: {
+    letterSpacing: 1,
   },
-  heroBtnSub: {
-    fontSize: 12,
-    color: Neo.inkMuted,
-    letterSpacing: 0.35,
-  },
-  secondaryBtn: {
-    width: "100%",
-    maxWidth: 380,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "rgba(255,255,255,0.88)",
-    borderWidth: Neo.borderThin,
-    borderColor: Neo.ink,
-    borderRadius: 12,
-    marginBottom: 24,
-  },
-  secondaryBtnPressed: {
+  playArrow: {
+    marginBottom: 2,
     opacity: 0.9,
-    transform: [{ scale: 0.99 }],
   },
-  secondaryBtnText: {
-    fontSize: 16,
-    color: Neo.ink,
-    letterSpacing: 0.35,
+  playGoal: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 16,
+    color: "rgba(250,250,250,0.72)",
+    textAlign: "center",
+    paddingHorizontal: 20,
+    letterSpacing: 0.25,
   },
-  footer: {
+  statsHead: {
+    textAlign: "center",
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  bottomBar: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  footerLink: {
-    fontSize: 15,
-    color: Neo.textOnDark,
-    letterSpacing: 0.4,
-    textDecorationLine: "underline",
-  },
-  footerDot: {
-    fontSize: 15,
-    color: Neo.textMutedOnDark,
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 6,
+    paddingTop: 2,
   },
   version: {
-    marginTop: 10,
-    fontSize: 11,
-    color: "rgba(250,250,250,0.45)",
-    letterSpacing: 0.3,
+    fontSize: 10,
+    color: T.textMutedOnDark,
+    letterSpacing: 0.35,
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 2,
   },
 });

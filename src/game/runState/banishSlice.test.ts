@@ -25,6 +25,27 @@ describe("laserRemoveSliceFromWheel", () => {
     expect(afterWheel.spinItems.length).toBe(afterWheel.slices.length);
   });
 
+  it("blocks removal when the wheel already has the minimum wedge count", () => {
+    let run = RunManager.createInitialRun(1);
+    run = { ...run, inventory: { wedgeEraser: 1 } };
+    const wheel = run.wheels[0]!;
+    const minCount = LASER_MIN_SLICE_COUNT;
+    const trimmed = wheel.slices.slice(0, minCount);
+    run = {
+      ...run,
+      wheels: run.wheels.map((w, i) =>
+        i === 0 ? { ...w, slices: trimmed, spinItems: w.spinItems.slice(0, minCount) } : w
+      ),
+    };
+    expect(run.wheels[0]!.slices.length).toBe(minCount);
+
+    const result = laserRemoveSliceFromWheel(run, 0, 0);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toContain(String(minCount));
+    expect(run.inventory?.wedgeEraser).toBe(1);
+  });
+
   it("rebuild respects laser cuts (fewer prize rows)", () => {
     const run = RunManager.createInitialRun(1);
     const slots = getPrizeSlotsForWheel("wheel_1", {

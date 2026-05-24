@@ -48,7 +48,7 @@ import {
 
 import { addRelic } from "./RelicSystem";
 
-import { buildFloorWheels, syncRunWheels } from "./WheelSystem";
+import { buildFloorWheels, rebuildBossWheelForRun, syncRunWheels } from "./WheelSystem";
 
 import {
   getAdvancementCycleStipend,
@@ -74,12 +74,13 @@ const FINAL_WHEEL_INDEX = 8;
 
 function applyClutchCashIfNeeded(run: RunState, wheelIndex: number): RunState {
   if (wheelIndex !== FINAL_WHEEL_INDEX) return run;
-  if (!run.perks.includes("clutch_cash")) return run;
+  const stacks = run.perks.filter((id) => id === "clutch_cash").length;
+  if (stacks === 0) return run;
   const paidCycle = run.runEffects?.clutchCashPaidCycle ?? 0;
   if (paidCycle >= run.floor) return run;
   return {
     ...run,
-    money: run.money + 50,
+    money: run.money + 50 * stacks,
     runEffects: { ...run.runEffects, clutchCashPaidCycle: run.floor },
   };
 }
@@ -235,7 +236,6 @@ export class RunManager {
     if (
       payload.debuffId != null &&
       DEBUFF_CATALOG[payload.debuffId] != null &&
-      !next.debuffs.includes(payload.debuffId) &&
       !rollCurseResisted(next)
     ) {
       next = { ...next, debuffs: [...next.debuffs, payload.debuffId] };
@@ -344,6 +344,9 @@ export class RunManager {
     let next = tickRunEffectsOnWheelAdvance({ ...run, wheelIndex: nextIndex });
     next = applyPostBuilderSliceFloor(next);
     next = applyClutchCashIfNeeded(next, nextIndex);
+    if (nextIndex === FINAL_WHEEL_INDEX) {
+      next = rebuildBossWheelForRun(next);
+    }
 
     return RunManager.checkRunEnd(next);
 
@@ -419,7 +422,7 @@ export class RunManager {
       winStreak: 0,
     };
 
-    const stipend = getAdvancementCycleStipend(next.advancements);
+    const stipend = getAdvancementCycleStipend(next.advancements, nextFloor);
     if (stipend > 0) {
       next = { ...next, money: next.money + stipend };
     }

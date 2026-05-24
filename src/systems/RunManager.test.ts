@@ -9,12 +9,12 @@ describe("RunManager", () => {
     expect(run.wheels).toHaveLength(9);
     expect(run.money).toBe(RUN_DEFAULTS.startingMoney);
     expect(run.phase).toBe("active");
-    expect(run.peakMoney).toBe(0);
+    expect(run.peakMoney).toBe(RUN_DEFAULTS.startingMoney);
   });
 
-  it("allows $0 bank before first spin", () => {
+  it("allows first spin at starting bank", () => {
     const run = RunManager.createInitialRun(1);
-    expect(run.money).toBe(0);
+    expect(run.money).toBe(RUN_DEFAULTS.startingMoney);
     expect(run.chipsEarnedThisRun).toBe(0);
     expect(RunManager.checkRunEnd(run).phase).toBe("active");
     expect(RunManager.canSpin(run, 0)).toBe(true);

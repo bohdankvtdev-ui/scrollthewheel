@@ -6,7 +6,12 @@ import {
   applyPerkPercentGain,
 } from "../game/effects/applyPerkEffects";
 import { isJokerSlotFull } from "../game/shop/jokerSlots";
-import { RUN_DEFAULTS } from "../game/loop";
+import {
+  appendPerkCopy,
+  canAddPerkCopy,
+  countPerkCopies,
+} from "../game/perks/perkStacks";
+import { RUN_DEFAULTS } from "../game/config/run.defaults";
 import { getRunMaxSliceCount, hasAdvancement } from "../game/advancements";
 import { getArchetypeForWheelIndex } from "../game/wheels";
 import type { RunState, SliceCount } from "../schemas";
@@ -16,7 +21,10 @@ import {
   syncRunWheels,
 } from "./WheelSystem";
 import { grantChipsInRun } from "../game/shop/chipEconomy";
-import { removeAllCurses, removeOldestCurse } from "../game/debuffs/curseRules";
+import {
+  clearAllPlayerDebuffs,
+  removeOldestCurse,
+} from "../game/debuffs/curseRules";
 
 const MAX_SLICES = RUN_DEFAULTS.maxSliceCapacity;
 
@@ -65,41 +73,26 @@ export function applyPerkAcquisition(run: RunState, perkId: string): RunState {
     };
   }
 
-  if (perkId === "safe_harbor") {
-    return {
-      ...run,
-      shields: (run.shields ?? 0) + 1,
-      shieldPerks: appendShieldPerk(run, perkId),
-      runEffects: { ...run.runEffects, safeHarborActive: true },
-    };
-  }
-
   if (perkId === "purify_touch") {
-    if (run.perks.includes(perkId)) return run;
-    if (isJokerSlotFull(run)) return run;
-    let next: RunState = { ...run, perks: [...run.perks, perkId] };
+    if (!canAddPerkCopy(run, perkId)) return run;
+    let next = appendPerkCopy(run, perkId);
     if (next.debuffs.length > 0) {
       return removeOldestCurse(next);
     }
-    return grantChipsInRun(next, 5);
+    return next;
   }
 
   if (perkId === "curse_break") {
-    if (run.perks.includes(perkId)) return run;
-    if (isJokerSlotFull(run)) return run;
-    const next: RunState = { ...run, perks: [...run.perks, perkId] };
-    return removeAllCurses(next);
+    let next = clearAllPlayerDebuffs(run);
+    if (!canAddPerkCopy(next, perkId)) return next;
+    return appendPerkCopy(next, perkId);
   }
 
   const isSlice =
     perkId === "extra_slice" || perkId === "slice_expander";
-  if (!isSlice && run.perks.includes(perkId)) return run;
-  if (!isSlice && isJokerSlotFull(run)) return run;
+  if (!isSlice && !canAddPerkCopy(run, perkId)) return run;
 
-  let next: RunState = run;
-  if (!run.perks.includes(perkId)) {
-    next = { ...next, perks: [...next.perks, perkId] };
-  }
+  let next: RunState = isSlice ? run : appendPerkCopy(run, perkId);
 
   if (isSlice) {
     next = addSliceSlots(next, 1);
@@ -140,9 +133,13 @@ export function applyMoneyDelta(
 
   if (delta > 0) {
     delta = applyPerkMoneyPayout(delta, run.perks, run.floorsCleared ?? 0);
+    const taxCutStacks = countPerkCopies(run.perks, "tax_cut");
+    const taxRelief = taxCutStacks > 0 ? Math.max(0, 1 - 0.05 * taxCutStacks) : 1;
     for (const debuffId of run.debuffs) {
       const d = DEBUFF_CATALOG[debuffId];
-      if (d?.moneyTax != null) delta = Math.floor(delta * (1 - d.moneyTax));
+      if (d?.moneyTax != null) {
+        delta = Math.floor(delta * (1 - d.moneyTax * taxRelief));
+      }
     }
   }
 

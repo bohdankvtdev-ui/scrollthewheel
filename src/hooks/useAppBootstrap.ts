@@ -4,6 +4,7 @@ import { useWindowDimensions } from "react-native";
 import { APP_TEXTURE } from "../constants/textureOverlay";
 import { useBebasNeueFonts } from "../../theme/fonts";
 import { isCompactWindow } from "../utils/deviceTier";
+import { initAppServices } from "../services/initApp";
 
 /**
  * Blocks the root UI until fonts (and texture on full-size windows) are ready.
@@ -15,6 +16,17 @@ export function useAppBootstrap(): boolean {
     width > 0 && height > 0 && isCompactWindow(width, height);
   const [fontsLoaded, fontError] = useBebasNeueFonts();
   const [textureReady, setTextureReady] = useState(false);
+  const [servicesReady, setServicesReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void initAppServices().then(() => {
+      if (!cancelled) setServicesReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (width <= 0 || height <= 0) return;
@@ -37,5 +49,5 @@ export function useAppBootstrap(): boolean {
   }, [skipTexture, width, height]);
 
   const fontsReady = fontsLoaded || fontError != null;
-  return fontsReady && textureReady;
+  return fontsReady && textureReady && servicesReady;
 }

@@ -1,10 +1,7 @@
 import type { InfiniteScalingParams, RunState, SliceDefinition, WheelDefinition } from "../schemas";
 import { getCycleParams, getWheelDifficultyBias, getConfigIdForArchetype } from "../game/gdd";
-import {
-  applySliceCapacityFromScaling,
-  getScalingParams,
-  INFINITE_SCALING,
-} from "../game/loop";
+import { getScalingParams, INFINITE_SCALING } from "../game/infiniteScalingConfig";
+import { applySliceCapacityFromScaling } from "../game/loop";
 import {
   buildFloorDefinitionsFromDatabase,
   wheelDefinitionFromConfig,

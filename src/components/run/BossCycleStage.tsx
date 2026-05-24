@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
-import { RUN_PAGE_BACKGROUND } from "../../game/runVisual";
+import { HomePalette } from "../../../theme/homeScreen";
+import { Neo } from "../../../theme/neoBrutal";
 import { isBossCycleOverlay, shouldHideWheelFeedDuringBoss } from "../../game/cycle/bossCycleFlow";
 import type { RunState } from "../../schemas";
 import type { RunUiEffect } from "../../stores/runStore";
@@ -37,7 +38,6 @@ export const BossCycleStage = memo(function BossCycleStage({
 }: BossCycleStageProps) {
   const overlay = isBossCycleOverlay(bossCyclePhase);
   const hideFeed = shouldHideWheelFeedDuringBoss(bossCyclePhase);
-
   return (
     <View style={styles.stage} onLayout={(e) => onLayout(e.nativeEvent.layout.height)}>
       <View
@@ -50,6 +50,9 @@ export const BossCycleStage = memo(function BossCycleStage({
       </View>
       {overlay ? (
         <View style={styles.overlay} pointerEvents="auto">
+          <View style={styles.overlayStripeTop} pointerEvents="none" />
+          <View style={styles.overlayStripeMid} pointerEvents="none" />
+          <View style={styles.overlayGlow} pointerEvents="none" />
           <BossCycleRewardPanel
             run={run}
             bossSliceEffect={bossSliceEffect}
@@ -77,7 +80,36 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: RUN_PAGE_BACKGROUND,
+    backgroundColor: "#6D28D9",
     zIndex: 12,
+  },
+  overlayStripeTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+    backgroundColor: HomePalette.yellow,
+    borderBottomWidth: Neo.borderThin,
+    borderBottomColor: Neo.ink,
+  },
+  overlayStripeMid: {
+    position: "absolute",
+    top: 14,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: HomePalette.cyan,
+    opacity: 0.85,
+  },
+  overlayGlow: {
+    position: "absolute",
+    top: "18%",
+    left: "8%",
+    right: "8%",
+    height: "42%",
+    borderRadius: 999,
+    backgroundColor: HomePalette.magenta,
+    opacity: 0.14,
   },
 });

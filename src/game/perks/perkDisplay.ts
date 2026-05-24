@@ -26,172 +26,176 @@ export type PerkDisplayCopy = {
   bullets: string[];
 };
 
-/** Short lines for shop + detail — max 2 shown in UI. */
+/** Short lines for shop + detail — one primary effect line. */
 export function getPerkDetailLines(perkId: string): string[] {
-  const d = PERK_DISPLAY[perkId];
-  if (d == null) return [];
-  const primary = d.shopLine.trim();
-  const extra = d.bullets.find((b) => b.trim() !== primary);
-  if (extra != null && extra.trim().length > 0) return [primary, extra.trim()];
-  return primary.length > 0 ? [primary] : [];
+  const line = perkLine(perkId);
+  return line.length > 0 ? [line] : [];
 }
 
 export const PERK_DISPLAY: Record<string, PerkDisplayCopy> = {
   lucky_money: {
     tagline: "W1 luck",
-    shopLine: "+12% +$ on Money wheel",
-    bullets: ["Money wheel only"],
+    shopLine: perkLine("lucky_money"),
+    bullets: [],
   },
   lucky_perk: {
     tagline: "W4 luck",
-    shopLine: "+12% perks on Perk wheel",
-    bullets: ["Perk wheel only"],
+    shopLine: perkLine("lucky_perk"),
+    bullets: [],
   },
   lucky_streak: {
     tagline: "Lucky runs",
-    shopLine: "+8% green wedges",
-    bullets: ["+2 chips on cash wins"],
+    shopLine: perkLine("lucky_streak"),
+    bullets: [],
   },
   lucky_percent: {
     tagline: "W2 luck",
-    shopLine: "+10% +% on Percent wheel",
-    bullets: ["Stacks VIP Roller"],
+    shopLine: perkLine("lucky_percent"),
+    bullets: [],
   },
   iron_reserve: {
     tagline: "Block 1 hit",
-    shopLine: "+1 shield",
-    bullets: ["Uses on next loss"],
+    shopLine: perkLine("iron_reserve"),
+    bullets: [],
   },
   ante_insurance: {
     tagline: "Cycle chips",
-    shopLine: "+4 chips per cycle clear",
-    bullets: ["Stacks each cycle"],
+    shopLine: perkLine("ante_insurance"),
+    bullets: [],
   },
   high_roller: {
     tagline: "W1 boost",
-    shopLine: "+10% +$ on Money wheel",
-    bullets: ["Stacks Lucky Money"],
+    shopLine: perkLine("high_roller"),
+    bullets: [],
   },
   gold_rush: {
     tagline: "Cash boost",
-    shopLine: "+20% from +$ wedges",
-    bullets: ["+1 chip on cash wins"],
+    shopLine: perkLine("gold_rush"),
+    bullets: [],
   },
   safe_harbor: {
     tagline: "Softer hits",
-    shopLine: "−20% Risk & Chaos losses",
-    bullets: ["+1 shield on buy"],
+    shopLine: perkLine("safe_harbor"),
+    bullets: [],
   },
   coupon_king: {
     tagline: "Shop sale",
-    shopLine: "Shop prices −15%",
-    bullets: ["Chips only"],
+    shopLine: perkLine("coupon_king"),
+    bullets: [],
   },
   hot_table: {
     tagline: "Rare hunt",
-    shopLine: "+10% rare wedges",
-    bullets: ["Jackpots & perks"],
+    shopLine: perkLine("hot_table"),
+    bullets: [],
   },
   vip_roller: {
     tagline: "% boost",
-    shopLine: "+15% from +% wedges",
-    bullets: ["Percent wheel"],
+    shopLine: perkLine("vip_roller"),
+    bullets: [],
   },
   double_down: {
     tagline: "One double",
-    shopLine: "Next +$ wedge ×2",
-    bullets: ["Once per run"],
+    shopLine: perkLine("double_down"),
+    bullets: [],
   },
   compounder: {
     tagline: "Scale up",
-    shopLine: "+5% cash per cycle cleared",
-    bullets: ["Stacks forever"],
+    shopLine: perkLine("compounder"),
+    bullets: [],
   },
   final_guard: {
     tagline: "Final armor",
-    shopLine: "−15% on Final wheel",
-    bullets: ["Wheel 9"],
+    shopLine: perkLine("final_guard"),
+    bullets: [],
   },
   final_tax_shield: {
     tagline: "Tax cap",
-    shopLine: "Perk tax capped at 15% bank",
-    bullets: ["Final wheel only"],
+    shopLine: perkLine("final_tax_shield"),
+    bullets: [],
   },
   clutch_cash: {
     tagline: "Final payday",
-    shopLine: "+$50 entering Final wheel",
-    bullets: ["Once per cycle"],
+    shopLine: perkLine("clutch_cash"),
+    bullets: [],
   },
   green_fever: {
     tagline: "Green bias",
-    shopLine: "+5% all green wedges",
-    bullets: ["Every wheel"],
+    shopLine: perkLine("green_fever"),
+    bullets: [],
   },
   chip_drip: {
     tagline: "Chip drip",
-    shopLine: "+1 chip on cash wins",
-    bullets: ["Stacks with Gold Rush"],
+    shopLine: perkLine("chip_drip"),
+    bullets: [],
   },
   deep_pockets: {
     tagline: "Deep run",
-    shopLine: "+4 chips on cycle clear",
-    bullets: ["+1 more per cycle #"],
+    shopLine: perkLine("deep_pockets"),
+    bullets: [],
   },
   drain_ward: {
     tagline: "Drain ward",
-    shopLine: "−10% Drain wheel (W5)",
-    bullets: ["Losses only"],
+    shopLine: perkLine("drain_ward"),
+    bullets: [],
   },
   chaos_ward: {
     tagline: "Chaos guard",
-    shopLine: "−12% Chaos wheel (W8)",
-    bullets: ["Stacks Safe Harbor"],
+    shopLine: perkLine("chaos_ward"),
+    bullets: [],
   },
   streak_spark: {
     tagline: "Hot streak",
-    shopLine: "+1 chip on cash wins",
-    bullets: ["Needs win streak 2+"],
+    shopLine: perkLine("streak_spark"),
+    bullets: [],
   },
   jackpot_hunter: {
     tagline: "W6 hunt",
-    shopLine: "+8% rare on Lucky wheel",
-    bullets: ["Jackpots & perks"],
+    shopLine: perkLine("jackpot_hunter"),
+    bullets: [],
   },
   purify_touch: {
     tagline: "Cleanse",
-    shopLine: "Remove oldest curse",
-    bullets: ["+5 chips if you have none"],
+    shopLine: perkLine("purify_touch"),
+    bullets: [],
   },
   hex_ward: {
     tagline: "Curse resist",
-    shopLine: "30% resist new curses",
-    bullets: ["Stacks with shields"],
+    shopLine: perkLine("hex_ward"),
+    bullets: [],
   },
   ghost_repel: {
     tagline: "Boss Ghost",
-    shopLine: "Boss Ghost half strength",
-    bullets: ["Less red wedges this cycle"],
+    shopLine: perkLine("ghost_repel"),
+    bullets: [],
   },
   money_stream: {
     tagline: "W1 stream",
-    shopLine: "+6% +$ on Money wheel",
-    bullets: ["Stacks Lucky Money"],
+    shopLine: perkLine("money_stream"),
+    bullets: [],
   },
   percent_focus: {
     tagline: "W2 focus",
-    shopLine: "+6% +% on Percent wheel",
-    bullets: ["Stacks Lucky Percent"],
+    shopLine: perkLine("percent_focus"),
+    bullets: [],
   },
   curse_break: {
     tagline: "Full cleanse",
-    shopLine: "Remove all curses",
-    bullets: ["One-time on buy"],
+    shopLine: perkLine("curse_break"),
+    bullets: [],
   },
   cycle_momentum: {
     tagline: "Long run",
-    shopLine: "+2 chips every 5 cycles",
-    bullets: ["Cycle 5, 10, 15…"],
+    shopLine: perkLine("cycle_momentum"),
+    bullets: [],
   },
+  rush_hour: { tagline: "W1 rush", shopLine: perkLine("rush_hour"), bullets: [] },
+  perk_magnet: { tagline: "W4 pull", shopLine: perkLine("perk_magnet"), bullets: [] },
+  green_chain: { tagline: "Green link", shopLine: perkLine("green_chain"), bullets: [] },
+  bank_bloom: { tagline: "Cash bloom", shopLine: perkLine("bank_bloom"), bullets: [] },
+  chip_hoarder: { tagline: "Cycle chips", shopLine: perkLine("chip_hoarder"), bullets: [] },
+  tax_cut: { tagline: "Tax relief", shopLine: perkLine("tax_cut"), bullets: [] },
+  bleed_slow: { tagline: "Soft hits", shopLine: perkLine("bleed_slow"), bullets: [] },
+  cycle_tithe: { tagline: "Cycle drip", shopLine: perkLine("cycle_tithe"), bullets: [] },
 };
 
 export function getPerkDisplay(perkId: string): PerkDisplayCopy | null {
@@ -231,6 +235,14 @@ export function perkPrizeLabel(perkId: string): string {
     percent_focus: "Percent Focus",
     curse_break: "Curse Break",
     cycle_momentum: "Cycle Momentum",
+    rush_hour: "Rush Hour",
+    perk_magnet: "Perk Magnet",
+    green_chain: "Green Chain",
+    bank_bloom: "Bank Bloom",
+    chip_hoarder: "Chip Hoarder",
+    tax_cut: "Tax Cut",
+    bleed_slow: "Bleed Slow",
+    cycle_tithe: "Cycle Tithe",
   };
   return names[perkId] ?? perkId;
 }

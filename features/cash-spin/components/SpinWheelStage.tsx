@@ -2,19 +2,23 @@ import { SpinWheel } from "../../../wheel";
 import { spinSafetyTimeoutMs } from "../../../lib/wheel";
 import type { SpinWheelRef } from "../../../wheel/types";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { Animated, Text, View, PixelRatio } from "react-native";
+import { Animated, Easing, Text, View, PixelRatio } from "react-native";
 import {
   computeBulbRingLayout,
   computeBulbRingTopOffset,
   computeStageMinWidth,
   normalizeWheelInnerSize,
+  WHEEL_INNER_MAX_PHONE,
 } from "../../../lib/layout/wheelFrame";
 import { Neo, NeoBulbRingLayoutChrome, NeoWheel } from "../../../theme/neoBrutal";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
+import type { GestureType } from "react-native-gesture-handler";
 import type { SpinWheelItem } from "../../../types/spin";
 import type { WheelPhysicsConfig } from "../../../lib/wheel";
 import type { BulbRingPalette } from "../../../src/game/content/sliceVisualTheme";
 import type { BulbRingPhase } from "../bulbRingPhase";
+import type { SpinFeedbackTier } from "../../../src/game/spinFeedback";
+import { isGainTier, isLossTier } from "../../../src/game/spinFeedback";
 import { NeoBulbRing } from "./NeoBulbRing";
 import { NeoKnob } from "./NeoKnob";
 
@@ -24,11 +28,15 @@ const VICTORY_UI_MS = 3200;
 export type SpinWheelStageProps = {
   data: SpinWheelItem[];
   wheelInnerSize: number;
+  /** Must match `computeRunWheelStageDimensions().wheelInnerMax` on the run screen. */
+  wheelInnerMax?: number;
   textSize: number;
   wheelPhysics: WheelPhysicsConfig;
   segmentColors: readonly string[];
   textColor: string;
   onSpinComplete: (item: SpinWheelItem) => void;
+  /** Fires when the wheel animation ends (parent applies armed slice from store). */
+  onSpinSettled?: () => void;
   /**
    * Optional: drive the bulb ring from the parent (`idle` | `spinning` | `victory`).
    * When omitted, the stage owns phase (spin → victory flash → idle).
@@ -65,16 +73,22 @@ export type SpinWheelStageProps = {
   /** Increment to arm bulb safety + sync external spins (parent-driven `spinToIndex`). */
   spinArmEpoch?: number;
   onSpinInterrupted?: () => void;
+  /** Reel vertical pan — required for center hub taps inside `GestureDetector`. */
+  stripPanGesture?: GestureType;
+  /** Money / loss tier — subtle disc shake only (page wash is on `RunScreen`). */
+  spinFeedbackTier?: SpinFeedbackTier | null;
 };
 
 export function SpinWheelStage({
   data,
   wheelInnerSize,
+  wheelInnerMax = WHEEL_INNER_MAX_PHONE,
   textSize,
   wheelPhysics,
   segmentColors,
   textColor,
   onSpinComplete,
+  onSpinSettled,
   bulbRingPhase: bulbRingPhaseProp,
   onBulbRingPhaseChange,
   ringPhaseResetKey,
@@ -95,6 +109,8 @@ export function SpinWheelStage({
   slicePressEnabled = true,
   spinArmEpoch,
   onSpinInterrupted,
+  stripPanGesture,
+  spinFeedbackTier = null,
 }: SpinWheelStageProps) {
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const victoryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,24 +119,30 @@ export function SpinWheelStage({
   const [internalPhase, setInternalPhase] = useState<BulbRingPhase>("idle");
 
   const ringPhase = bulbRingPhaseProp ?? internalPhase;
+  const bulbPhaseControlled = bulbRingPhaseProp !== undefined;
 
   /** Mirrors prize-disc lift pulse (`SpinWheel` spinDiscScale) so the bulb ring shakes with the wheel. */
   const chromeDiscScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    if (bulbPhaseControlled) return;
     onBulbRingPhaseChange?.(ringPhase);
-  }, [ringPhase, onBulbRingPhaseChange]);
+  }, [bulbPhaseControlled, ringPhase, onBulbRingPhaseChange]);
 
-  const wheel = useMemo(() => normalizeWheelInnerSize(wheelInnerSize), [wheelInnerSize]);
+  const wheel = useMemo(
+    () => normalizeWheelInnerSize(wheelInnerSize, wheelInnerMax),
+    [wheelInnerMax, wheelInnerSize]
+  );
 
   const layout = useMemo(
     () =>
       computeBulbRingLayout({
         wheelInnerSize: wheel,
         bulbCount: DEFAULT_BULB_COUNT,
+        maxWheelInnerSize: wheelInnerMax,
         ...NeoBulbRingLayoutChrome,
       }),
-    [wheel]
+    [wheel, wheelInnerMax]
   );
 
   const ringTop = useMemo(
@@ -129,8 +151,8 @@ export function SpinWheelStage({
   );
 
   const stageWidth = useMemo(
-    () => computeStageMinWidth(wheel, layout.outerDiameter),
-    [wheel, layout.outerDiameter]
+    () => computeStageMinWidth(wheel, layout.outerDiameter, wheelInnerMax),
+    [wheel, layout.outerDiameter, wheelInnerMax]
   );
 
   const clearSafety = useCallback(() => {
@@ -172,50 +194,105 @@ export function SpinWheelStage({
   }, [bulbRingPhaseProp, ringPhaseResetKey, clearSafety, clearVictory, onBulbRingPhaseChange]);
 
   const armSafetyTimer = useCallback(() => {
-    onBulbRingPhaseChange?.("spinning");
-    if (bulbRingPhaseProp === undefined) {
+    if (!bulbPhaseControlled) {
+      onBulbRingPhaseChange?.("spinning");
       setInternalPhase("spinning");
     }
     clearSafety();
     safetyTimer.current = setTimeout(() => {
       safetyTimer.current = null;
       if (!mountedRef.current) return;
-      onBulbRingPhaseChange?.("idle");
-      if (bulbRingPhaseProp === undefined) {
+      if (!bulbPhaseControlled) {
+        onBulbRingPhaseChange?.("idle");
         setInternalPhase((p) => (p === "spinning" ? "idle" : p));
       }
     }, spinSafetyTimeoutMs(wheelPhysics));
-  }, [bulbRingPhaseProp, clearSafety, onBulbRingPhaseChange, wheelPhysics]);
+  }, [bulbPhaseControlled, clearSafety, onBulbRingPhaseChange, wheelPhysics]);
 
   useEffect(() => {
     if (spinArmEpoch == null || spinArmEpoch <= 0) return;
     armSafetyTimer();
   }, [armSafetyTimer, spinArmEpoch]);
 
+  useEffect(() => {
+    if (spinFeedbackTier == null || spinFeedbackTier === "neutral") return;
+    if (isLossTier(spinFeedbackTier)) {
+      chromeDiscScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(chromeDiscScale, {
+          toValue: 0.985,
+          duration: 50,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(chromeDiscScale, {
+          toValue: 1.012,
+          duration: 50,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(chromeDiscScale, {
+          toValue: 1,
+          duration: 80,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+    if (isGainTier(spinFeedbackTier)) {
+      const peak = spinFeedbackTier === "gain_jackpot" ? 1.08 : 1.05;
+      chromeDiscScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(chromeDiscScale, {
+          toValue: peak,
+          duration: 140,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(chromeDiscScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [spinFeedbackTier, chromeDiscScale]);
+
   const onLibrarySpinEnd = useCallback(
-    (item: SpinWheelItem) => {
+    (item: SpinWheelItem | null | undefined, _index: number) => {
       clearSafety();
       clearVictory();
-      if (item != null && String(item.id ?? "").trim() !== "") {
+      if (externalSpinControl) {
+        onSpinSettled?.();
+      } else if (item != null) {
         onSpinComplete(item);
+      }
+      const showVictory = externalSpinControl || item != null;
+      if (showVictory && bulbRingPhaseProp === undefined) {
         onBulbRingPhaseChange?.("victory");
-        if (bulbRingPhaseProp === undefined) {
-          setInternalPhase("victory");
-          victoryTimer.current = setTimeout(() => {
-            victoryTimer.current = null;
-            if (!mountedRef.current) return;
-            onBulbRingPhaseChange?.("idle");
-            setInternalPhase("idle");
-          }, VICTORY_UI_MS);
-        }
-      } else {
-        onBulbRingPhaseChange?.("idle");
-        if (bulbRingPhaseProp === undefined) {
+        setInternalPhase("victory");
+        victoryTimer.current = setTimeout(() => {
+          victoryTimer.current = null;
+          if (!mountedRef.current) return;
+          onBulbRingPhaseChange?.("idle");
           setInternalPhase("idle");
-        }
+        }, VICTORY_UI_MS);
+      } else if (!showVictory && bulbRingPhaseProp === undefined) {
+        onBulbRingPhaseChange?.("idle");
+        setInternalPhase("idle");
       }
     },
-    [bulbRingPhaseProp, clearSafety, clearVictory, onBulbRingPhaseChange, onSpinComplete]
+    [
+      bulbRingPhaseProp,
+      clearSafety,
+      clearVictory,
+      externalSpinControl,
+      onBulbRingPhaseChange,
+      onSpinComplete,
+      onSpinSettled,
+    ]
   );
 
   if (data.length === 0) {
@@ -267,7 +344,7 @@ export function SpinWheelStage({
               size={wheel}
               wheelPhysics={wheelPhysics}
               syncDiscScale={chromeDiscScale}
-              segmentBgColor={segmentColors}
+              segmentBgColor={[...segmentColors]}
               segmentStrokeColor={NeoWheel.segmentStroke}
               segmentStrokeWidth={NeoWheel.segmentStrokeWidth}
               segmentPadAngle={NeoWheel.segmentPadAngle}
@@ -284,7 +361,7 @@ export function SpinWheelStage({
               showSpinButton
               centerSpinButton
               hubSoftShadow={false}
-              prizeSliceVictoryShine={ringPhase === "victory"}
+              prizeSliceVictoryShine={ringPhase === "victory" || ringPhase === "jackpot"}
               spinLocked={spinLocked}
               hubMode={hubMode}
               onHubClaimPress={onHubClaimPress}
@@ -303,10 +380,11 @@ export function SpinWheelStage({
                   onExternalSpinPress?.();
                 }
               }}
-              onSpinEnd={(item) => {
-                onLibrarySpinEnd(item);
+              onSpinEnd={(item, index) => {
+                onLibrarySpinEnd(item, index);
               }}
               onSpinInterrupted={onSpinInterrupted}
+              stripPanGesture={stripPanGesture}
             />
             {scrollGrainOverlay != null ? (
               <View

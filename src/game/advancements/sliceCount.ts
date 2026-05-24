@@ -1,11 +1,15 @@
 import type { SliceCount } from "../../schemas";
 import { clampSliceCount } from "../../schemas/wheel.schema";
-import { getSliceCountForCycle } from "../cycle/cycleProgression";
 import { FLOOR_WHEEL_ORDER } from "../wheels/database/wheelDatabase";
 import type { WheelConfigId } from "../wheels/database/types";
 import { hasAdvancement } from "./advancementCatalog";
 
 export const BASE_SLICES_PER_WHEEL = 6;
+
+/** Base wedges per wheel — only builder / shop upgrades add more (`permanentWedgeBonus`). */
+export function getSliceCountForCycle(_cycle: number, _advancements: string[] = []): number {
+  return clampSliceCount(BASE_SLICES_PER_WHEEL);
+}
 
 /** Extra wedges from advancements on a given wheel (0–3). */
 export function getExtraSlicesForWheel(

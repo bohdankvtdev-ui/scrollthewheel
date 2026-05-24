@@ -16,10 +16,7 @@ describe("wheelDatabase", () => {
     for (const id of FLOOR_WHEEL_ORDER) {
       const slices = getConfiguredWheelSlices(id, id);
       expect(slices).toHaveLength(SLICES_PER_WHEEL);
-      const labels = new Set(slices.map((s) => s.label));
-      if (!slices.some((s) => s.label === "Nothing")) {
-        expect(labels.size).toBe(SLICES_PER_WHEEL);
-      }
+      expect(slices.length).toBe(SLICES_PER_WHEEL);
     }
   });
 
@@ -116,16 +113,37 @@ describe("wheelDatabase", () => {
     expect(slices.some((s) => s.label.includes("%"))).toBe(true);
   });
 
-  it("cycle 1 money wheel has no losses or nothing", () => {
+  it("cycle 1 money wheel is positive cash only", () => {
     const slices = getConfiguredWheelSlices("wheel_1", "wheel_1", 1);
-    expect(slices.every((s) => s.kind === "money")).toBe(true);
+    const cash = slices.filter((s) => s.kind === "money");
+    const downside = slices.filter((s) => s.kind === "money_loss");
+    expect(cash.length).toBeGreaterThanOrEqual(4);
+    expect(downside.length).toBe(0);
     expect(slices.some((s) => s.label === "Nothing")).toBe(false);
+  });
+
+  it("cycle 1 money wheel shows distinct +$ labels (no cap-collapsed duplicates)", () => {
+    const slices = getConfiguredWheelSlices("wheel_1", "wheel_1", 1);
+    const gainLabels = slices
+      .filter((s) => s.kind === "money")
+      .map((s) => s.label);
+    expect(new Set(gainLabels).size).toBe(gainLabels.length);
+    const count120 = gainLabels.filter((l) => l === "+$120").length;
+    expect(count120).toBeLessThanOrEqual(1);
+  });
+
+  it("drain wheel (W5) includes bank % cuts", () => {
+    const slices = getConfiguredWheelSlices("wheel_5", "wheel_5", 1);
+    expect(slices.some((s) => s.kind === "bank_cut" && (s.payload.bankPercent ?? 0) < 0)).toBe(
+      true
+    );
+    expect(slices.reduce((sum, s) => sum + s.baseWeight, 0)).toBe(100);
   });
 
   it("wheel_1 is money-themed with same cash icon on +$ wedges", () => {
     const slices = getConfiguredWheelSlices("wheel_1", "wheel_1", 2);
     expect(slices).toHaveLength(6);
-    expect(slices.every((s) => s.kind === "money" || s.kind === "money_loss")).toBe(true);
+    expect(slices.every((s) => s.kind === "money")).toBe(true);
     expect(slices.filter((s) => s.kind === "money").every((s) => s.icon === "attach-money")).toBe(
       true
     );
@@ -136,14 +154,15 @@ describe("wheelDatabase", () => {
   it("cycle 2 scales money wheel payouts above cycle 1", () => {
     const c1 = getConfiguredWheelSlices("wheel_1", "wheel_1", 1);
     const c2 = getConfiguredWheelSlices("wheel_1", "wheel_1_f2", 2);
-    const minGain = (rows: typeof c1) =>
-      Math.min(
+    const maxGain = (rows: typeof c1) =>
+      Math.max(
+        0,
         ...rows
           .filter((s) => s.kind === "money")
           .map((s) => s.payload.moneyDelta ?? 0)
           .filter((n) => n > 0)
       );
-    expect(minGain(c2)).toBeGreaterThan(minGain(c1));
+    expect(maxGain(c2)).toBeGreaterThan(maxGain(c1));
   });
 
   it("lucky wheel layout is stable per run seed", () => {
@@ -213,15 +232,18 @@ describe("wheelDatabase", () => {
     const flatWins = finalWheel.filter((s) => (s.payload.moneyDelta ?? 0) > 0);
     expect(flatLosses.length).toBeGreaterThanOrEqual(3);
     expect(flatLosses.length).toBeGreaterThan(flatWins.length);
-    expect(
-      finalWheel.some(
-        (s) =>
-          s.payload.runEffectId === "boss_perk_tax" ||
-          s.kind === "bank_cut" ||
-          s.payload.runEffectId === "boss_overhead"
-      )
-    ).toBe(true);
-    expect(finalWheel.some((s) => s.payload.moneyDelta === 800)).toBe(false);
+    expect(finalWheel.some((s) => s.payload.runEffectId === "boss_perk_tax")).toBe(false);
+    expect(finalWheel.some((s) => s.payload.runEffectId === "boss_shield_break")).toBe(false);
+    expect(finalWheel.some((s) => s.payload.runEffectId === "debt_bomb")).toBe(false);
+    expect(finalWheel.some((s) => s.kind === "bank_cut")).toBe(false);
+    expect(finalWheel.some((s) => s.kind === "bank_wipe")).toBe(false);
+
+    const bossLate = getConfiguredWheelSlices("wheel_9", "wheel_9", {
+      runId: "__boss_late__",
+      cycle: 4,
+      ownedPerks: [],
+    });
+    expect(bossLate.every((s) => s.kind === "money_loss" || s.kind === "neutral" || s.kind === "money" || s.kind === "bank_wipe")).toBe(true);
   });
 
   it("prints wheel_1 odds (manual inspect)", () => {

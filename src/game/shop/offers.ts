@@ -3,6 +3,7 @@ import type { RunState } from "../../schemas";
 import { BALATRO_ECONOMY } from "../balatroEconomy";
 import { shopChipCost } from "./chipEconomy";
 import { countJokers, isJokerSlotFull } from "./jokerSlots";
+import { canAddPerkCopy, perkHiddenFromShop } from "../perks/perkStacks";
 
 function seedFromRun(run: RunState, salt: number): number {
   let h = salt;
@@ -26,7 +27,8 @@ function nodeAvailable(run: RunState, node: ShopPerkNode): boolean {
   if (node.perkId === "extra_slice" || node.perkId === "slice_expander") {
     return false;
   }
-  if (run.perks.includes(node.perkId)) return false;
+  if (perkHiddenFromShop(run, node.perkId)) return false;
+  if (!canAddPerkCopy(run, node.perkId)) return false;
   if (isJokerSlotFull(run)) return false;
   for (const req of node.requires) {
     if (!run.perks.includes(req)) {

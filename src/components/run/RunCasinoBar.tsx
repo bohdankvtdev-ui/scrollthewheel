@@ -73,6 +73,11 @@ export function RunCasinoBar({
   }));
 
   useEffect(() => {
+    setShownMoney(run.money);
+    setLossTintActive(false);
+  }, [run.runId]);
+
+  useEffect(() => {
     if (revealKey == null) {
       setShownMoney(run.money);
       return;
@@ -175,7 +180,7 @@ export function RunCasinoBar({
             style={[
               styles.moneyDelta,
               isLossReveal ? styles.moneyDeltaLoss : styles.moneyDeltaGain,
-              { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.narrow ? 13 : 14 },
+              { fontFamily: FONT_BEBAS_NEUE, fontSize: chrome.bar.deltaFontSize },
             ]}
             numberOfLines={1}
           >

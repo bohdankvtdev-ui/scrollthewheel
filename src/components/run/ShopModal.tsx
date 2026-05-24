@@ -12,24 +12,29 @@ import {
 } from "react-native";
 import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
+import { homeBrutalButton, homeKickerStyle, HomePalette, HomeScreenTheme as T } from "../../../theme/homeScreen";
 import { BALATRO_ECONOMY } from "../../game/balatroEconomy";
 import { PERK_TIER_LABELS } from "../../game/gdd";
+import { PERK_CATALOG } from "../../data/perks";
+import { getPerkFamily, PERK_FAMILY_COLORS, PERK_FAMILY_LABELS } from "../../game/perks/perkFamilies";
+import { shortenPerkLockReason } from "../../game/shop/perkCatalog";
 import { getSpendableChips } from "../../game/shop/chipEconomy";
 import { shopRerollCost } from "../../game/shop/offers";
-import { countJokers, ShopSystem, type ShopPerkCatalogEntry } from "../../systems/ShopSystem";
+import { countJokers, ShopSystem } from "../../systems/ShopSystem";
 import type { RunState } from "../../schemas";
 
 const SHOP = {
-  bg: "#0F0A18",
-  card: "#1A1228",
-  cardBorder: "#2D2440",
-  jokerAccent: "#FFE94D",
-  advAccent: "#A78BFA",
-  text: "#FAFAFA",
-  muted: "rgba(250,250,250,0.62)",
-  chip: "#22D3EE",
-  money: "#4ADE80",
-  danger: "#FB7185",
+  bg: T.background,
+  panel: T.panelDark,
+  card: "#2E2444",
+  border: T.ink,
+  text: T.textOnDark,
+  muted: T.textMutedOnDark,
+  chip: HomePalette.cyan,
+  money: HomePalette.green,
+  perk: HomePalette.yellow,
+  upgrade: HomePalette.purpleBright,
+  danger: HomePalette.magenta,
 } as const;
 
 type ShopModalProps = {
@@ -44,18 +49,99 @@ type ShopModalProps = {
   onReroll: () => void;
 };
 
-function ChipCost({ cost, large }: { cost: number; large?: boolean }) {
+type OfferNode = ReturnType<typeof ShopSystem.listOfferNodes>[number];
+type AdvNode = ReturnType<typeof ShopSystem.listAdvancementNodes>[number];
+
+function perkShopStyle(perkId: string) {
+  const catalog = PERK_CATALOG[perkId];
+  if (catalog == null) {
+    return {
+      bg: SHOP.perk,
+      accent: Neo.ink,
+      cardTint: "rgba(255, 235, 59, 0.12)",
+      border: SHOP.perk,
+      label: "PERK",
+    };
+  }
+  const family = getPerkFamily(perkId, catalog.category);
+  const colors = PERK_FAMILY_COLORS[family];
+  return { ...colors, label: PERK_FAMILY_LABELS[family].toUpperCase() };
+}
+
+function ChipCost({
+  cost,
+  large,
+  muted,
+  showLabel,
+}: {
+  cost: number;
+  large?: boolean;
+  muted?: boolean;
+  showLabel?: boolean;
+}) {
+  const color = muted ? SHOP.muted : SHOP.chip;
   return (
     <View style={styles.chipCostRow}>
-      <MaterialCommunityIcons name="poker-chip" size={large ? 22 : 18} color={SHOP.chip} />
-      <Text style={[styles.chipCostText, large && styles.chipCostTextLg, { fontFamily: FONT_BEBAS_NEUE }]}>
+      <MaterialCommunityIcons name="poker-chip" size={large ? 20 : 16} color={color} />
+      <Text
+        style={[
+          styles.chipCostText,
+          large && styles.chipCostTextLg,
+          muted && styles.chipCostTextMuted,
+          { fontFamily: FONT_BEBAS_NEUE, color },
+        ]}
+      >
         {cost}
+        {showLabel ? " chips" : ""}
       </Text>
     </View>
   );
 }
 
-type AdvNode = ReturnType<typeof ShopSystem.listAdvancementNodes>[number];
+function CardPriceFooter({
+  cost,
+  playerChips,
+  canAfford,
+  owned,
+  locked,
+  lockReason,
+}: {
+  cost: number;
+  playerChips: number;
+  canAfford: boolean;
+  owned: boolean;
+  locked: boolean;
+  lockReason?: string | null;
+}) {
+  const lockLabel = shortenPerkLockReason(lockReason ?? null);
+  const shortfall = Math.max(0, cost - playerChips);
+
+  if (owned) {
+    return (
+      <Text style={[styles.statusText, styles.statusTextOwned, { fontFamily: FONT_BEBAS_NEUE }]}>
+        Owned
+      </Text>
+    );
+  }
+
+  return (
+    <View style={styles.priceFooterCol}>
+      <View style={[styles.pricePill, !canAfford && styles.pricePillShort]}>
+        <ChipCost cost={cost} large muted={!canAfford} />
+      </View>
+      {!canAfford && shortfall > 0 ? (
+        <Text style={[styles.shortfallText, { fontFamily: FONT_BEBAS_NEUE }]}>
+          Short {shortfall}
+        </Text>
+      ) : null}
+      {locked && lockLabel != null ? (
+        <Text style={[styles.lockHintText, { fontFamily: FONT_BEBAS_NEUE }]} numberOfLines={2}>
+          {lockLabel}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 function ShopCard({
   title,
@@ -75,6 +161,9 @@ function ShopCard({
   fullWidth,
   featured,
   tier,
+  playerChips,
+  cardTint,
+  familyBorder,
 }: {
   title: string;
   subtitle: string;
@@ -93,10 +182,12 @@ function ShopCard({
   fullWidth?: boolean;
   featured?: boolean;
   tier?: number;
+  playerChips: number;
+  cardTint?: string;
+  familyBorder?: string;
 }) {
   const disabled = owned || locked || !canAfford;
-  const statusLabel =
-    owned ? "OWNED" : locked && lockReason != null ? lockReason.toUpperCase() : locked ? "LOCKED" : null;
+  const lockLabel = shortenPerkLockReason(lockReason ?? null);
 
   return (
     <Pressable
@@ -104,15 +195,25 @@ function ShopCard({
       style={({ pressed }) => [
         styles.card,
         fullWidth && styles.cardFull,
-        { borderColor: featured ? SHOP.jokerAccent : accent },
-        featured && styles.cardFeatured,
+        featured
+          ? {
+              backgroundColor: cardTint ?? "rgba(255, 235, 59, 0.1)",
+              borderWidth: T.borderBold,
+              borderColor: familyBorder ?? SHOP.perk,
+              borderLeftWidth: 6,
+              borderLeftColor: familyBorder ?? SHOP.perk,
+            }
+          : { borderColor: accent },
         owned && styles.cardOwned,
         disabled && !owned && styles.cardDisabled,
         !disabled && pressed && styles.cardPressed,
       ]}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      accessibilityLabel={`${title}. ${description}. ${owned ? "Owned" : `${cost} chips${!canAfford ? `, short ${Math.max(0, cost - playerChips)}` : ""}`}${lockLabel ? `. ${lockLabel}` : ""}`}
     >
       <View style={[styles.iconWrap, { backgroundColor: accent }]}>
-        <VectorIcon name={icon} family={iconFamily} size={36} color={iconTint ?? Neo.ink} />
+        <VectorIcon name={icon} family={iconFamily} size={34} color={iconTint ?? Neo.ink} />
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTopRow}>
@@ -121,88 +222,35 @@ function ShopCard({
           </Text>
           <View style={styles.badgeRow}>
             {tier != null ? (
-              <Text style={[styles.tierBadge, { fontFamily: FONT_BEBAS_NEUE }]}>
-                {PERK_TIER_LABELS[tier as 0 | 1 | 2 | 3] ?? `T${tier}`}
-              </Text>
+              <View style={styles.tierPill}>
+                <Text style={[styles.tierBadge, { fontFamily: FONT_BEBAS_NEUE }]}>
+                  {PERK_TIER_LABELS[tier as 0 | 1 | 2 | 3] ?? `T${tier}`}
+                </Text>
+              </View>
             ) : null}
-            <Text style={[styles.badge, { color: accent, fontFamily: FONT_BEBAS_NEUE }]}>{badge}</Text>
+            <View style={[styles.familyPill, { backgroundColor: accent }]}>
+              <Text style={[styles.badge, { color: iconTint ?? Neo.ink, fontFamily: FONT_BEBAS_NEUE }]}>
+                {badge}
+              </Text>
+            </View>
           </View>
         </View>
-        <Text style={styles.cardSubtitle} numberOfLines={1}>
-          {featured ? `★ Pick · ${subtitle}` : subtitle}
+        <Text style={[styles.cardSubtitle, { color: iconTint ?? accent }]} numberOfLines={1}>
+          {subtitle}
         </Text>
         <Text style={styles.cardDesc} numberOfLines={2}>
           {description}
         </Text>
       </View>
       <View style={styles.cardFooter}>
-        {statusLabel != null ? (
-          <Text
-            style={[
-              styles.statusText,
-              lockReason != null && styles.statusTextSmall,
-              { fontFamily: FONT_BEBAS_NEUE },
-            ]}
-            numberOfLines={2}
-          >
-            {statusLabel}
-          </Text>
-        ) : !canAfford ? (
-          <Text style={[styles.statusText, { color: SHOP.danger, fontFamily: FONT_BEBAS_NEUE }]}>
-            NEED CHIPS
-          </Text>
-        ) : (
-          <ChipCost cost={cost} large />
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-function PerkCatalogTile({
-  entry,
-  onPress,
-}: {
-  entry: ShopPerkCatalogEntry;
-  onPress: () => void;
-}) {
-  const disabled = !entry.purchasable || !entry.canAfford;
-  const status =
-    entry.owned
-      ? "✓"
-      : entry.lockReason != null
-        ? "!"
-        : entry.canAfford
-          ? entry.cost
-          : "·";
-
-  return (
-    <Pressable
-      onPress={disabled ? undefined : onPress}
-      style={({ pressed }) => [
-        styles.catalogTile,
-        { borderColor: entry.inOffers ? SHOP.jokerAccent : entry.familyBg },
-        entry.inOffers && styles.catalogTileFeatured,
-        entry.owned && styles.catalogTileOwned,
-        !disabled && pressed && styles.cardPressed,
-      ]}
-      accessibilityLabel={`${entry.name} — ${entry.description}`}
-    >
-      <View style={[styles.catalogIcon, { backgroundColor: entry.familyBg }]}>
-        <VectorIcon name={entry.icon} family={entry.iconFamily} size={22} color={entry.familyAccent} />
-      </View>
-      <Text style={[styles.catalogName, { fontFamily: FONT_BEBAS_NEUE }]} numberOfLines={1}>
-        {entry.name}
-      </Text>
-      <Text style={styles.catalogDesc} numberOfLines={2}>
-        {entry.description}
-      </Text>
-      <View style={styles.catalogFooter}>
-        {typeof status === "number" ? (
-          <ChipCost cost={status} />
-        ) : (
-          <Text style={[styles.catalogStatus, { fontFamily: FONT_BEBAS_NEUE }]}>{status}</Text>
-        )}
+        <CardPriceFooter
+          cost={cost}
+          playerChips={playerChips}
+          canAfford={canAfford}
+          owned={owned}
+          locked={locked}
+          lockReason={lockReason}
+        />
       </View>
     </Pressable>
   );
@@ -242,9 +290,7 @@ export function ShopModal({
     if (!visible) setRerolls(0);
   }, [visible]);
 
-  const perkCatalog = ShopSystem.listPerkCatalog(run, offerIds);
-  const dealPerks = perkCatalog.filter((e) => e.inOffers && !e.owned);
-  const catalogPerks = perkCatalog.filter((e) => !e.owned);
+  const perkOffers = ShopSystem.listOfferNodes(run, offerIds);
   const advNodes = ShopSystem.listAdvancementNodes(run, advancementIds);
   const owned = ShopSystem.listOwnedJokers(run);
   const ownedAdv = ShopSystem.listOwnedAdvancements(run);
@@ -254,6 +300,7 @@ export function ShopModal({
   const advCount = (run.advancements ?? []).length;
   const chips = getSpendableChips(run);
   const rerollChipCost = shopRerollCost(run, rerolls);
+  const canReroll = chips >= rerollChipCost;
   const cardFull = width < 400;
 
   const handleReroll = useCallback(() => {
@@ -266,35 +313,41 @@ export function ShopModal({
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <View>
-              <Text style={[styles.title, { fontFamily: FONT_BEBAS_NEUE }]}>Shop</Text>
-              <Text style={styles.subtitle}>Buy any unlocked perk · reroll picks</Text>
+            <View style={styles.headerText}>
+              <Text style={[styles.kicker, homeKickerStyle(), { fontFamily: FONT_BEBAS_NEUE }]}>
+                Between wheels
+              </Text>
+              <Text style={[styles.title, { fontFamily: FONT_BEBAS_NEUE }]}>
+                Perk <Text style={styles.titleAccent}>shop</Text>
+              </Text>
+              <Text style={styles.subtitle}>Pick one perk · reroll for new options</Text>
             </View>
-            <Pressable onPress={onClose} hitSlop={16} style={styles.closeBtn}>
-              <MaterialIcons name="close" size={28} color={SHOP.text} />
+            <Pressable onPress={onClose} hitSlop={16} style={styles.closeBtn} accessibilityLabel="Close shop">
+              <MaterialIcons name="close" size={26} color={SHOP.text} />
             </Pressable>
           </View>
 
+          <View style={styles.chipHero}>
+            <MaterialCommunityIcons name="poker-chip" size={28} color={SHOP.chip} />
+            <Text style={[styles.chipHeroValue, { fontFamily: FONT_BEBAS_NEUE }]}>{chips}</Text>
+            <Text style={styles.chipHeroLabel}>shop chips</Text>
+          </View>
+
           <View style={styles.statsRow}>
-            <View style={styles.statPill}>
-              <MaterialCommunityIcons name="poker-chip" size={22} color={SHOP.chip} />
-              <Text style={[styles.statValue, { fontFamily: FONT_BEBAS_NEUE }]}>{chips}</Text>
-              <Text style={styles.statLabel}>chips</Text>
-            </View>
-            <View style={styles.statPill}>
-              <MaterialIcons name="attach-money" size={22} color={SHOP.money} />
+            <View style={[styles.statPill, styles.statPillMoney]}>
+              <MaterialIcons name="attach-money" size={18} color={SHOP.money} />
               <Text style={[styles.statValue, { fontFamily: FONT_BEBAS_NEUE }]}>${run.money}</Text>
               <Text style={styles.statLabel}>bank</Text>
             </View>
-            <View style={styles.statPill}>
-              <MaterialIcons name="auto-awesome" size={20} color={SHOP.jokerAccent} />
+            <View style={[styles.statPill, styles.statPillPerk]}>
+              <MaterialIcons name="auto-awesome" size={18} color={SHOP.perk} />
               <Text style={[styles.statValue, { fontFamily: FONT_BEBAS_NEUE }]}>
                 {jokers}/{BALATRO_ECONOMY.maxJokerSlots}
               </Text>
               <Text style={styles.statLabel}>perks</Text>
             </View>
-            <View style={styles.statPill}>
-              <MaterialIcons name="upgrade" size={20} color={SHOP.advAccent} />
+            <View style={[styles.statPill, styles.statPillUpgrade]}>
+              <MaterialIcons name="upgrade" size={18} color={HomePalette.purple} />
               <Text style={[styles.statValue, { fontFamily: FONT_BEBAS_NEUE }]}>
                 {advCount}/{BALATRO_ECONOMY.maxAdvancements}
               </Text>
@@ -308,102 +361,118 @@ export function ShopModal({
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Perk picks</Text>
-              <Text style={styles.sectionHint}>Reroll refreshes highlighted deals · buy any unlocked perk below</Text>
-              {dealPerks.length === 0 ? (
-                <Text style={styles.emptyHint}>No deals — check the catalog or reroll</Text>
-              ) : (
-                dealPerks.map((entry) => (
-                  <ShopCard
-                    key={`deal-${entry.perkId}`}
-                    title={entry.name}
-                    subtitle={entry.tagline || entry.familyLabel}
-                    description={entry.description}
-                    icon={entry.icon}
-                    iconFamily={
-                      entry.iconFamily === "MaterialCommunityIcons"
-                        ? "MaterialCommunityIcons"
-                        : "MaterialIcons"
-                    }
-                    accent={entry.familyBg}
-                    iconTint={entry.familyAccent}
-                    badge={entry.familyLabel.toUpperCase()}
-                    tier={entry.tier}
-                    cost={entry.cost}
-                    owned={entry.owned}
-                    locked={!entry.purchasable}
-                    lockReason={entry.lockReason}
-                    canAfford={entry.canAfford}
-                    featured
-                    onPress={() => onBuy(entry.perkId)}
-                    fullWidth={cardFull}
-                  />
-                ))
-              )}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>All perks</Text>
-              <Text style={styles.sectionHint}>
-                {catalogPerks.length} available · tap to buy when unlocked
-              </Text>
-              <View style={styles.catalogGrid}>
-                {perkCatalog.map((entry) => (
-                  <View key={`cat-${entry.perkId}`} style={styles.catalogCell}>
-                    <PerkCatalogTile
-                      entry={entry}
-                      onPress={() => onBuy(entry.perkId)}
-                    />
-                  </View>
-                ))}
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionDot} />
+                <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Perk picks</Text>
               </View>
+              <Text style={styles.sectionHint}>
+                Price in chips on every card — tap to buy
+              </Text>
+              {perkOffers.length === 0 ? (
+                <Text style={styles.emptyHint}>No perks available — try rerolling</Text>
+              ) : (
+                perkOffers.map((node: OfferNode) => {
+                  const family = perkShopStyle(node.perkId);
+                  return (
+                    <ShopCard
+                      key={node.perkId}
+                      title={node.name}
+                      subtitle={node.tagline || family.label}
+                      description={node.description}
+                      icon={node.icon}
+                      iconFamily={
+                        node.iconFamily === "MaterialCommunityIcons"
+                          ? "MaterialCommunityIcons"
+                          : "MaterialIcons"
+                      }
+                      accent={family.bg}
+                      iconTint={family.accent}
+                      badge={family.label}
+                      cardTint={family.cardTint}
+                      familyBorder={family.border}
+                      tier={node.tier}
+                      cost={node.cost}
+                      owned={node.owned}
+                      locked={node.locked}
+                      lockReason={node.lockReason}
+                      canAfford={node.canAfford}
+                      playerChips={chips}
+                      featured
+                      onPress={() => onBuy(node.perkId)}
+                      fullWidth={cardFull}
+                    />
+                  );
+                })
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.rerollBtn,
+                  !canReroll && styles.rerollBtnDisabled,
+                  pressed && canReroll && styles.cardPressed,
+                ]}
+                onPress={canReroll ? handleReroll : undefined}
+                disabled={!canReroll}
+                accessibilityRole="button"
+                accessibilityLabel={`Reroll perk picks for ${rerollChipCost} chips`}
+              >
+                <MaterialIcons name="refresh" size={22} color={canReroll ? SHOP.chip : SHOP.muted} />
+                <View style={styles.rerollCopy}>
+                  <Text style={[styles.rerollTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Reroll picks</Text>
+                  <Text style={styles.rerollHint}>
+                    {canReroll
+                      ? "New random perks · costs chips each time"
+                      : `Need ${Math.max(0, rerollChipCost - chips)} more chips · you have ${chips}`}
+                  </Text>
+                </View>
+                <ChipCost cost={rerollChipCost} large muted={!canReroll} />
+              </Pressable>
+            </View>
+
+            <View style={styles.divider}>
+              <Text style={[styles.dividerText, { fontFamily: FONT_BEBAS_NEUE }]}>Also in shop</Text>
             </View>
 
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-                Consumables
-              </Text>
-              <Text style={styles.sectionHint}>
-                Wedge Laser — tap the square button under the wheel map, then tap a wedge
-              </Text>
+              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Tools</Text>
               <ShopCard
                 title={eraserNode.name}
-                subtitle={`Owned · ${eraserNode.owned}/${eraserNode.maxStack}`}
+                subtitle={`Owned ${eraserNode.owned}/${eraserNode.maxStack}`}
                 description={eraserNode.description}
                 icon={eraserNode.icon}
                 iconFamily="MaterialCommunityIcons"
-                accent={SHOP.chip}
+                accent={HomePalette.cyan}
+                iconTint={Neo.ink}
                 badge="TOOL"
                 cost={eraserNode.cost}
                 owned={eraserNode.owned >= eraserNode.maxStack}
                 locked={eraserNode.owned >= eraserNode.maxStack}
                 canAfford={eraserNode.canAfford}
+                playerChips={chips}
                 onPress={() => onBuyConsumable("wedge_eraser")}
                 fullWidth={cardFull}
               />
             </View>
 
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-                Chip forge
-              </Text>
-              <Text style={styles.sectionHint}>
-                Infinite upgrades — cash, %, guards, shields
-              </Text>
+              <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Chip forge</Text>
+              <Text style={styles.sectionHint}>Permanent run boosts — level up with chips</Text>
               {forgeNodes.map((node) => (
                 <ShopCard
                   key={node.forgeId}
                   title={`${node.name} · Lv ${node.level}`}
-                  subtitle={node.maxed ? "MAX" : `Next · Lv ${node.level + 1}`}
+                  subtitle={node.maxed ? "Max level" : `Next · Lv ${node.level + 1}`}
                   description={node.description}
                   icon={node.icon}
                   iconFamily={node.iconFamily}
-                  accent={SHOP.chip}
+                  accent={HomePalette.cyan}
+                  iconTint={Neo.ink}
                   badge="FORGE"
                   cost={node.cost}
                   owned={node.maxed}
                   locked={node.maxed}
                   canAfford={node.canAfford}
+                  playerChips={chips}
                   onPress={() => onBuyForge(node.forgeId)}
                   fullWidth={cardFull}
                 />
@@ -412,10 +481,8 @@ export function ShopModal({
 
             {advNodes.length > 0 ? (
               <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>
-                  Run upgrades
-                </Text>
-                <Text style={styles.sectionHint}>Add wedges & passive power — permanent this run</Text>
+                <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Run upgrades</Text>
+                <Text style={styles.sectionHint}>Extra wedges & passive power for this run</Text>
                 {advNodes.map((node: AdvNode) => (
                   <ShopCard
                     key={node.advancementId}
@@ -424,12 +491,14 @@ export function ShopModal({
                     description={node.description}
                     icon={node.icon}
                     iconFamily="MaterialIcons"
-                    accent={SHOP.advAccent}
+                    accent={SHOP.upgrade}
+                    iconTint={HomePalette.purple}
                     badge="UPGRADE"
                     cost={node.cost}
                     owned={node.owned}
                     locked={node.locked}
                     canAfford={node.canAfford}
+                    playerChips={chips}
                     onPress={() => onBuyAdvancement(node.advancementId)}
                     fullWidth={cardFull}
                   />
@@ -442,7 +511,7 @@ export function ShopModal({
                 <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Your upgrades</Text>
                 <View style={styles.ownedRow}>
                   {ownedAdv.map((a) => (
-                    <View key={a.advancementId} style={[styles.ownedChip, { borderColor: SHOP.advAccent }]}>
+                    <View key={a.advancementId} style={styles.ownedChip}>
                       <Text style={[styles.ownedName, { fontFamily: FONT_BEBAS_NEUE }]}>{a.name}</Text>
                     </View>
                   ))}
@@ -453,6 +522,7 @@ export function ShopModal({
             {owned.length > 0 ? (
               <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { fontFamily: FONT_BEBAS_NEUE }]}>Sell perks</Text>
+                <Text style={styles.sectionHint}>Refund half the chip price</Text>
                 <View style={styles.ownedRow}>
                   {owned.map((j) => (
                     <Pressable key={j.perkId} style={styles.sellChip} onPress={() => onSell(j.perkId)}>
@@ -466,14 +536,16 @@ export function ShopModal({
           </ScrollView>
 
           <View style={styles.footer}>
-            <Pressable style={styles.rerollBtn} onPress={handleReroll}>
-              <MaterialIcons name="refresh" size={20} color={SHOP.chip} />
-              <Text style={[styles.rerollText, { fontFamily: FONT_BEBAS_NEUE }]}>
-                Reroll offers · {rerollChipCost} chips
-              </Text>
-            </Pressable>
-            <Pressable style={styles.continueBtn} onPress={onClose}>
-              <Text style={[styles.continueText, { fontFamily: FONT_BEBAS_NEUE }]}>Continue spinning</Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.continueBtn,
+                homeBrutalButton(HomePalette.yellow),
+                pressed && styles.cardPressed,
+              ]}
+              onPress={onClose}
+            >
+              <Text style={[styles.continueText, { fontFamily: FONT_BEBAS_NEUE }]}>Back to wheel</Text>
+              <MaterialIcons name="arrow-forward" size={22} color={Neo.ink} />
             </Pressable>
           </View>
         </View>
@@ -485,37 +557,83 @@ export function ShopModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.72)",
+    backgroundColor: "rgba(10, 8, 16, 0.78)",
     justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: SHOP.bg,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 3,
-    borderColor: Neo.ink,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderTopWidth: T.borderBold,
+    borderLeftWidth: T.borderBold,
+    borderRightWidth: T.borderBold,
+    borderColor: SHOP.border,
     maxHeight: "92%",
   },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 10,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  headerText: {
+    flex: 1,
+    gap: 2,
+    paddingRight: 8,
+  },
+  kicker: {
+    marginBottom: 2,
   },
   title: {
-    fontSize: 32,
+    fontSize: 30,
     color: SHOP.text,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+  },
+  titleAccent: {
+    color: SHOP.perk,
   },
   subtitle: {
     fontSize: 14,
+    lineHeight: 19,
     color: SHOP.muted,
     marginTop: 2,
   },
   closeBtn: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: T.borderThin,
+    borderColor: SHOP.border,
+    backgroundColor: SHOP.panel,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chipHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: SHOP.panel,
+    borderWidth: T.borderThin,
+    borderColor: SHOP.border,
+    borderLeftWidth: 5,
+    borderLeftColor: SHOP.perk,
+    borderRadius: T.radius,
+  },
+  chipHeroValue: {
+    fontSize: 32,
+    color: SHOP.chip,
+    letterSpacing: 0.5,
+  },
+  chipHeroLabel: {
+    fontSize: 14,
+    color: SHOP.muted,
+    marginTop: 4,
   },
   statsRow: {
     flexDirection: "row",
@@ -527,20 +645,31 @@ const styles = StyleSheet.create({
   statPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     backgroundColor: SHOP.card,
-    borderWidth: 2,
-    borderColor: SHOP.cardBorder,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderWidth: T.borderThin,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  statPillMoney: {
+    borderColor: "rgba(74, 222, 128, 0.45)",
+    backgroundColor: "rgba(74, 222, 128, 0.08)",
+  },
+  statPillPerk: {
+    borderColor: "rgba(255, 235, 59, 0.45)",
+    backgroundColor: "rgba(255, 235, 59, 0.08)",
+  },
+  statPillUpgrade: {
+    borderColor: "rgba(196, 181, 253, 0.45)",
+    backgroundColor: "rgba(196, 181, 253, 0.08)",
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     color: SHOP.text,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: SHOP.muted,
   },
   scroll: {
@@ -548,48 +677,82 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 20,
+    paddingBottom: 12,
+    gap: 16,
   },
   section: {
-    gap: 10,
+    gap: 8,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 20,
     color: SHOP.text,
-    letterSpacing: 0.4,
+    letterSpacing: 0.35,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: SHOP.perk,
+    borderWidth: 1.5,
+    borderColor: SHOP.border,
   },
   sectionHint: {
     fontSize: 13,
+    lineHeight: 18,
     color: SHOP.muted,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(250,250,250,0.1)",
+    paddingTop: 4,
+  },
+  dividerText: {
+    fontSize: 12,
+    color: SHOP.muted,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
     backgroundColor: SHOP.card,
-    borderWidth: 2,
-    borderRadius: 16,
-    padding: 14,
-    minHeight: 100,
+    borderWidth: T.borderThin,
+    borderRadius: 14,
+    padding: 12,
+    minHeight: 96,
   },
   cardFull: {
     flexDirection: "column",
     alignItems: "stretch",
   },
   cardOwned: {
-    opacity: 0.55,
+    opacity: 0.5,
   },
   cardDisabled: {
-    opacity: 0.72,
+    opacity: 0.7,
   },
   cardPressed: {
-    transform: [{ scale: 0.98 }],
+    transform: [{ scale: 0.985 }],
   },
-  cardFeatured: {
-    borderWidth: 3,
-    backgroundColor: "rgba(255,233,77,0.06)",
+  familyPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Neo.ink,
+  },
+  tierPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(250,250,250,0.12)",
   },
   badgeRow: {
     flexDirection: "row",
@@ -599,84 +762,26 @@ const styles = StyleSheet.create({
   tierBadge: {
     fontSize: 10,
     color: SHOP.muted,
-    letterSpacing: 0.4,
-  },
-  statusTextSmall: {
-    fontSize: 11,
-    textAlign: "right",
-    maxWidth: 88,
+    letterSpacing: 0.3,
   },
   emptyHint: {
     fontSize: 14,
     color: SHOP.muted,
     fontStyle: "italic",
-  },
-  catalogGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 4,
-  },
-  catalogCell: {
-    width: "48%",
-    flexGrow: 1,
-    minWidth: 150,
-    maxWidth: "48%",
-  },
-  catalogTile: {
-    backgroundColor: SHOP.card,
-    borderWidth: 2,
-    borderRadius: 14,
-    padding: 10,
-    gap: 6,
-    minHeight: 128,
-  },
-  catalogTileFeatured: {
-    borderWidth: 2,
-  },
-  catalogTileOwned: {
-    opacity: 0.45,
-  },
-  catalogIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: Neo.ink,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  catalogName: {
-    fontSize: 16,
-    color: SHOP.text,
-    letterSpacing: 0.3,
-  },
-  catalogDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: SHOP.muted,
-    flex: 1,
-  },
-  catalogFooter: {
-    alignItems: "flex-start",
-  },
-  catalogStatus: {
-    fontSize: 14,
-    color: SHOP.muted,
-    letterSpacing: 0.3,
+    paddingVertical: 8,
   },
   iconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
-    borderWidth: 2,
+    width: 58,
+    height: 58,
+    borderRadius: 12,
+    borderWidth: T.borderThin,
     borderColor: Neo.ink,
     alignItems: "center",
     justifyContent: "center",
   },
   cardBody: {
     flex: 1,
-    gap: 4,
+    gap: 3,
     minWidth: 0,
   },
   cardTopRow: {
@@ -686,45 +791,113 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 18,
     color: SHOP.text,
     flex: 1,
   },
   badge: {
-    fontSize: 11,
-    letterSpacing: 0.6,
+    fontSize: 10,
+    letterSpacing: 0.5,
   },
   cardSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: SHOP.chip,
     fontWeight: "600",
   },
   cardDesc: {
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 17,
     color: SHOP.muted,
   },
   cardFooter: {
     alignItems: "flex-end",
     justifyContent: "center",
-    minWidth: 72,
+    minWidth: 76,
+  },
+  priceFooterCol: {
+    alignItems: "flex-end",
+    gap: 4,
+    maxWidth: 96,
+  },
+  pricePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(34, 211, 238, 0.12)",
+    borderWidth: 1.5,
+    borderColor: "rgba(34, 211, 238, 0.45)",
+  },
+  pricePillShort: {
+    backgroundColor: "rgba(251, 113, 133, 0.1)",
+    borderColor: "rgba(251, 113, 133, 0.35)",
+  },
+  shortfallText: {
+    fontSize: 11,
+    color: SHOP.danger,
+    letterSpacing: 0.25,
+    textAlign: "right",
+  },
+  lockHintText: {
+    fontSize: 10,
+    lineHeight: 13,
+    color: SHOP.muted,
+    textAlign: "right",
   },
   statusText: {
-    fontSize: 14,
-    color: SHOP.muted,
-    letterSpacing: 0.3,
+    fontSize: 13,
+    color: SHOP.money,
+    letterSpacing: 0.2,
+    textAlign: "right",
+  },
+  statusTextOwned: {
+    color: SHOP.money,
+  },
+  chipCostTextMuted: {
+    opacity: 0.85,
   },
   chipCostRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
   chipCostText: {
-    fontSize: 18,
+    fontSize: 16,
     color: SHOP.chip,
   },
   chipCostTextLg: {
-    fontSize: 22,
+    fontSize: 20,
+  },
+  rerollBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: T.borderThin,
+    borderColor: SHOP.chip,
+    backgroundColor: "rgba(34, 211, 238, 0.08)",
+  },
+  rerollBtnDisabled: {
+    borderColor: "rgba(250,250,250,0.12)",
+    backgroundColor: SHOP.card,
+    opacity: 0.75,
+  },
+  rerollCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  rerollTitle: {
+    fontSize: 17,
+    color: SHOP.text,
+    letterSpacing: 0.3,
+  },
+  rerollHint: {
+    fontSize: 12,
+    color: SHOP.muted,
   },
   ownedRow: {
     flexDirection: "row",
@@ -732,15 +905,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   ownedChip: {
-    borderWidth: 2,
+    borderWidth: T.borderThin,
+    borderColor: HomePalette.purple,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(196, 181, 253, 0.12)",
   },
   sellChip: {
-    borderWidth: 2,
-    borderColor: SHOP.cardBorder,
+    borderWidth: T.borderThin,
+    borderColor: "rgba(250,250,250,0.14)",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -753,38 +927,21 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: 16,
-    gap: 10,
     borderTopWidth: 1,
-    borderTopColor: SHOP.cardBorder,
+    borderTopColor: "rgba(250,250,250,0.1)",
   },
-  rerollBtn: {
+  continueBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: SHOP.cardBorder,
-    backgroundColor: SHOP.card,
-  },
-  rerollText: {
-    fontSize: 16,
-    color: SHOP.chip,
-  },
-  continueBtn: {
+    gap: 10,
     paddingVertical: 16,
-    alignItems: "center",
-    backgroundColor: Neo.neonYellow,
-    borderWidth: 3,
-    borderColor: Neo.ink,
-    borderRadius: 12,
   },
   continueText: {
     fontSize: 18,
     color: Neo.ink,
-    letterSpacing: 0.3,
+    letterSpacing: 0.35,
   },
 });

@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet } from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeIn, SlideInRight } from "react-native-reanimated";
+import { FONT_BEBAS_NEUE } from "../../../theme/fonts";
 import { Neo } from "../../../theme/neoBrutal";
 import { PrizeGlyph } from "../../../lib/ui/PrizeGlyph";
 import type { IconFamily } from "../../schemas";
 
-const SLOT = 44;
+const DEFAULT_SLOT = 44;
 
 export type LoadoutChipVariant = "good" | "bad";
 
@@ -29,9 +30,16 @@ const VARIANT_STYLE: Record<
 type PerkIconChipProps = {
   icon: string;
   iconFamily: IconFamily;
+  /** Chip outer size — defaults to phone loadout slot. */
+  size?: number;
   /** Green perk vs red curse styling */
   variant?: LoadoutChipVariant;
+  /** Perk family colors — overrides default green when set */
+  familyTint?: string;
+  familyIconColor?: string;
+  familyHighlight?: string;
   tier?: number;
+  stackCount?: number;
   selected?: boolean;
   highlighted?: boolean;
   animateEnter?: boolean;
@@ -42,8 +50,13 @@ type PerkIconChipProps = {
 export function PerkIconChip({
   icon,
   iconFamily,
+  size = DEFAULT_SLOT,
   variant = "good",
+  familyTint,
+  familyIconColor,
+  familyHighlight,
   tier: _tier = 0,
+  stackCount = 1,
   selected,
   highlighted,
   animateEnter = false,
@@ -51,34 +64,68 @@ export function PerkIconChip({
   accessibilityLabel = "View effect",
 }: PerkIconChipProps) {
   const palette = VARIANT_STYLE[variant];
+  const tint = familyTint ?? palette.tint;
+  const iconColor = familyIconColor ?? palette.iconColor;
+  const highlightBorder = familyHighlight ?? palette.highlightBorder;
   const showAccent = selected || highlighted;
+  const showBadge = stackCount > 1;
+  const badgeSize = Math.max(16, Math.round(size * 0.4));
+  const badgeFontSize = Math.max(10, Math.round(size * 0.24));
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [styles.slot, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.slot, { width: size, height: size }, pressed && styles.pressed]}
     >
       <Animated.View
         entering={
           animateEnter
-            ? ZoomIn.springify().damping(16).stiffness(240).duration(280)
+            ? SlideInRight.springify().damping(18).stiffness(280).duration(220)
             : FadeIn.duration(100)
         }
         style={[
           styles.glyphWrap,
-          { borderColor: showAccent ? palette.highlightBorder : "transparent", backgroundColor: showAccent ? palette.highlightBg : "transparent" },
+          {
+            width: size,
+            height: size,
+            borderRadius: Math.round(size * 0.27),
+            borderColor: showAccent ? highlightBorder : "transparent",
+            backgroundColor: showAccent ? palette.highlightBg : "transparent",
+          },
         ]}
       >
         <PrizeGlyph
           icon={icon}
           iconFamily={iconFamily}
           size="sm"
-          tint={palette.tint}
+          tint={tint}
           tone={variant === "bad" ? "curse" : "perk"}
-          iconColor={palette.iconColor}
+          iconColor={iconColor}
         />
+        {showBadge ? (
+          <View
+            style={[
+              styles.badge,
+              variant === "bad" ? styles.badgeBad : styles.badgeGood,
+              {
+                minWidth: badgeSize,
+                height: badgeSize,
+                borderRadius: badgeSize / 2,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.badgeText,
+                { fontFamily: FONT_BEBAS_NEUE, fontSize: badgeFontSize, lineHeight: badgeFontSize + 2 },
+              ]}
+            >
+              {stackCount}
+            </Text>
+          </View>
+        ) : null}
       </Animated.View>
     </Pressable>
   );
@@ -86,22 +133,38 @@ export function PerkIconChip({
 
 const styles = StyleSheet.create({
   slot: {
-    width: SLOT,
-    height: SLOT,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
+    overflow: "visible",
   },
   glyphWrap: {
-    width: SLOT,
-    height: SLOT,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
     borderWidth: 2,
+    overflow: "visible",
   },
   pressed: {
     opacity: 0.9,
     transform: [{ scale: 0.96 }],
+  },
+  badge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: Neo.ink,
+  },
+  badgeGood: {
+    backgroundColor: Neo.neonYellow,
+  },
+  badgeBad: {
+    backgroundColor: "#FCA5A5",
+  },
+  badgeText: {
+    color: Neo.ink,
+    letterSpacing: 0.2,
   },
 });

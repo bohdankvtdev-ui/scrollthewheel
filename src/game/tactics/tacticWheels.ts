@@ -24,10 +24,19 @@ function mulberry32(seed: number) {
   };
 }
 
+/** Cycle 1 wheels 1–2: no tactic prompts (player lacks chips early). */
+export function isTacticWheelEligible(run: RunState, wheelIndex: number): boolean {
+  if (run.floor === 1 && wheelIndex < 2) return false;
+  return isTacticDecisionWheel(run, wheelIndex);
+}
+
 /** Pick exactly `TACTIC_WHEELS_PER_CYCLE` distinct wheel indices for this cycle. */
 export function rollTacticWheelIndices(runId: string, floor: number): number[] {
   const rng = mulberry32(hashSeed(runId, floor));
-  const pool = Array.from({ length: WHEEL_COUNT }, (_, i) => i);
+  let pool = Array.from({ length: WHEEL_COUNT }, (_, i) => i);
+  if (floor === 1) {
+    pool = pool.filter((i) => i >= 2);
+  }
   const picked: number[] = [];
   while (picked.length < TACTIC_WHEELS_PER_CYCLE && pool.length > 0) {
     const i = Math.floor(rng() * pool.length);

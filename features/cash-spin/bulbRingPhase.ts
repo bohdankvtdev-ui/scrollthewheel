@@ -1,4 +1,4 @@
 /**
- * Bulb ring visual mode — drives colors, chase, and victory flash (controllable from stage).
+ * Bulb ring visual mode — drives colors, chase, and result flash (controllable from stage).
  */
-export type BulbRingPhase = "idle" | "spinning" | "victory";
+export type BulbRingPhase = "idle" | "spinning" | "victory" | "jackpot" | "damage";

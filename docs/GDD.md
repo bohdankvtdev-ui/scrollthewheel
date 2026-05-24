@@ -84,17 +84,19 @@ Mode is **infinite cycles** until you lose. No hard blind gate to advance.
 
 | # | Wheel | Purpose |
 |---|--------|---------|
-| 1 | **Money** | Warm-up economy — flat cash only |
-| 2 | **Percent** | % cuts, wipe, double bank |
-| 3 | **Risk** | Big swings, curses, cash losses |
+| 1 | **Money** | Warm-up — mostly +$ with a small early downside wedge |
+| 2 | **Percent** | Balanced ±% of bank (double bank from cycle 5+) |
+| 3 | **Risk** | 50/50 good vs bad — swings, curses, ±% |
 | 4 | **Perk** | Build engine — perk offers |
-| 5 | **Drain** | Punishment — losses, Debt Bomb, Lock |
+| 5 | **Drain** | **Mini-boss** — heavy −% bank, traps, debuffs (surviving raises boss stakes) |
 | 6 | **Lucky** | Jackpots and streak perks |
 | 7 | **Builder** | Chip row add/remove/upgrade |
 | 8 | **Chaos** | Pre-boss stress — wipe, corruption, gamble |
 | 9 | **Boss** | Gate — mega rewards, Doom Spiral, relic |
 
-**Cycle scaling:** Cycle 2+ adds negative bias, shop price increases, cycle 3+ swaps some wheels to risk, cycle 4+ double-boss pressure on wheel 9.
+**Cycle scaling:** Cycle 2+ adds negative bias and faster loss growth than gains; shop chip income is tighter early (see `chipGrants.ts`). Cycle 3+ pool scout advances hard slices; cycle 4+ late spikes and boss wipe pressure.
+
+**Economy tuning:** `cycleEconomy.ts` (flat $ / % compounding), `chipGrants.ts` (shop chips), `cycleEvSim.ts` (balance Monte Carlo).
 
 **Edit wheels:** `src/game/wheels/database/wheelDatabase.ts` + `prizeCatalog.ts`. Run `npm run validate:wheels`.
 
@@ -512,13 +514,4 @@ Design **SpinWheel**: a mobile **money roguelike**. No fantasy RPG stats, no spe
 
 When proposing changes, list: pool edits, perk IDs, numeric changes in `gdd.ts`, shop tree diffs.
 
----
-
-## Changelog
-
-| Date | Notes |
-|------|--------|
-| 2026-05 | Expanded: detailed loop, data architecture, run state, design playbook |
-| 2026-05 | UI: removed stakes banner + perk toasts (layout stability) |
-| 2026-05 | Rewrote for readability: 60s summary, glossary, player-first structure |
-| 2026-05 | Initial GDD + icon registry |
+ 
